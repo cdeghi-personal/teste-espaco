@@ -1,0 +1,38 @@
+export const MOCK_THERAPISTS = [
+  {
+    id: 'u1',
+    name: 'Dra. Ana Lima',
+    email: 'ana@casaamarela.com.br',
+    phone: '(11) 91111-1111',
+    specialty: 'PSICOLOGIA',
+    credential: 'CRP 06/12345',
+    active: true,
+  },
+  {
+    id: 'u2',
+    name: 'Dr. Carlos Mendes',
+    email: 'carlos@casaamarela.com.br',
+    phone: '(11) 92222-2222',
+    specialty: 'FISIOTERAPIA',
+    credential: 'CREFITO 3/12345-F',
+    active: true,
+  },
+  {
+    id: 'u3',
+    name: 'Dra. Beatriz Santos',
+    email: 'beatriz@casaamarela.com.br',
+    phone: '(11) 93333-3333',
+    specialty: 'FONOAUDIOLOGIA',
+    credential: 'CRFa 2/12345',
+    active: true,
+  },
+  {
+    id: 'u4',
+    name: 'Dra. Mariana Costa',
+    email: 'mariana@casaamarela.com.br',
+    phone: '(11) 94444-4444',
+    specialty: 'TO',
+    credential: 'CREFITO 3/67890-TO',
+    active: true,
+  },
+]

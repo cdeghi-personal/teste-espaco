@@ -1,0 +1,16 @@
+export const MOCK_DIAGNOSES = [
+  { id: 'diag1', name: 'TEA (Transtorno do Espectro Autista)', active: true },
+  { id: 'diag2', name: 'TDAH (Transtorno do Déficit de Atenção)', active: true },
+  { id: 'diag3', name: 'Síndrome de Down', active: true },
+  { id: 'diag4', name: 'Paralisia Cerebral', active: true },
+  { id: 'diag5', name: 'Atraso no Desenvolvimento Neuropsicomotor', active: true },
+  { id: 'diag6', name: 'Dislexia', active: true },
+  { id: 'diag7', name: 'Discalculia', active: true },
+  { id: 'diag8', name: 'Transtorno de Ansiedade Infantil', active: true },
+  { id: 'diag9', name: 'Síndrome de Williams', active: true },
+  { id: 'diag10', name: 'Síndrome de Angelman', active: true },
+  { id: 'diag11', name: 'Disfluência (Gagueira)', active: true },
+  { id: 'diag12', name: 'Desvio Fonológico', active: true },
+  { id: 'diag13', name: 'Miopatia', active: true },
+  { id: 'diag14', name: 'Outros', active: true },
+]
