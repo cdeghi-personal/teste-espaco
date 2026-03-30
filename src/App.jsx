@@ -38,6 +38,7 @@ import RoomsPage from './pages/admin/rooms/RoomsPage'
 // Common
 import ScrollToTop from './components/common/ScrollToTop'
 import { useAuth } from './context/AuthContext'
+import { ToastProvider } from './components/ui/Toast'
 
 // Redireciona para reset de senha quando o link de convite/recuperação é clicado
 function AuthRedirect() {
@@ -51,6 +52,7 @@ export default function App() {
     <BrowserRouter>
       <ScrollToTop />
       <AuthProvider>
+        <ToastProvider>
         <AuthRedirect />
         <DataProvider>
           <Routes>
@@ -89,6 +91,7 @@ export default function App() {
             <Route path="*" element={<Navigate to={ROUTES.HOME} replace />} />
           </Routes>
         </DataProvider>
+        </ToastProvider>
       </AuthProvider>
     </BrowserRouter>
   )

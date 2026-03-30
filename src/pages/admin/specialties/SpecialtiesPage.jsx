@@ -53,7 +53,8 @@ export default function SpecialtiesPage() {
                     <FiLayers size={14} className="text-gray-500" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="font-medium text-sm text-gray-900">{s.name}</div>
+                    <div className="font-medium text-sm text-gray-900">{s.label}</div>
+                    <div className="text-xs text-gray-400">{s.key}</div>
                   </div>
                   <span className={`shrink-0 px-2 py-0.5 rounded-full text-xs font-medium ${isInactive ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
                     {isInactive ? 'Inativa' : 'Ativa'}

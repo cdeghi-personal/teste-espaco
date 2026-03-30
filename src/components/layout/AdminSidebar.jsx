@@ -1,5 +1,6 @@
+import { useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
-import { FiGrid, FiCalendar, FiUsers, FiUserCheck, FiClipboard, FiLogOut, FiUserPlus, FiLayers, FiCreditCard, FiActivity, FiFlag, FiHome } from 'react-icons/fi'
+import { FiGrid, FiCalendar, FiUsers, FiUserCheck, FiClipboard, FiLogOut, FiUserPlus, FiLayers, FiCreditCard, FiActivity, FiFlag, FiHome, FiChevronDown, FiChevronUp } from 'react-icons/fi'
 import { ROUTES } from '../../constants/routes'
 import { useAuth } from '../../context/AuthContext'
 import { SPECIALTIES } from '../../constants/specialties'
@@ -44,6 +45,7 @@ function NavItem({ to, icon: Icon, label, end, onClick }) {
 export default function AdminSidebar({ open, onClose }) {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
+  const [adminExpanded, setAdminExpanded] = useState(false)
 
   function handleLogout() {
     logout()
@@ -61,30 +63,47 @@ export default function AdminSidebar({ open, onClose }) {
       ${open ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
     `}>
       {/* Logo */}
-      <div className="px-4 py-3 border-b border-gray-100">
+      <div className="px-4 py-3 border-b border-gray-100 shrink-0">
         <NavLink to="/" className="flex items-center" onClick={onClose}>
           <img src="/logo.jpg" alt="Casa Amarela" className="h-10 w-auto" />
         </NavLink>
       </div>
 
-      {/* Nav */}
-      <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto scrollbar-thin">
+      {/* Nav — scrollável apenas no desktop; no mobile é fixo para caber tudo */}
+      <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto md:overflow-y-auto">
         {mainNavItems.map(item => <NavItem key={item.to} {...item} onClick={onClose} />)}
 
         {isAdmin && (
           <>
+            {/* Header da seção Admin — clicável para expandir/colapsar */}
             <div className="px-3 pt-4 pb-1">
-              <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Administração</span>
+              <button
+                onClick={() => setAdminExpanded(v => !v)}
+                className="w-full flex items-center justify-between group"
+              >
+                <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider group-hover:text-gray-600 transition-colors">
+                  Administração
+                </span>
+                {adminExpanded
+                  ? <FiChevronUp size={13} className="text-gray-400 group-hover:text-gray-600 transition-colors" />
+                  : <FiChevronDown size={13} className="text-gray-400 group-hover:text-gray-600 transition-colors" />
+                }
+              </button>
             </div>
-            {adminNavItems.map(item => <NavItem key={item.to} {...item} onClick={onClose} />)}
+
+            {adminExpanded && (
+              <div className="space-y-1">
+                {adminNavItems.map(item => <NavItem key={item.to} {...item} onClick={onClose} />)}
+              </div>
+            )}
           </>
         )}
       </nav>
 
-      {/* User Info + Logout */}
-      <div className="px-3 py-4 border-t border-gray-100">
-        <div className="flex items-center gap-3 px-3 py-2 mb-2">
-          <div className="w-9 h-9 rounded-full bg-brand-yellow flex items-center justify-center text-brand-blue font-bold text-sm shrink-0">
+      {/* User Info + Logout — sempre visível */}
+      <div className="px-3 py-3 border-t border-gray-100 shrink-0">
+        <div className="flex items-center gap-3 px-3 py-2 mb-1">
+          <div className="w-8 h-8 rounded-full bg-brand-yellow flex items-center justify-center text-brand-blue font-bold text-sm shrink-0">
             {user?.name?.charAt(0) || 'U'}
           </div>
           <div className="min-w-0">

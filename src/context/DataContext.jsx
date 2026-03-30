@@ -5,6 +5,14 @@ import {
   mapSpecialty, mapPaymentMethod, mapDiagnosis, mapPatientStatus, mapRoom,
   syncPatientRelations, syncGuardianPatients,
 } from '../lib/supabase'
+import { useToast } from '../components/ui/Toast'
+
+function dbError(error, toast) {
+  const msg = error?.message || 'Erro ao salvar. Tente novamente.'
+  console.error('[DataContext]', error)
+  if (toast) toast.show(msg)
+  return { error: msg }
+}
 
 const DataContext = createContext(null)
 
@@ -33,6 +41,7 @@ const CONSULTATION_SELECT = `
 // ─── Provider ─────────────────────────────────────────────────────────────────
 
 export function DataProvider({ children }) {
+  const toast = useToast()
   const [patients, setPatients] = useState([])
   const [guardians, setGuardians] = useState([])
   const [appointments, setAppointments] = useState([])
@@ -97,7 +106,7 @@ export function DataProvider({ children }) {
       .select(PATIENT_SELECT)
       .single()
 
-    if (error) { console.error(error); return }
+    if (error) return dbError(error, toast)
 
     await syncPatientRelations(inserted.id, {
       specialties: data.specialties || [],
@@ -175,7 +184,7 @@ export function DataProvider({ children }) {
       .select()
       .single()
 
-    if (error) { console.error(error); return }
+    if (error) return dbError(error, toast)
 
     await syncGuardianPatients(inserted.id, data.patientIds || [])
 
@@ -246,7 +255,7 @@ export function DataProvider({ children }) {
       .select()
       .single()
 
-    if (error) { console.error(error); return }
+    if (error) return dbError(error, toast)
     const newAppt = mapAppointment(inserted)
     setAppointments(prev => [...prev, newAppt])
     return newAppt
@@ -296,7 +305,7 @@ export function DataProvider({ children }) {
       .select()
       .single()
 
-    if (error) { console.error(error); return }
+    if (error) return dbError(error, toast)
 
     let mappedActivities = []
     if (activities?.length) {
@@ -384,7 +393,7 @@ export function DataProvider({ children }) {
       .select()
       .single()
 
-    if (error) { console.error(error); return }
+    if (error) return dbError(error, toast)
     const newTherapist = mapTherapist(inserted)
     setTherapists(prev => [...prev, newTherapist])
     return newTherapist
@@ -420,7 +429,7 @@ export function DataProvider({ children }) {
       .from('specialties')
       .insert({ key: data.key, label: data.label, active: true })
       .select().single()
-    if (error) { console.error(error); return }
+    if (error) return dbError(error, toast)
     const item = mapSpecialty(inserted)
     setSpecialtiesData(prev => [...prev, item])
     return item
@@ -442,7 +451,7 @@ export function DataProvider({ children }) {
       .from('payment_methods')
       .insert({ name: data.name, active: true })
       .select().single()
-    if (error) { console.error(error); return }
+    if (error) return dbError(error, toast)
     const item = mapPaymentMethod(inserted)
     setPaymentMethods(prev => [...prev, item])
     return item
@@ -463,7 +472,7 @@ export function DataProvider({ children }) {
       .from('diagnoses')
       .insert({ name: data.name, active: true })
       .select().single()
-    if (error) { console.error(error); return }
+    if (error) return dbError(error, toast)
     const item = mapDiagnosis(inserted)
     setDiagnoses(prev => [...prev, item])
     return item
@@ -484,7 +493,7 @@ export function DataProvider({ children }) {
       .from('patient_statuses')
       .insert({ name: data.name, color: data.color || 'bg-gray-100 text-gray-700', active: true })
       .select().single()
-    if (error) { console.error(error); return }
+    if (error) return dbError(error, toast)
     const item = mapPatientStatus(inserted)
     setPatientStatuses(prev => [...prev, item])
     return item
@@ -506,7 +515,7 @@ export function DataProvider({ children }) {
       .from('rooms')
       .insert({ name: data.name, description: data.description || null, active: true })
       .select().single()
-    if (error) { console.error(error); return }
+    if (error) return dbError(error, toast)
     const item = mapRoom(inserted)
     setRooms(prev => [...prev, item])
     return item
