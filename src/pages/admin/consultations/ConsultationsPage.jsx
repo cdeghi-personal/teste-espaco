@@ -46,20 +46,22 @@ export default function ConsultationsPage() {
   const outcomeLabels = { achieved: 'Alcançado', partial: 'Parcial', not_achieved: 'Não alcançado' }
 
   return (
-    <div className="p-4 md:p-6 space-y-4">
-      <div className="flex items-center justify-between">
+    <div className="p-3 md:p-6 space-y-4">
+      <div className="flex items-center justify-between gap-2">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Registros de Consulta</h1>
-          <p className="text-sm text-gray-500 mt-0.5">{consultations.length} registro(s)</p>
+          <h1 className="text-xl md:text-2xl font-bold text-gray-900">Consultas</h1>
+          <p className="text-xs text-gray-500 mt-0.5">{filtered.length} registro(s)</p>
         </div>
         <Button variant="primary" onClick={() => { setEditConsultation(null); setShowModal(true) }}>
-          <FiPlus size={16} /> Novo Registro
+          <FiPlus size={16} />
+          <span className="hidden sm:inline">Novo Registro</span>
+          <span className="sm:hidden">Novo</span>
         </Button>
       </div>
 
-      <div className="flex flex-wrap gap-3">
-        <div className="relative flex-1 min-w-[200px]">
-          <FiSearch size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+      <div className="flex flex-col sm:flex-row gap-2">
+        <div className="relative flex-1">
+          <FiSearch size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
             value={search}
             onChange={e => setSearch(e.target.value)}
@@ -72,7 +74,7 @@ export default function ConsultationsPage() {
           onChange={e => setFilterSpecialty(e.target.value)}
           className="px-3 py-2 text-sm border border-gray-200 rounded-xl bg-white focus:ring-2 focus:ring-brand-blue outline-none"
         >
-          <option value="">Todas as especialidades</option>
+          <option value="">Especialidade</option>
           {SPECIALTY_LIST.map(k => <option key={k} value={k}>{SPECIALTIES[k].label}</option>)}
         </select>
       </div>

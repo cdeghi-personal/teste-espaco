@@ -11,7 +11,6 @@ export default function DashboardPage() {
   const today = isoToday()
   const isAdmin = user?.role === 'admin'
 
-  // Role-based visibility
   const visiblePatients = isAdmin
     ? patients.filter(p => !p.deleted)
     : patients.filter(p => !p.deleted && (
@@ -62,11 +61,11 @@ export default function DashboardPage() {
   const greeting = hour < 12 ? 'Bom dia' : hour < 18 ? 'Boa tarde' : 'Boa noite'
 
   return (
-    <div className="p-4 md:p-6 space-y-6">
+    <div className="p-3 md:p-6 space-y-4 md:space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">{greeting}, {user?.name?.split(' ')[0]}! 👋</h1>
-        <p className="text-gray-500 text-sm mt-1">
+        <h1 className="text-xl md:text-2xl font-bold text-gray-900">{greeting}, {user?.name?.split(' ')[0]}! 👋</h1>
+        <p className="text-gray-500 text-xs md:text-sm mt-1">
           {now.toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
         </p>
         {!isAdmin && (
@@ -77,44 +76,43 @@ export default function DashboardPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 md:gap-4">
         {stats.map(({ icon: Icon, label, value, color, bg }) => (
-          <div key={label} className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
-            <div className={`w-10 h-10 ${bg} rounded-xl flex items-center justify-center mb-3`}>
-              <Icon size={20} className={color} />
+          <div key={label} className="bg-white rounded-2xl p-3 md:p-5 border border-gray-100 shadow-sm">
+            <div className={`w-8 h-8 md:w-10 md:h-10 ${bg} rounded-xl flex items-center justify-center mb-2 md:mb-3`}>
+              <Icon size={16} className={color} />
             </div>
-            <div className="text-2xl font-bold text-gray-900">{value}</div>
-            <div className="text-xs text-gray-500 mt-0.5">{label}</div>
+            <div className="text-xl md:text-2xl font-bold text-gray-900">{value}</div>
+            <div className="text-xs text-gray-500 mt-0.5 leading-tight">{label}</div>
           </div>
         ))}
       </div>
 
       {/* Upcoming appointments */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-          <h2 className="font-semibold text-gray-900">Próximas Consultas</h2>
-          <span className="text-xs text-gray-500">{upcomingAppts.length} agendamento(s)</span>
+        <div className="px-3 md:px-6 py-3 md:py-4 border-b border-gray-100 flex items-center justify-between">
+          <h2 className="font-semibold text-gray-900 text-sm md:text-base">Próximas Consultas</h2>
+          <span className="text-xs text-gray-500">{upcomingAppts.length}</span>
         </div>
         {upcomingAppts.length === 0 ? (
-          <div className="px-6 py-10 text-center text-gray-400 text-sm">Nenhuma consulta agendada</div>
+          <div className="px-4 py-8 text-center text-gray-400 text-sm">Nenhuma consulta agendada</div>
         ) : (
           <div className="divide-y divide-gray-50">
             {upcomingAppts.map((appt) => {
               const patient = getPatient(appt.patientId)
               const therapist = getTherapist(appt.therapistId)
               return (
-                <div key={appt.id} className="px-6 py-4 flex items-center gap-4 hover:bg-gray-50/50 transition-colors">
-                  <div className="min-w-[80px] text-center">
+                <div key={appt.id} className="px-3 md:px-6 py-3 md:py-4 flex items-center gap-2 md:gap-4 hover:bg-gray-50/50 transition-colors">
+                  <div className="min-w-[60px] md:min-w-[80px] text-center shrink-0">
                     <div className="text-xs text-gray-500">{formatDateShort(appt.date)}</div>
                     <div className="font-semibold text-gray-900 text-sm">{appt.startTime}</div>
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="font-medium text-gray-900 text-sm truncate">{patient?.fullName || '—'}</div>
-                    <div className="text-xs text-gray-500 truncate">{therapist?.name} • {appt.room}</div>
+                    <div className="text-xs text-gray-500 truncate">{therapist?.name}</div>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="shrink-0">
                     <Badge specialty={appt.specialty} />
-                    <Badge status={appt.status} />
                   </div>
                 </div>
               )
@@ -124,12 +122,12 @@ export default function DashboardPage() {
       </div>
 
       {/* Specialty breakdown */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 md:gap-4">
         {Object.entries(SPECIALTIES).map(([key, spec]) => {
           const count = visiblePatients.filter(p => p.specialties?.includes(key) && p.status === 'active').length
           return (
-            <div key={key} className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
-              <div className={`inline-flex px-2 py-1 rounded-lg text-xs font-medium mb-3 ${spec.color}`}>
+            <div key={key} className="bg-white rounded-2xl p-3 md:p-5 border border-gray-100 shadow-sm">
+              <div className={`inline-flex px-2 py-1 rounded-lg text-xs font-medium mb-2 md:mb-3 ${spec.color}`}>
                 {spec.label}
               </div>
               <div className="text-xl font-bold text-gray-900">{count}</div>

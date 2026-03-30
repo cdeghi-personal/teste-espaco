@@ -45,7 +45,7 @@ export default function PatientDetailPage() {
     .sort((a, b) => b.date.localeCompare(a.date))
 
   return (
-    <div className="p-4 md:p-6 space-y-6">
+    <div className="p-3 md:p-6 space-y-6">
       {/* Header */}
       <div className="flex items-start gap-4">
         <button onClick={() => navigate('/admin/pacientes')} className="mt-1 p-2 rounded-xl hover:bg-gray-100 text-gray-500">
@@ -57,7 +57,7 @@ export default function PatientDetailPage() {
               {patient.fullName?.charAt(0)}
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">{patient.fullName}</h1>
+              <h1 className="text-lg md:text-2xl font-bold text-gray-900">{patient.fullName}</h1>
               <div className="flex items-center gap-2 mt-1 flex-wrap">
                 <span className="text-sm text-gray-500">{calculateAge(patient.dateOfBirth)}</span>
                 <span className="text-gray-300">•</span>

@@ -12,7 +12,6 @@ export default function GuardiansPage() {
   const [showModal, setShowModal] = useState(false)
   const [editGuardian, setEditGuardian] = useState(null)
 
-  // Source of truth: guardian.patientIds
   function getLinkedPatients(guardian) {
     const ids = guardian.patientIds || []
     return patients.filter(p => !p.deleted && ids.includes(p.id))
@@ -28,42 +27,34 @@ export default function GuardiansPage() {
   })
 
   function handleDelete(id, name) {
-    if (confirm(`Desativar o responsável "${name}"? Você poderá restaurá-lo depois.`)) {
-      deleteGuardian(id)
-    }
-  }
-
-  function handleRestore(id) {
-    restoreGuardian(id)
+    if (confirm(`Desativar "${name}"?`)) deleteGuardian(id)
   }
 
   return (
-    <div className="p-4 md:p-6 space-y-4">
-      <div className="flex items-center justify-between flex-wrap gap-3">
+    <div className="p-3 md:p-6 space-y-4">
+      <div className="flex items-center justify-between gap-2">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Responsáveis</h1>
-          <p className="text-sm text-gray-500 mt-0.5">{filtered.length} exibido(s)</p>
+          <h1 className="text-xl md:text-2xl font-bold text-gray-900">Responsáveis</h1>
+          <p className="text-xs text-gray-500 mt-0.5">{filtered.length} exibido(s)</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           <button
             onClick={() => setShowInactive(v => !v)}
-            className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium border transition-all ${
-              showInactive
-                ? 'bg-red-50 text-red-700 border-red-200'
-                : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
-            }`}
+            className={`p-2 rounded-xl border transition-all ${showInactive ? 'bg-red-50 text-red-700 border-red-200' : 'bg-white text-gray-500 border-gray-200'}`}
+            title={showInactive ? 'Ver Ativos' : 'Ver Inativos'}
           >
-            <FiEyeOff size={15} />
-            {showInactive ? 'Mostrando Inativos' : 'Ver Inativos'}
+            <FiEyeOff size={16} />
           </button>
           <Button variant="primary" onClick={() => { setEditGuardian(null); setShowModal(true) }}>
-            <FiPlus size={16} /> Novo Responsável
+            <FiPlus size={16} />
+            <span className="hidden sm:inline">Novo Responsável</span>
+            <span className="sm:hidden">Novo</span>
           </Button>
         </div>
       </div>
 
-      <div className="relative max-w-sm">
-        <FiSearch size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+      <div className="relative">
+        <FiSearch size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
         <input
           value={search}
           onChange={e => setSearch(e.target.value)}
@@ -84,114 +75,117 @@ export default function GuardiansPage() {
             )}
           />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-gray-100 bg-gray-50/50">
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Nome</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide hidden md:table-cell">Contato</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Paciente(s)</th>
-                  <th className="px-4 py-3 w-24" />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {filtered.map(g => {
-                  const linkedPatients = getLinkedPatients(g)
-                  const isInactive = g.active === false
-                  return (
-                    <tr key={g.id} className={`hover:bg-gray-50/50 transition-colors ${isInactive ? 'opacity-60' : ''}`}>
-                      {/* Nome */}
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-3">
-                          <div className={`w-9 h-9 rounded-full flex items-center justify-center font-semibold text-sm shrink-0 ${
-                            isInactive ? 'bg-gray-100 text-gray-400' : 'bg-purple-100 text-purple-700'
-                          }`}>
-                            {g.fullName?.charAt(0)}
-                          </div>
-                          <div>
-                            <div className="font-medium text-gray-900 text-sm">{g.fullName}</div>
-                            <div className="text-xs text-gray-400">{g.relationship} {isInactive && '• Inativo'}</div>
-                          </div>
+          <>
+            {/* Mobile card list */}
+            <div className="sm:hidden divide-y divide-gray-50">
+              {filtered.map(g => {
+                const linkedPatients = getLinkedPatients(g)
+                const isInactive = g.active === false
+                return (
+                  <div key={g.id} className={`px-3 py-3 flex items-center gap-3 ${isInactive ? 'opacity-60' : ''}`}>
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold text-sm shrink-0 ${isInactive ? 'bg-gray-100 text-gray-400' : 'bg-purple-100 text-purple-700'}`}>
+                      {g.fullName?.charAt(0)}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium text-sm text-gray-900 truncate">{g.fullName}</div>
+                      <div className="text-xs text-gray-500">{g.relationship}{isInactive ? ' · Inativo' : ''}</div>
+                      {g.phone && (
+                        <div className="flex items-center gap-1 text-xs text-gray-500 mt-0.5">
+                          <FiPhone size={10} />{g.phone}
                         </div>
-                      </td>
+                      )}
+                      {linkedPatients.length > 0 && (
+                        <div className="text-xs text-gray-400 mt-0.5 truncate">
+                          {linkedPatients.map(p => p.fullName).join(', ')}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      {isInactive ? (
+                        <button onClick={() => restoreGuardian(g.id)} className="p-2 rounded-lg text-gray-400"><FiRotateCcw size={15} /></button>
+                      ) : (
+                        <>
+                          <button onClick={() => { setEditGuardian(g); setShowModal(true) }} className="p-2 rounded-lg text-gray-400"><FiEdit2 size={15} /></button>
+                          <button onClick={() => handleDelete(g.id, g.fullName)} className="p-2 rounded-lg text-gray-400"><FiTrash2 size={15} /></button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
 
-                      {/* Contato */}
-                      <td className="px-4 py-3 hidden md:table-cell">
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-1.5 text-xs text-gray-600">
-                            <FiPhone size={11} className="text-gray-400 shrink-0" />
-                            <span>{g.phone || '—'}</span>
+            {/* Desktop table */}
+            <div className="hidden sm:block overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-gray-100 bg-gray-50/50">
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Nome</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide hidden md:table-cell">Contato</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Paciente(s)</th>
+                    <th className="px-4 py-3 w-24" />
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {filtered.map(g => {
+                    const linkedPatients = getLinkedPatients(g)
+                    const isInactive = g.active === false
+                    return (
+                      <tr key={g.id} className={`hover:bg-gray-50/50 transition-colors ${isInactive ? 'opacity-60' : ''}`}>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-3">
+                            <div className={`w-9 h-9 rounded-full flex items-center justify-center font-semibold text-sm shrink-0 ${isInactive ? 'bg-gray-100 text-gray-400' : 'bg-purple-100 text-purple-700'}`}>
+                              {g.fullName?.charAt(0)}
+                            </div>
+                            <div>
+                              <div className="font-medium text-gray-900 text-sm">{g.fullName}</div>
+                              <div className="text-xs text-gray-400">{g.relationship}{isInactive && ' • Inativo'}</div>
+                            </div>
                           </div>
-                          {g.email && (
-                            <div className="flex items-center gap-1.5 text-xs text-gray-500">
-                              <FiMail size={11} className="text-gray-400 shrink-0" />
-                              <span className="truncate max-w-[180px]">{g.email}</span>
+                        </td>
+                        <td className="px-4 py-3 hidden md:table-cell">
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-1.5 text-xs text-gray-600"><FiPhone size={11} className="text-gray-400 shrink-0" /><span>{g.phone || '—'}</span></div>
+                            {g.email && <div className="flex items-center gap-1.5 text-xs text-gray-500"><FiMail size={11} className="text-gray-400 shrink-0" /><span className="truncate max-w-[180px]">{g.email}</span></div>}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          {linkedPatients.length === 0 ? (
+                            <span className="text-xs text-gray-400">Nenhum</span>
+                          ) : (
+                            <div className="space-y-1">
+                              {linkedPatients.map(p => (
+                                <div key={p.id} className="flex items-center gap-1.5">
+                                  <div className="w-1.5 h-1.5 rounded-full bg-brand-yellow shrink-0" />
+                                  <span className="text-xs text-gray-700">{p.fullName}</span>
+                                </div>
+                              ))}
                             </div>
                           )}
-                        </div>
-                      </td>
-
-                      {/* Pacientes vinculados */}
-                      <td className="px-4 py-3">
-                        {linkedPatients.length === 0 ? (
-                          <span className="text-xs text-gray-400">Nenhum</span>
-                        ) : (
-                          <div className="space-y-1">
-                            {linkedPatients.map(p => (
-                              <div key={p.id} className="flex items-center gap-1.5">
-                                <div className="w-1.5 h-1.5 rounded-full bg-brand-yellow shrink-0" />
-                                <span className="text-xs text-gray-700">
-                                  {p.fullName}
-                                  <span className="text-gray-400 ml-1">({g.relationship})</span>
-                                </span>
-                              </div>
-                            ))}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-1 justify-end">
+                            {isInactive ? (
+                              <button onClick={() => restoreGuardian(g.id)} className="p-1.5 rounded-lg text-gray-400 hover:text-green-600 hover:bg-green-50 transition-colors"><FiRotateCcw size={15} /></button>
+                            ) : (
+                              <>
+                                <button onClick={() => { setEditGuardian(g); setShowModal(true) }} className="p-1.5 rounded-lg text-gray-400 hover:text-brand-blue hover:bg-blue-50 transition-colors"><FiEdit2 size={15} /></button>
+                                <button onClick={() => handleDelete(g.id, g.fullName)} className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"><FiTrash2 size={15} /></button>
+                              </>
+                            )}
                           </div>
-                        )}
-                      </td>
-
-                      {/* Ações */}
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-1 justify-end">
-                          {isInactive ? (
-                            <button
-                              onClick={() => handleRestore(g.id)}
-                              className="p-1.5 rounded-lg text-gray-400 hover:text-green-600 hover:bg-green-50 transition-colors"
-                              title="Restaurar responsável"
-                            >
-                              <FiRotateCcw size={15} />
-                            </button>
-                          ) : (
-                            <>
-                              <button
-                                onClick={() => { setEditGuardian(g); setShowModal(true) }}
-                                className="p-1.5 rounded-lg text-gray-400 hover:text-brand-blue hover:bg-blue-50 transition-colors"
-                              >
-                                <FiEdit2 size={15} />
-                              </button>
-                              <button
-                                onClick={() => handleDelete(g.id, g.fullName)}
-                                className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
-                                title="Desativar responsável"
-                              >
-                                <FiTrash2 size={15} />
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </div>
 
-      {showModal && (
-        <GuardianFormModal onClose={() => setShowModal(false)} initial={editGuardian || {}} />
-      )}
+      {showModal && <GuardianFormModal onClose={() => setShowModal(false)} initial={editGuardian || {}} />}
     </div>
   )
 }
