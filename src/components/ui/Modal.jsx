@@ -21,9 +21,9 @@ export default function Modal({ title, children, onClose, size = 'md', footer })
   }, [onClose])
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className={`relative bg-white rounded-2xl shadow-2xl w-full ${sizes[size]} flex flex-col max-h-[90vh]`}>
+      <div className={`relative bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full ${sizes[size]} flex flex-col max-h-[92vh]`}>
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
           <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
           <button

@@ -45,7 +45,7 @@ export default function PatientDetailPage() {
     .sort((a, b) => b.date.localeCompare(a.date))
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 md:p-6 space-y-6">
       {/* Header */}
       <div className="flex items-start gap-4">
         <button onClick={() => navigate('/admin/pacientes')} className="mt-1 p-2 rounded-xl hover:bg-gray-100 text-gray-500">

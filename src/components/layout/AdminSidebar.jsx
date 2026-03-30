@@ -21,11 +21,12 @@ const adminNavItems = [
   { to: ROUTES.ROOMS, icon: FiHome, label: 'Salas' },
 ]
 
-function NavItem({ to, icon: Icon, label, end }) {
+function NavItem({ to, icon: Icon, label, end, onClick }) {
   return (
     <NavLink
       to={to}
       end={end}
+      onClick={onClick}
       className={({ isActive }) =>
         `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
           isActive
@@ -40,7 +41,7 @@ function NavItem({ to, icon: Icon, label, end }) {
   )
 }
 
-export default function AdminSidebar() {
+export default function AdminSidebar({ open, onClose }) {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
 
@@ -53,24 +54,29 @@ export default function AdminSidebar() {
   const isAdmin = user?.role === 'admin'
 
   return (
-    <aside className="w-64 bg-white border-r border-gray-200 flex flex-col h-screen sticky top-0 shrink-0">
+    <aside className={`
+      fixed md:static inset-y-0 left-0 z-30
+      w-64 bg-white border-r border-gray-200 flex flex-col h-screen shrink-0
+      transform transition-transform duration-200 ease-in-out
+      ${open ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+    `}>
       {/* Logo */}
       <div className="px-4 py-3 border-b border-gray-100">
-        <NavLink to="/" className="flex items-center">
+        <NavLink to="/" className="flex items-center" onClick={onClose}>
           <img src="/logo.jpg" alt="Casa Amarela" className="h-10 w-auto" />
         </NavLink>
       </div>
 
       {/* Nav */}
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto scrollbar-thin">
-        {mainNavItems.map(item => <NavItem key={item.to} {...item} />)}
+        {mainNavItems.map(item => <NavItem key={item.to} {...item} onClick={onClose} />)}
 
         {isAdmin && (
           <>
             <div className="px-3 pt-4 pb-1">
               <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Administração</span>
             </div>
-            {adminNavItems.map(item => <NavItem key={item.to} {...item} />)}
+            {adminNavItems.map(item => <NavItem key={item.to} {...item} onClick={onClose} />)}
           </>
         )}
       </nav>
