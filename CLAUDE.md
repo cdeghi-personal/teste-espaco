@@ -51,7 +51,7 @@ src/
     common/
       ScrollToTop.jsx
     ui/
-      Badge.jsx, Button.jsx, Input.jsx, Select.jsx, Textarea.jsx, Modal.jsx, EmptyState.jsx, Spinner.jsx
+      Badge.jsx, Button.jsx, Input.jsx, Select.jsx, Textarea.jsx, Modal.jsx, EmptyState.jsx, Spinner.jsx, Toast.jsx
   pages/
     public/   HomePage, AboutPage, ServicesPage, TeamPage, ContactPage
     auth/     LoginPage, ResetPasswordPage
@@ -213,6 +213,35 @@ Cada especialidade tem `label`, `color` (Tailwind), `bgColor`, `textColor`, `cal
 - Datas armazenadas como string ISO `YYYY-MM-DD`; timestamps como ISO completo
 - Quando um agendamento vira consulta: `appointment.consultationId = consultation.id` e `appointment.status = 'completed'`
 - Na branch feat/supabase, o DataContext é **async** — todas as funções CRUD retornam Promise
+- Erros do Supabase são exibidos via `Toast` (notificação na parte inferior da tela, 4s)
+- Funções CRUD retornam `{ error: string }` em caso de falha, ou o objeto criado em caso de sucesso
+
+## Toast (notificações)
+
+- Componente em `src/components/ui/Toast.jsx`
+- `ToastProvider` envolve o app em `App.jsx` (dentro de `AuthProvider`)
+- Hook `useToast()` retorna `{ show(message, type) }` — type: `'error'` (padrão) ou `'success'`
+- Aparece na parte inferior centralizada, desaparece em 4s, pode ser fechado manualmente
+
+## Sidebar Admin (mobile)
+
+- Seção "Administração" é **colapsável** — começa fechada no mobile
+- Botão `▼/▲` ao lado do título "Administração" abre/fecha os itens de config
+- "Sair" sempre visível no rodapé da sidebar (fora da área rolável)
+
+## Tela de Login
+
+- Logo oficial `/logo.jpg` no topo
+- Botão "Esqueci minha senha" ao lado do label do campo senha
+- Dispara `supabase.auth.resetPasswordForEmail()` com redirect para `/reset-senha`
+- Exibe tela de confirmação após envio do e-mail
+
+## Especialidades (tabela `specialties` no banco)
+
+- Campos no banco: `key` (identificador único, ex: `MUSICOTERAPIA`) e `label` (nome exibido)
+- `SpecialtyFormModal` gera o `key` automaticamente a partir do `label` digitado
+- `key` aceita apenas letras maiúsculas, números e `_`
+- A página exibe tanto o `label` quanto o `key` em cada linha
 
 ## Deploy
 
