@@ -19,8 +19,7 @@ export default function LoginPage() {
     e.preventDefault()
     setError('')
     setLoading(true)
-    await new Promise((r) => setTimeout(r, 400))
-    const result = login(email, password)
+    const result = await login(email, password)
     setLoading(false)
     if (result.success) {
       navigate(from, { replace: true })
@@ -113,13 +112,6 @@ export default function LoginPage() {
             </button>
           </form>
 
-          <div className="mt-6 p-4 bg-gray-50 rounded-xl">
-            <p className="text-xs font-medium text-gray-500 mb-2">Credenciais de demonstração:</p>
-            <div className="space-y-1 text-xs text-gray-600">
-              <p>ana@casaamarela.com.br — casaamarela123</p>
-              <p>admin@casaamarela.com.br — admin2024</p>
-            </div>
-          </div>
         </div>
       </div>
     </div>
