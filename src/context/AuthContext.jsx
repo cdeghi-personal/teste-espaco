@@ -6,6 +6,7 @@ const AuthContext = createContext(null)
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [needsPasswordReset, setNeedsPasswordReset] = useState(false)
 
   useEffect(() => {
     // Sessão inicial
@@ -17,8 +18,14 @@ export function AuthProvider({ children }) {
       }
     })
 
-    // Mudanças de auth (login, logout, refresh de token)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    // Mudanças de auth (login, logout, convite aceito, reset de senha)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        // Link de reset de senha clicado — redireciona para tela de definição de senha
+        setNeedsPasswordReset(true)
+        setIsLoading(false)
+        return
+      }
       if (session) {
         loadUser(session.user)
       } else {
@@ -80,11 +87,12 @@ export function AuthProvider({ children }) {
   async function updatePassword(newPassword) {
     const { error } = await supabase.auth.updateUser({ password: newPassword })
     if (error) return { success: false, error: error.message }
+    setNeedsPasswordReset(false)
     return { success: true }
   }
 
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated: !!user, isLoading, login, logout, updatePassword }}>
+    <AuthContext.Provider value={{ user, isAuthenticated: !!user, isLoading, needsPasswordReset, login, logout, updatePassword }}>
       {children}
     </AuthContext.Provider>
   )

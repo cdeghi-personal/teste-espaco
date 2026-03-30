@@ -17,6 +17,7 @@ import ContactPage from './pages/public/ContactPage'
 
 // Auth
 import LoginPage from './pages/auth/LoginPage'
+import ResetPasswordPage from './pages/auth/ResetPasswordPage'
 
 // Admin Pages
 import DashboardPage from './pages/admin/DashboardPage'
@@ -36,12 +37,21 @@ import RoomsPage from './pages/admin/rooms/RoomsPage'
 
 // Common
 import ScrollToTop from './components/common/ScrollToTop'
+import { useAuth } from './context/AuthContext'
+
+// Redireciona para reset de senha quando o link de convite/recuperação é clicado
+function AuthRedirect() {
+  const { needsPasswordReset } = useAuth()
+  if (needsPasswordReset) return <Navigate to="/reset-senha" replace />
+  return null
+}
 
 export default function App() {
   return (
     <BrowserRouter>
       <ScrollToTop />
       <AuthProvider>
+        <AuthRedirect />
         <DataProvider>
           <Routes>
             {/* Public */}
@@ -55,6 +65,7 @@ export default function App() {
 
             {/* Auth */}
             <Route path={ROUTES.LOGIN} element={<LoginPage />} />
+            <Route path="/reset-senha" element={<ResetPasswordPage />} />
 
             {/* Admin (protected) */}
             <Route element={<PrivateRoute />}>
