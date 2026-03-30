@@ -10,7 +10,7 @@ export default function PublicFooter() {
           {/* Brand */}
           <div className="md:col-span-1">
             <div className="mb-4">
-              <img src="/logo.jpg" alt="Espaço Casa Amarela" className="h-16 w-auto brightness-0 invert" />
+              <img src="/logo.jpg" alt="Espaço Casa Amarela" className="h-16 w-auto rounded-md" />
             </div>
             <p className="text-blue-200 text-sm leading-relaxed">
               Clínica multidisciplinar especializada no cuidado integral de crianças com necessidades especiais.
