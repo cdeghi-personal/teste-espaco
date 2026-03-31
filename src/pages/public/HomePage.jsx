@@ -28,30 +28,62 @@ const testimonials = [
   },
 ]
 
+const reasons = [
+  {
+    icon: FiUsers,
+    title: 'Equipe interdisciplinar',
+    desc: 'Fisioterapia, fonoaudiologia, terapia ocupacional e psicologia atuando de forma integrada.',
+  },
+  {
+    icon: FiHeart,
+    title: 'Cuidado centrado na família',
+    desc: 'Acolhemos pais e responsáveis como parte fundamental do processo de desenvolvimento.',
+  },
+  {
+    icon: FiAward,
+    title: 'Atuação baseada em ciência',
+    desc: 'Utilizamos abordagens atualizadas, estruturadas e apoiadas em evidências clínicas.',
+  },
+  {
+    icon: FiCheckCircle,
+    title: 'Ambiente acolhedor e seguro',
+    desc: 'Um espaço pensado para que crianças e famílias se sintam bem, confiantes e respeitadas.',
+  },
+]
+
+const careTopics = [
+  { title: 'TEA', subtitle: 'Transtorno do Espectro Autista', className: 'bg-brand-blue text-white', subtitleClass: 'text-blue-200', titleClass: 'text-brand-yellow' },
+  { title: 'TDAH', subtitle: 'Transtorno do Déficit de Atenção', className: 'bg-brand-yellow text-brand-blue', subtitleClass: 'text-brand-blue-dark', titleClass: 'text-brand-blue' },
+  { title: 'Síndrome de Down', subtitle: 'Desenvolvimento com suporte interdisciplinar', className: 'bg-green-50 border-2 border-green-200 text-gray-800', subtitleClass: 'text-gray-500', titleClass: 'text-gray-800' },
+  { title: 'E muito mais', subtitle: 'Cada criança é acolhida em sua singularidade', className: 'bg-purple-50 border-2 border-purple-200 text-gray-800', subtitleClass: 'text-gray-500', titleClass: 'text-gray-800' },
+]
+
 export default function HomePage() {
   return (
     <div>
       {/* Hero */}
-      <section className="relative bg-gradient-to-br from-brand-blue via-brand-blue to-brand-blue-dark overflow-hidden">
-        <div className="absolute inset-0 opacity-10">
-          <div className="absolute top-10 left-10 w-64 h-64 bg-brand-yellow rounded-full blur-3xl" />
-          <div className="absolute bottom-10 right-10 w-48 h-48 bg-white rounded-full blur-3xl" />
-        </div>
-        <div className="relative max-w-6xl mx-auto px-4 sm:px-6 py-16 md:py-20">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-center">
-            {/* Text */}
+      <section className="relative overflow-hidden bg-gradient-to-br from-brand-blue via-brand-blue to-brand-blue-dark py-24 text-white">
+        <div className="absolute inset-0 opacity-10 bg-[radial-gradient(circle_at_top_right,_#facc15,_transparent_30%)]" />
+        <div className="absolute inset-0 opacity-10 bg-[radial-gradient(circle_at_bottom_left,_white,_transparent_25%)]" />
+
+        <div className="relative max-w-6xl mx-auto px-4 sm:px-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
             <div>
               <div className="inline-flex items-center gap-2 bg-brand-yellow/20 border border-brand-yellow/40 rounded-full px-4 py-1.5 text-brand-yellow text-sm font-medium mb-6">
                 <FiHeart size={14} />
-                Cuidado especializado para cada criança
+                Cuidado interdisciplinar com acolhimento e ciência
               </div>
-              <h1 className="text-4xl md:text-5xl font-bold text-white leading-tight mb-6">
-                Cada criança tem seu
-                <span className="text-brand-yellow"> ritmo único</span>
-              </h1>
-              <p className="text-lg text-blue-200 leading-relaxed mb-8">
-                No Espaço Casa Amarela, oferecemos atendimento multidisciplinar especializado para crianças com TEA, TDAH, Síndrome de Down e outras necessidades especiais, com amor e ciência.
-              </p>
+
+				<h1 className="text-3xl md:text-5xl font-bold leading-tight mb-6">
+				  Cada criança tem seu tempo.
+				  <br />
+				  <span className="text-brand-yellow">Nós respeitamos isso.</span>
+				</h1>
+
+				<p className="text-lg text-blue-100 leading-relaxed max-w-xl">
+					Desenvolvimento infantil com abordagem interdisciplinar,
+					unindo ciência, acolhimento e parceria com as famílias.
+				</p>
               <div className="flex flex-col sm:flex-row gap-4">
                 <Link
                   to={ROUTES.CONTACT}
@@ -60,6 +92,7 @@ export default function HomePage() {
                   Agendar Avaliação
                   <FiArrowRight size={18} />
                 </Link>
+
                 <Link
                   to={ROUTES.SERVICES}
                   className="inline-flex items-center justify-center gap-2 bg-white/10 border border-white/30 text-white font-medium px-8 py-3.5 rounded-xl hover:bg-white/20 transition-all text-base"
@@ -72,7 +105,7 @@ export default function HomePage() {
                 {[
                   { value: '200+', label: 'Pacientes atendidos' },
                   { value: '4', label: 'Especialidades' },
-                  { value: '5+', label: 'Anos de experiência' },
+                  { value: '5+', label: 'Anos de trajetória' },
                   { value: '98%', label: 'Famílias satisfeitas' },
                 ].map((stat) => (
                   <div key={stat.label} className="text-center">
@@ -83,12 +116,11 @@ export default function HomePage() {
               </div>
             </div>
 
-            {/* Hero Image */}
             <div className="hidden lg:flex items-center justify-center">
               <img
                 src="/hero.png"
-                alt="Crianças no Espaço Casa Amarela"
-                className="w-full max-w-lg rounded-2xl shadow-2xl object-cover"
+                alt="Casa Amarela acolhendo crianças e famílias"
+                className="w-full max-w-xl rounded-3xl shadow-2xl object-cover border border-white/10"
               />
             </div>
           </div>
@@ -99,11 +131,15 @@ export default function HomePage() {
       <section className="py-20 bg-white">
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
           <div className="text-center mb-12">
+            <p className="text-sm text-gray-400 mb-2 uppercase tracking-[0.18em]">
+              Atuação integrada
+            </p>
             <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
               Nossas <span className="text-brand-blue">Especialidades</span>
             </h2>
             <p className="text-gray-500 max-w-2xl mx-auto">
-              Uma equipe completa e integrada trabalhando juntos pelo desenvolvimento saudável da sua criança.
+              Diferentes áreas trabalhando juntas para apoiar o desenvolvimento infantil de forma completa,
+              personalizada e conectada.
             </p>
           </div>
 
@@ -112,15 +148,18 @@ export default function HomePage() {
               <Link
                 key={key}
                 to={ROUTES.SERVICES}
-                className="group p-6 rounded-2xl border-2 border-gray-100 hover:border-brand-yellow hover:shadow-xl transition-all duration-300 text-center"
+                className="group p-6 rounded-2xl border border-gray-100 bg-white shadow-sm hover:-translate-y-1 hover:shadow-xl transition-all duration-300 text-center"
               >
-                <div className="text-4xl mb-4">{specialtyIcons[key]}</div>
+                <div className="text-5xl mb-5">{specialtyIcons[key]}</div>
+
                 <div
                   className="w-1 h-10 rounded-full mx-auto mb-4 group-hover:h-14 transition-all duration-300"
                   style={{ backgroundColor: spec.calendarColor }}
                 />
+
                 <h3 className="font-bold text-gray-900 text-base mb-2">{spec.label}</h3>
                 <p className="text-sm text-gray-500 leading-relaxed">{spec.description}</p>
+
                 <div className="mt-4 text-brand-blue text-sm font-medium group-hover:gap-2 flex items-center justify-center gap-1 transition-all">
                   Saiba mais <FiArrowRight size={14} />
                 </div>
@@ -130,52 +169,94 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Por que nós */}
+      {/* Diferenciais */}
       <section className="py-20 bg-gray-50">
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
             <div>
-              <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-6">
-                Por que escolher o <span className="text-brand-blue">Espaço Casa Amarela?</span>
-              </h2>
-              <p className="text-gray-600 mb-8 leading-relaxed">
-                Acreditamos que cada criança tem um potencial único a ser descoberto. Nossa abordagem integrativa garante que todos os aspectos do desenvolvimento sejam tratados de forma harmônica e personalizada.
+              <p className="text-sm text-gray-400 mb-2 uppercase tracking-[0.18em]">
+                O jeito Casa Amarela de cuidar
               </p>
-              <div className="space-y-4">
-                {[
-                  { icon: FiUsers, title: 'Equipe Multidisciplinar', desc: 'Fisioterapeutas, fonoaudiólogos, terapeutas ocupacionais e psicólogos trabalhando juntos' },
-                  { icon: FiHeart, title: 'Centrado na Família', desc: 'Envolvemos pais e responsáveis em todas as etapas do tratamento' },
-                  { icon: FiAward, title: 'Baseado em Evidências', desc: 'Metodologias científicas atualizadas e validadas pela comunidade clínica' },
-                  { icon: FiCheckCircle, title: 'Ambiente Acolhedor', desc: 'Espaço pensado para o conforto e segurança das crianças e suas famílias' },
-                ].map(({ icon: Icon, title, desc }) => (
+
+              <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-6">
+                Por que escolher a <span className="text-brand-blue">Casa Amarela?</span>
+              </h2>
+
+              <p className="text-gray-600 mb-8 leading-relaxed">
+                Acreditamos que o desenvolvimento infantil acontece quando diferentes áreas se conectam.
+                Por isso, trabalhamos de forma integrada, olhando para cada criança de maneira completa,
+                respeitando seu tempo, sua história e seu potencial.
+              </p>
+
+              <div className="space-y-5">
+                {reasons.map(({ icon: Icon, title, desc }) => (
                   <div key={title} className="flex gap-4">
-                    <div className="w-10 h-10 rounded-xl bg-brand-yellow/20 flex items-center justify-center shrink-0">
+                    <div className="w-11 h-11 rounded-2xl bg-brand-yellow/20 flex items-center justify-center shrink-0">
                       <Icon size={18} className="text-brand-blue" />
                     </div>
                     <div>
-                      <h4 className="font-semibold text-gray-900 text-sm">{title}</h4>
-                      <p className="text-sm text-gray-500 mt-0.5">{desc}</p>
+                      <h4 className="font-semibold text-gray-900">{title}</h4>
+                      <p className="text-sm text-gray-500 mt-1">{desc}</p>
                     </div>
                   </div>
                 ))}
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="bg-brand-blue rounded-3xl p-8 text-white flex flex-col items-center justify-center text-center aspect-square">
-                <div className="text-5xl font-bold text-brand-yellow">TEA</div>
-                <div className="text-sm text-blue-200 mt-2">Transtorno do<br />Espectro Autista</div>
+
+            <div>
+              <div className="mb-5">
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                  Atuamos com crianças com:
+                </h3>
+                <p className="text-sm text-gray-500">
+                  Diferentes perfis de desenvolvimento, sempre com olhar individualizado e integrado.
+                </p>
               </div>
-              <div className="bg-brand-yellow rounded-3xl p-8 text-brand-blue flex flex-col items-center justify-center text-center aspect-square">
-                <div className="text-5xl font-bold">TDAH</div>
-                <div className="text-sm text-brand-blue-dark mt-2 font-medium">Transtorno do<br />Déficit de Atenção</div>
+
+              <div className="grid grid-cols-2 gap-4">
+                {careTopics.map((item) => (
+                  <div
+                    key={item.title}
+                    className={`rounded-3xl p-8 flex flex-col items-center justify-center text-center aspect-square shadow-sm ${item.className}`}
+                  >
+                    <div className={`text-3xl md:text-4xl font-bold ${item.titleClass}`}>
+                      {item.title}
+                    </div>
+                    <div className={`text-sm mt-3 leading-relaxed ${item.subtitleClass}`}>
+                      {item.subtitle}
+                    </div>
+                  </div>
+                ))}
               </div>
-              <div className="bg-green-50 border-2 border-green-200 rounded-3xl p-8 flex flex-col items-center justify-center text-center aspect-square">
-                <div className="text-4xl mb-2">🌟</div>
-                <div className="text-sm font-semibold text-gray-700">Síndrome de Down</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Bloco institucional */}
+      <section className="py-20 bg-white">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6">
+          <div className="bg-brand-blue rounded-3xl p-8 md:p-12 text-white overflow-hidden relative">
+            <div className="absolute inset-0 opacity-10 bg-[radial-gradient(circle_at_top_left,_#facc15,_transparent_35%)]" />
+            <div className="relative grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+              <div>
+                <span className="inline-block text-sm uppercase tracking-[0.2em] text-blue-200 mb-3">
+                  Nosso compromisso
+                </span>
+                <h3 className="text-3xl md:text-4xl font-bold leading-tight">
+                  Mais do que terapias,
+                  <br />
+                  uma rede de cuidado
+                </h3>
               </div>
-              <div className="bg-purple-50 border-2 border-purple-200 rounded-3xl p-8 flex flex-col items-center justify-center text-center aspect-square">
-                <div className="text-4xl mb-2">💙</div>
-                <div className="text-sm font-semibold text-gray-700">E muito mais...</div>
+
+              <div>
+                <p className="text-blue-100 leading-relaxed text-lg">
+                  Na Casa Amarela, cada especialidade contribui para um mesmo propósito: apoiar o
+                  desenvolvimento de cada criança com responsabilidade técnica, sensibilidade humana e
+                  atuação interdisciplinar. Aqui, as famílias encontram acolhimento, clareza e parceria
+                  verdadeira ao longo da jornada.
+                </p>
               </div>
             </div>
           </div>
@@ -186,19 +267,32 @@ export default function HomePage() {
       <section className="py-20 bg-brand-yellow/10">
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
           <div className="text-center mb-12">
+            <p className="text-sm text-gray-400 mb-2 uppercase tracking-[0.18em]">
+              Confiança construída no dia a dia
+            </p>
             <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
-              O que dizem as <span className="text-brand-blue">famílias</span>
+              Histórias reais de <span className="text-brand-blue">famílias</span>
             </h2>
           </div>
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {testimonials.map((t, i) => (
-              <div key={i} className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+              <div
+                key={i}
+                className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:shadow-lg transition-all duration-300"
+              >
                 <div className="flex gap-0.5 mb-4">
-                  {Array(5).fill(0).map((_, j) => (
-                    <span key={j} className="text-brand-yellow">★</span>
-                  ))}
+                  {Array(5)
+                    .fill(0)
+                    .map((_, j) => (
+                      <span key={j} className="text-brand-yellow">
+                        ★
+                      </span>
+                    ))}
                 </div>
+
                 <p className="text-gray-600 text-sm leading-relaxed mb-4">"{t.text}"</p>
+
                 <div>
                   <p className="font-semibold text-gray-900 text-sm">{t.author}</p>
                   <p className="text-xs text-gray-500">{t.relation}</p>
@@ -213,23 +307,27 @@ export default function HomePage() {
       <section className="py-20 bg-brand-blue">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 text-center">
           <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
-            Dê o primeiro passo hoje
+            Vamos caminhar juntos?
           </h2>
+
           <p className="text-blue-200 text-lg mb-8 max-w-2xl mx-auto">
-            Entre em contato conosco e agende uma avaliação inicial. Nossa equipe está pronta para acolher você e sua família.
+            Estamos prontos para acolher você e sua família e construir juntos um caminho de
+            desenvolvimento para o seu filho.
           </p>
+
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link
               to={ROUTES.CONTACT}
-              className="inline-flex items-center justify-center gap-2 bg-brand-yellow text-brand-blue font-bold px-8 py-3.5 rounded-xl hover:bg-brand-yellow-dark transition-all text-base"
+              className="inline-flex items-center justify-center gap-2 bg-brand-yellow text-brand-blue font-bold px-8 py-3.5 rounded-xl hover:bg-brand-yellow-dark transition-all text-base shadow-sm hover:shadow-md"
             >
               Entrar em Contato <FiArrowRight size={18} />
             </Link>
+
             <a
               href="https://wa.me/5511999999999"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center justify-center gap-2 bg-green-500 text-white font-bold px-8 py-3.5 rounded-xl hover:bg-green-600 transition-all text-base"
+              className="inline-flex items-center justify-center gap-2 bg-green-500 text-white font-bold px-8 py-3.5 rounded-xl hover:bg-green-600 transition-all text-base shadow-sm hover:shadow-md"
             >
               WhatsApp
             </a>

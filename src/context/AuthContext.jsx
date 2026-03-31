@@ -76,7 +76,10 @@ export function AuthProvider({ children }) {
 
   async function login(email, password) {
     const { error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) return { success: false, error: 'E-mail ou senha incorretos.' }
+    if (error) {
+      console.error('Supabase login error:', error)
+      return { success: false, error: error.message }
+    }
     return { success: true }
   }
 

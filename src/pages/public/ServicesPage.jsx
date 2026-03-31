@@ -4,89 +4,121 @@ import { SPECIALTIES } from '../../constants/specialties'
 const specialtyDetails = {
   FISIOTERAPIA: {
     emoji: '🏃',
+    image: '/Fisioterapia.png',
     whoFor: ['Paralisia Cerebral', 'Síndrome de Down', 'Atraso no Desenvolvimento Motor', 'Miopatias', 'Lesões ortopédicas'],
     whatToDo: 'Avaliação cinesiofuncional, exercícios terapêuticos, treino de marcha, fisioterapia neurológica e respiratória.',
     expect: 'Sessões de 45 a 60 minutos, com evolução gradual e registros detalhados do progresso.',
   },
   FONOAUDIOLOGIA: {
     emoji: '💬',
-    whoFor: ['TEA (Transtorno do Espectro Autista)', 'Atraso de linguagem', 'Disfluência (gagueira)', 'Desvios fonológicos', 'Dificuldades de deglutição'],
-    whatToDo: 'Estimulação de linguagem oral e escrita, uso de CAA (Comunicação Aumentativa e Alternativa), terapia miofuncional.',
-    expect: 'Sessões dinâmicas com atividades lúdicas adaptadas a cada criança. Orientação às famílias.',
+    image: '/Fonoaudiologia.png',
+    whoFor: ['TEA', 'Atraso de linguagem', 'Gagueira', 'Desvios fonológicos', 'Dificuldades de deglutição'],
+    whatToDo: 'Estimulação de linguagem oral e escrita, uso de CAA, terapia miofuncional.',
+    expect: 'Sessões dinâmicas e lúdicas com orientação às famílias.',
   },
   TO: {
     emoji: '🧩',
-    whoFor: ['TEA', 'TDAH', 'Dificuldades de integração sensorial', 'Paralisia Cerebral', 'Dificuldades de coordenação motora fina'],
-    whatToDo: 'Treino de atividades de vida diária (AVDs), integração sensorial, estimulação cognitiva, adaptações escolares.',
-    expect: 'Ambiente sensorial rico e estimulante. Foco na independência e qualidade de vida.',
+    image: '/Terapia_Ocupacional.png',
+    whoFor: ['TEA', 'TDAH', 'Integração sensorial', 'Paralisia Cerebral', 'Coordenação motora'],
+    whatToDo: 'Treino de AVDs, integração sensorial, estimulação cognitiva.',
+    expect: 'Foco em independência e qualidade de vida.',
   },
   PSICOLOGIA: {
     emoji: '🧠',
-    whoFor: ['TEA', 'TDAH', 'Ansiedade infantil', 'Dificuldades comportamentais', 'Baixa autoestima'],
-    whatToDo: 'Avaliação psicológica, terapia cognitivo-comportamental (TCC), intervenção baseada em ABA, orientação familiar.',
-    expect: 'Espaço seguro e acolhedor para a criança se expressar. Parceria ativa com a família.',
+    image: '/Psicologia.png',
+    whoFor: ['TEA', 'TDAH', 'Ansiedade', 'Comportamento', 'Autoestima'],
+    whatToDo: 'Avaliação psicológica, TCC, ABA, orientação familiar.',
+    expect: 'Ambiente seguro e acolhedor.',
   },
 }
 
 export default function ServicesPage() {
   return (
     <div>
-      {/* Hero */}
-      <section className="bg-gradient-to-br from-brand-blue to-brand-blue-dark py-20 text-white">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6">
-          <h1 className="text-4xl md:text-5xl font-bold mb-4">Nossas Especialidades</h1>
-          <p className="text-xl text-blue-200 max-w-2xl">
-            Uma equipe integrada trabalhando em conjunto pelo desenvolvimento pleno da sua criança.
+
+      {/* HERO */}
+      <section className="relative overflow-hidden bg-gradient-to-br from-brand-blue to-brand-blue-dark py-24 text-white">
+        <div className="absolute inset-0 opacity-10 bg-[radial-gradient(circle_at_top_right,_#facc15,_transparent_30%)]" />
+        <div className="relative max-w-6xl mx-auto px-4">
+          <span className="inline-flex bg-white/10 px-4 py-1 rounded-full text-sm mb-6">
+            Nossa atuação
+          </span>
+          <h1 className="text-4xl md:text-6xl font-bold mb-6">
+            Nossas <span className="text-brand-yellow">Especialidades</span>
+          </h1>
+          <p className="text-xl text-blue-100 max-w-2xl">
+            Diferentes saberes integrados para desenvolver cada criança de forma única.
           </p>
         </div>
       </section>
 
-      {/* Specialties */}
+      {/* ESPECIALIDADES */}
       <section className="py-20 bg-white">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 space-y-20">
+        <div className="max-w-6xl mx-auto px-4 space-y-20">
+
           {Object.entries(SPECIALTIES).map(([key, spec], index) => {
             const detail = specialtyDetails[key]
             const isEven = index % 2 === 0
+
             return (
-              <div key={key} className={`grid grid-cols-1 lg:grid-cols-2 gap-12 items-center ${!isEven ? 'lg:flex-row-reverse' : ''}`}>
-                <div className={isEven ? '' : 'lg:order-2'}>
-                  <div className="flex items-center gap-4 mb-6">
-                    <div className="text-5xl">{detail.emoji}</div>
-                    <div>
-                      <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium mb-2 ${spec.color}`}>
-                        Especialidade
-                      </span>
-                      <h2 className="text-3xl font-bold text-gray-900">{spec.label}</h2>
-                    </div>
-                  </div>
+              <div key={key} className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
 
-                  <div className="mb-6">
-                    <h3 className="font-semibold text-gray-700 mb-3 text-sm uppercase tracking-wide">O que realizamos</h3>
-                    <p className="text-gray-600 leading-relaxed">{detail.whatToDo}</p>
-                  </div>
-
-                  <div className="mb-6">
-                    <h3 className="font-semibold text-gray-700 mb-3 text-sm uppercase tracking-wide">O que esperar</h3>
-                    <p className="text-gray-600 leading-relaxed">{detail.expect}</p>
+                {/* IMAGEM */}
+                <div className={`${isEven ? '' : 'lg:order-2'}`}>
+                  <div className="overflow-hidden rounded-3xl shadow-md">
+                    <img
+                      src={detail.image}
+                      alt={spec.label}
+                      className="w-full h-[360px] md:h-[420px] object-cover"
+                    />
                   </div>
                 </div>
 
-                <div className={isEven ? 'lg:order-2' : ''}>
-                  <div
-                    className="rounded-3xl p-8"
-                    style={{ backgroundColor: spec.bgColor }}
-                  >
-                    <h3 className="font-semibold mb-4" style={{ color: spec.textColor }}>
-                      Quem se beneficia
-                    </h3>
-                    <ul className="space-y-3">
-                      {detail.whoFor.map((item) => (
-                        <li key={item} className="flex items-center gap-3">
-                          <FiCheckCircle size={16} style={{ color: spec.calendarColor }} className="shrink-0" />
-                          <span className="text-sm text-gray-700">{item}</span>
-                        </li>
-                      ))}
-                    </ul>
+                {/* TEXTO */}
+                <div className={`${isEven ? '' : 'lg:order-1'}`}>
+
+                  <div className="flex items-center gap-4 mb-6">
+                    <div className="text-5xl">{detail.emoji}</div>
+                    <div>
+                      <span className={`px-3 py-1 rounded-full text-xs ${spec.color}`}>
+                        Especialidade
+                      </span>
+                      <h2 className="text-3xl font-bold">{spec.label}</h2>
+                    </div>
+                  </div>
+
+                  <div className="space-y-6">
+
+                    <div>
+                      <h3 className="text-sm uppercase tracking-wide text-gray-500 mb-2">
+                        O que fazemos
+                      </h3>
+                      <p className="text-gray-700 leading-relaxed">
+                        {detail.whatToDo}
+                      </p>
+                    </div>
+
+                    <div>
+                      <h3 className="text-sm uppercase tracking-wide text-gray-500 mb-2">
+                        O que esperar
+                      </h3>
+                      <p className="text-gray-700 leading-relaxed">
+                        {detail.expect}
+                      </p>
+                    </div>
+
+                    <div className="bg-gray-50 rounded-2xl p-6 border">
+                      <h3 className="font-semibold mb-4">Quem se beneficia</h3>
+                      <ul className="space-y-3">
+                        {detail.whoFor.map((item) => (
+                          <li key={item} className="flex gap-3 items-center">
+                            <FiCheckCircle className="text-brand-blue" />
+                            <span className="text-sm text-gray-700">{item}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+
                   </div>
                 </div>
               </div>
@@ -95,27 +127,42 @@ export default function ServicesPage() {
         </div>
       </section>
 
-      {/* Abordagem Multidisciplinar */}
+      {/* BLOCO DIFERENCIAL */}
       <section className="py-20 bg-gray-50">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 text-center">
-          <h2 className="text-3xl font-bold text-gray-900 mb-6">Abordagem Multidisciplinar</h2>
-          <p className="text-gray-600 leading-relaxed text-lg mb-8">
-            O grande diferencial do Espaço Casa Amarela é a integração entre as especialidades. Nossas equipes se comunicam constantemente, compartilham evoluções e traçam estratégias conjuntas para potencializar o progresso de cada criança.
+        <div className="max-w-5xl mx-auto px-4 text-center">
+
+          <span className="text-sm uppercase tracking-widest text-gray-400">
+            Diferencial Casa Amarela
+          </span>
+
+          <h2 className="text-3xl md:text-4xl font-bold mt-3 mb-6">
+            Integração entre especialidades
+          </h2>
+
+          <p className="text-gray-600 text-lg leading-relaxed mb-10">
+            Nosso grande diferencial é a atuação interdisciplinar. As especialidades não trabalham isoladas — 
+            elas se conectam, compartilham evolução e constroem estratégias conjuntas para potencializar o desenvolvimento de cada criança.
           </p>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+
+          <div className="flex flex-wrap justify-center gap-4">
             {Object.entries(SPECIALTIES).map(([key, spec]) => (
               <div
                 key={key}
-                className="p-4 rounded-2xl border-2 text-center"
-                style={{ borderColor: spec.calendarColor, backgroundColor: spec.bgColor }}
+                className="px-5 py-3 rounded-full text-sm font-medium border"
+                style={{ borderColor: spec.calendarColor, color: spec.textColor }}
               >
-                <div className="text-sm font-semibold" style={{ color: spec.textColor }}>{spec.label}</div>
+                {spec.label}
               </div>
             ))}
           </div>
-          <div className="mt-6 text-gray-500 text-sm">↕ Comunicação constante entre todas as especialidades</div>
+
+          <div className="mt-6 text-gray-400 text-sm">
+            Comunicação contínua entre toda a equipe
+          </div>
+
         </div>
       </section>
+
     </div>
   )
 }
