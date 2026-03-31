@@ -3,6 +3,7 @@ import {
   supabase,
   mapPatient, mapGuardian, mapTherapist, mapAppointment, mapConsultation,
   mapSpecialty, mapPaymentMethod, mapDiagnosis, mapPatientStatus, mapRoom,
+  mapFamilyContext, mapClinicalHistory, mapAssessment, mapTherapeuticPlan,
   syncPatientRelations, syncGuardianPatients,
 } from '../lib/supabase'
 import { useToast } from '../components/ui/Toast'
@@ -530,6 +531,153 @@ export function DataProvider({ children }) {
     setRooms(prev => prev.map(r => r.id === id ? { ...r, ...data } : r))
   }
 
+  // ─── Prontuário: Contexto Familiar ───────────────────────────────────────────
+
+  async function getFamilyContext(patientId) {
+    const { data, error } = await supabase
+      .from('patient_family_context')
+      .select('*, updater:updated_by(name)')
+      .eq('patient_id', patientId)
+      .maybeSingle()
+    if (error) return dbError(error, toast)
+    return mapFamilyContext(data)
+  }
+
+  async function saveFamilyContext(patientId, data, authUserId) {
+    const payload = {
+      patient_id: patientId,
+      family_composition: data.familyComposition || null,
+      guardian_relationship: data.guardianRelationship || null,
+      daily_routine: data.dailyRoutine || null,
+      school_context: data.schoolContext || null,
+      family_environment: data.familyEnvironment || null,
+      updated_by: authUserId,
+      updated_at: new Date().toISOString(),
+    }
+    const { data: saved, error } = await supabase
+      .from('patient_family_context')
+      .upsert(payload, { onConflict: 'patient_id' })
+      .select().single()
+    if (error) return dbError(error, toast)
+    return mapFamilyContext(saved)
+  }
+
+  // ─── Prontuário: Histórico Clínico ────────────────────────────────────────────
+
+  async function getClinicalHistory(patientId) {
+    const { data, error } = await supabase
+      .from('patient_clinical_history')
+      .select('*, updater:updated_by(name)')
+      .eq('patient_id', patientId)
+      .maybeSingle()
+    if (error) return dbError(error, toast)
+    return mapClinicalHistory(data)
+  }
+
+  async function saveClinicalHistory(patientId, data, authUserId) {
+    const payload = {
+      patient_id: patientId,
+      main_complaint: data.mainComplaint || null,
+      diagnostic_hypotheses: data.diagnosticHypotheses || null,
+      current_medications: data.currentMedications || null,
+      medical_history: data.medicalHistory || null,
+      previous_therapy_history: data.previousTherapyHistory || null,
+      comorbidities: data.comorbidities || null,
+      updated_by: authUserId,
+      updated_at: new Date().toISOString(),
+    }
+    const { data: saved, error } = await supabase
+      .from('patient_clinical_history')
+      .upsert(payload, { onConflict: 'patient_id' })
+      .select().single()
+    if (error) return dbError(error, toast)
+    return mapClinicalHistory(saved)
+  }
+
+  // ─── Prontuário: Avaliações Iniciais ─────────────────────────────────────────
+
+  async function getAssessments(patientId) {
+    const { data, error } = await supabase
+      .from('patient_assessments')
+      .select('*, therapist:therapist_id(name)')
+      .eq('patient_id', patientId)
+      .order('specialty')
+    if (error) return dbError(error, toast)
+    return (data || []).map(mapAssessment)
+  }
+
+  async function saveAssessment(patientId, specialty, data, therapistId) {
+    const payload = {
+      patient_id: patientId,
+      specialty,
+      therapist_id: therapistId || null,
+      assessment_date: data.assessmentDate || new Date().toISOString().slice(0, 10),
+      main_complaint: data.mainComplaint || null,
+      initial_objectives: data.initialObjectives || null,
+      applied_tests: data.appliedTests || null,
+      clinical_observations: data.clinicalObservations || null,
+      updated_at: new Date().toISOString(),
+    }
+    const { data: saved, error } = await supabase
+      .from('patient_assessments')
+      .upsert(payload, { onConflict: 'patient_id,specialty' })
+      .select('*, therapist:therapist_id(name)')
+      .single()
+    if (error) return dbError(error, toast)
+    return mapAssessment(saved)
+  }
+
+  // ─── Prontuário: Plano Terapêutico ────────────────────────────────────────────
+
+  async function getTherapeuticPlans(patientId) {
+    const { data, error } = await supabase
+      .from('therapeutic_plans')
+      .select('*, updater:updated_by(name)')
+      .eq('patient_id', patientId)
+      .order('specialty')
+    if (error) return dbError(error, toast)
+    return (data || []).map(mapTherapeuticPlan)
+  }
+
+  async function saveTherapeuticPlan(patientId, specialty, data, authUserId) {
+    const payload = {
+      patient_id: patientId,
+      specialty,
+      general_objectives: data.generalObjectives || null,
+      specific_objectives: data.specificObjectives || null,
+      attendance_frequency: data.attendanceFrequency || null,
+      intervention_strategy: data.interventionStrategy || null,
+      revision_notes: data.revisionNotes || null,
+      updated_by: authUserId,
+      updated_at: new Date().toISOString(),
+    }
+    // upsert: insert ou update baseado em patient_id + specialty
+    const { data: existing } = await supabase
+      .from('therapeutic_plans')
+      .select('id')
+      .eq('patient_id', patientId)
+      .eq('specialty', specialty)
+      .maybeSingle()
+
+    let saved, error
+    if (existing) {
+      ;({ data: saved, error } = await supabase
+        .from('therapeutic_plans')
+        .update(payload)
+        .eq('id', existing.id)
+        .select('*, updater:updated_by(name)')
+        .single())
+    } else {
+      ;({ data: saved, error } = await supabase
+        .from('therapeutic_plans')
+        .insert({ ...payload, created_by: authUserId })
+        .select('*, updater:updated_by(name)')
+        .single())
+    }
+    if (error) return dbError(error, toast)
+    return mapTherapeuticPlan(saved)
+  }
+
   // ─── Value ───────────────────────────────────────────────────────────────────
 
   const value = {
@@ -544,6 +692,11 @@ export function DataProvider({ children }) {
     diagnoses, addDiagnosis, updateDiagnosis,
     patientStatuses, addPatientStatus, updatePatientStatus,
     rooms, addRoom, updateRoom,
+    // Prontuário
+    getFamilyContext, saveFamilyContext,
+    getClinicalHistory, saveClinicalHistory,
+    getAssessments, saveAssessment,
+    getTherapeuticPlans, saveTherapeuticPlan,
   }
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>

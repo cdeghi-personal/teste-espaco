@@ -121,6 +121,73 @@ export function mapRoom(row) {
   return { id: row.id, name: row.name, description: row.description || '', active: row.active }
 }
 
+export function mapFamilyContext(row) {
+  if (!row) return null
+  return {
+    id: row.id,
+    patientId: row.patient_id,
+    familyComposition: row.family_composition || '',
+    guardianRelationship: row.guardian_relationship || '',
+    dailyRoutine: row.daily_routine || '',
+    schoolContext: row.school_context || '',
+    familyEnvironment: row.family_environment || '',
+    updatedBy: row.updated_by,
+    updatedAt: row.updated_at,
+    updatedByName: row.updater?.name || null,
+  }
+}
+
+export function mapClinicalHistory(row) {
+  if (!row) return null
+  return {
+    id: row.id,
+    patientId: row.patient_id,
+    mainComplaint: row.main_complaint || '',
+    diagnosticHypotheses: row.diagnostic_hypotheses || '',
+    currentMedications: row.current_medications || '',
+    medicalHistory: row.medical_history || '',
+    previousTherapyHistory: row.previous_therapy_history || '',
+    comorbidities: row.comorbidities || '',
+    updatedBy: row.updated_by,
+    updatedAt: row.updated_at,
+    updatedByName: row.updater?.name || null,
+  }
+}
+
+export function mapAssessment(row) {
+  return {
+    id: row.id,
+    patientId: row.patient_id,
+    therapistId: row.therapist_id,
+    therapistName: row.therapist?.name || null,
+    specialty: row.specialty,
+    assessmentDate: row.assessment_date,
+    mainComplaint: row.main_complaint || '',
+    initialObjectives: row.initial_objectives || '',
+    appliedTests: row.applied_tests || '',
+    clinicalObservations: row.clinical_observations || '',
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }
+}
+
+export function mapTherapeuticPlan(row) {
+  return {
+    id: row.id,
+    patientId: row.patient_id,
+    specialty: row.specialty,
+    generalObjectives: row.general_objectives || '',
+    specificObjectives: row.specific_objectives || '',
+    attendanceFrequency: row.attendance_frequency || '',
+    interventionStrategy: row.intervention_strategy || '',
+    revisionNotes: row.revision_notes || '',
+    createdBy: row.created_by,
+    updatedBy: row.updated_by,
+    updatedAt: row.updated_at,
+    updatedByName: row.updater?.name || null,
+  }
+}
+
 // ─── Helpers para salvar relações de paciente ─────────────────────────────────
 
 export async function syncPatientRelations(patientId, data) {
