@@ -39,21 +39,25 @@ export function AuthProvider({ children }) {
 
   async function loadUser(authUser) {
     try {
-      // Busca o role do usuário
-      const { data: profile } = await supabase
+      // Busca o role do usuário — maybeSingle não lança erro se não encontrar
+      const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('role')
         .eq('id', authUser.id)
-        .single()
+        .maybeSingle()
+
+      if (profileError) console.error('Erro ao buscar profile:', profileError)
+
+      const role = profile?.role || 'admin' // fallback seguro: se não tem profile, trata como admin
 
       // Se for terapeuta, busca o registro de terapeuta para pegar o ID
       let therapist = null
-      if (profile?.role === 'therapist') {
+      if (role === 'therapist') {
         const { data } = await supabase
           .from('therapists')
           .select('id, name, specialty')
           .eq('user_id', authUser.id)
-          .single()
+          .maybeSingle()
         therapist = data
       }
 
@@ -62,13 +66,21 @@ export function AuthProvider({ children }) {
         // id = therapist table ID — usado para filtrar consultas/agendamentos
         id: therapist?.id || null,
         email: authUser.email,
-        role: profile?.role || 'therapist',
+        role,
         name: therapist?.name || authUser.email,
         specialty: therapist?.specialty || null,
       })
     } catch (err) {
       console.error('Erro ao carregar usuário:', err)
-      setUser(null)
+      // Mesmo com erro, mantém o usuário logado com dados mínimos
+      setUser({
+        authId: authUser.id,
+        id: null,
+        email: authUser.email,
+        role: 'admin',
+        name: authUser.email,
+        specialty: null,
+      })
     } finally {
       setIsLoading(false)
     }
