@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { FiMail, FiCheck } from 'react-icons/fi'
+import { FiMail, FiCheck, FiPlus, FiTrash2 } from 'react-icons/fi'
 import Modal from '../../../components/ui/Modal'
 import Button from '../../../components/ui/Button'
 import Input from '../../../components/ui/Input'
@@ -7,12 +7,27 @@ import Select from '../../../components/ui/Select'
 import { useData } from '../../../context/DataContext'
 import { SPECIALTY_LIST, SPECIALTIES } from '../../../constants/specialties'
 
-const EMPTY = { name: '', email: '', phone: '', specialty: '', credential: '', active: true }
+const EMPTY_SPEC = { specialty: '', credential: '' }
+
+const EMPTY = {
+  name: '', email: '', phone: '',
+  therapistSpecialties: [{ ...EMPTY_SPEC }],
+  bank: '', agency: '', accountNumber: '', pixKey: '',
+  active: true,
+}
 
 export default function TherapistFormModal({ onClose, initial = {} }) {
   const { addTherapist, updateTherapist } = useData()
   const isEdit = !!initial.id
-  const [form, setForm] = useState({ ...EMPTY, ...initial })
+
+  const [form, setForm] = useState({
+    ...EMPTY,
+    ...initial,
+    therapistSpecialties:
+      initial.therapistSpecialties?.length
+        ? initial.therapistSpecialties
+        : [{ ...EMPTY_SPEC }],
+  })
   const [errors, setErrors] = useState({})
   const [loading, setLoading] = useState(false)
   const [inviteSent, setInviteSent] = useState(false)
@@ -22,10 +37,30 @@ export default function TherapistFormModal({ onClose, initial = {} }) {
     setErrors(e => ({ ...e, [field]: undefined }))
   }
 
+  function setSpecRow(index, field, value) {
+    setForm(f => {
+      const rows = [...f.therapistSpecialties]
+      rows[index] = { ...rows[index], [field]: value }
+      return { ...f, therapistSpecialties: rows }
+    })
+  }
+
+  function addSpecRow() {
+    setForm(f => ({ ...f, therapistSpecialties: [...f.therapistSpecialties, { ...EMPTY_SPEC }] }))
+  }
+
+  function removeSpecRow(index) {
+    setForm(f => {
+      const rows = f.therapistSpecialties.filter((_, i) => i !== index)
+      return { ...f, therapistSpecialties: rows.length ? rows : [{ ...EMPTY_SPEC }] }
+    })
+  }
+
   function validate() {
     const e = {}
     if (!form.name.trim()) e.name = 'Nome obrigatório'
-    if (!form.specialty) e.specialty = 'Selecione a especialidade'
+    const hasSpec = form.therapistSpecialties.some(s => s.specialty)
+    if (!hasSpec) e.specialties = 'Adicione ao menos uma especialidade'
     if (!isEdit && !form.email.trim()) e.email = 'E-mail obrigatório para enviar o convite'
     return e
   }
@@ -40,26 +75,19 @@ export default function TherapistFormModal({ onClose, initial = {} }) {
         await updateTherapist(initial.id, form)
         onClose()
       } else {
-        // 1. Cria o terapeuta no banco
         const therapist = await addTherapist(form)
-        if (!therapist) throw new Error('Erro ao criar terapeuta')
+        if (!therapist || therapist.error) throw new Error(therapist?.error || 'Erro ao criar terapeuta')
 
-        // 2. Chama a Edge Function para enviar o convite por email
         const { supabase } = await import('../../../lib/supabase')
         const { error } = await supabase.functions.invoke('invite-therapist', {
-          body: {
-            email: form.email,
-            therapistId: therapist.id,
-            therapistName: form.name,
-          },
+          body: { email: form.email, therapistId: therapist.id, therapistName: form.name },
         })
-
         if (error) throw error
         setInviteSent(true)
       }
     } catch (err) {
       console.error(err)
-      setErrors({ submit: 'Erro ao salvar. Tente novamente.' })
+      setErrors({ submit: err.message || 'Erro ao salvar. Tente novamente.' })
     } finally {
       setLoading(false)
     }
@@ -88,7 +116,7 @@ export default function TherapistFormModal({ onClose, initial = {} }) {
     <Modal
       title={isEdit ? 'Editar Terapeuta' : 'Novo Terapeuta'}
       onClose={onClose}
-      size="md"
+      size="lg"
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>Cancelar</Button>
@@ -100,48 +128,124 @@ export default function TherapistFormModal({ onClose, initial = {} }) {
         </>
       }
     >
-      <div className="space-y-4">
-        <Input
-          label="Nome Completo *"
-          value={form.name}
-          onChange={e => set('name', e.target.value)}
-          error={errors.name}
-          placeholder="Nome do terapeuta"
-        />
+      <div className="space-y-6">
+        {/* Dados Básicos */}
+        <section>
+          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3 pb-2 border-b border-gray-100">
+            Dados Pessoais
+          </h3>
+          <div className="space-y-3">
+            <Input
+              label="Nome Completo *"
+              value={form.name}
+              onChange={e => set('name', e.target.value)}
+              error={errors.name}
+              placeholder="Nome do terapeuta"
+            />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Input
+                label={isEdit ? 'E-mail' : 'E-mail *'}
+                type="email"
+                value={form.email}
+                onChange={e => set('email', e.target.value)}
+                error={errors.email}
+                placeholder="email@clinica.com.br"
+              />
+              <Input
+                label="Telefone"
+                value={form.phone}
+                onChange={e => set('phone', e.target.value)}
+                placeholder="(11) 9 9999-9999"
+              />
+            </div>
+          </div>
+        </section>
 
-        <Select
-          label="Especialidade *"
-          value={form.specialty}
-          onChange={e => set('specialty', e.target.value)}
-          error={errors.specialty}
-        >
-          <option value="">Selecione</option>
-          {SPECIALTY_LIST.map(k => <option key={k} value={k}>{SPECIALTIES[k].label}</option>)}
-        </Select>
+        {/* Especialidades */}
+        <section>
+          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3 pb-2 border-b border-gray-100">
+            Especialidades e Registros Profissionais
+          </h3>
+          {errors.specialties && (
+            <p className="text-xs text-red-600 mb-2">{errors.specialties}</p>
+          )}
+          <div className="space-y-2">
+            {/* Cabeçalho da tabela */}
+            <div className="hidden sm:grid grid-cols-[1fr_1fr_32px] gap-2 px-1">
+              <span className="text-xs text-gray-400 font-medium">Especialidade</span>
+              <span className="text-xs text-gray-400 font-medium">Nº Conselho Regional</span>
+              <span />
+            </div>
 
-        <Input
-          label="Registro Profissional"
-          value={form.credential}
-          onChange={e => set('credential', e.target.value)}
-          placeholder="Ex: CRP 06/12345, CRFa 2/12345..."
-        />
+            {form.therapistSpecialties.map((row, i) => (
+              <div key={i} className="grid grid-cols-[1fr_1fr_32px] gap-2 items-start">
+                <Select
+                  value={row.specialty}
+                  onChange={e => setSpecRow(i, 'specialty', e.target.value)}
+                >
+                  <option value="">Selecione</option>
+                  {SPECIALTY_LIST.map(k => (
+                    <option key={k} value={k}>{SPECIALTIES[k].label}</option>
+                  ))}
+                </Select>
+                <Input
+                  value={row.credential}
+                  onChange={e => setSpecRow(i, 'credential', e.target.value)}
+                  placeholder="Ex: CRFa 2/12345"
+                />
+                <button
+                  type="button"
+                  onClick={() => removeSpecRow(i)}
+                  className="mt-1 p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+                  title="Remover"
+                >
+                  <FiTrash2 size={14} />
+                </button>
+              </div>
+            ))}
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Input
-            label={isEdit ? 'E-mail' : 'E-mail *'}
-            type="email"
-            value={form.email}
-            onChange={e => set('email', e.target.value)}
-            error={errors.email}
-            placeholder="email@clinica.com.br"
-          />
-          <Input
-            label="Telefone"
-            value={form.phone}
-            onChange={e => set('phone', e.target.value)}
-            placeholder="(11) 9 9999-9999"
-          />
-        </div>
+            <button
+              type="button"
+              onClick={addSpecRow}
+              className="flex items-center gap-1.5 text-sm text-brand-blue hover:underline mt-1"
+            >
+              <FiPlus size={14} /> Adicionar especialidade
+            </button>
+          </div>
+        </section>
+
+        {/* Dados Bancários */}
+        <section>
+          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3 pb-2 border-b border-gray-100">
+            Dados Bancários
+          </h3>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <Input
+              label="Banco"
+              value={form.bank}
+              onChange={e => set('bank', e.target.value)}
+              placeholder="Ex: Bradesco"
+            />
+            <Input
+              label="Agência"
+              value={form.agency}
+              onChange={e => set('agency', e.target.value)}
+              placeholder="0000"
+            />
+            <Input
+              label="Conta Corrente"
+              value={form.accountNumber}
+              onChange={e => set('accountNumber', e.target.value)}
+              placeholder="00000-0"
+            />
+            <Input
+              label="Chave PIX"
+              value={form.pixKey}
+              onChange={e => set('pixKey', e.target.value)}
+              placeholder="CPF, e-mail ou telefone"
+            />
+          </div>
+        </section>
 
         {!isEdit && (
           <div className="flex items-start gap-2 p-3 bg-blue-50 rounded-xl text-xs text-blue-700">

@@ -14,6 +14,27 @@ export function mapPatient(row) {
     dateOfBirth: row.date_of_birth,
     sex: row.sex,
     cpf: row.cpf || '',
+    rg: row.rg || '',
+    phone: row.phone || '',
+    email: row.email || '',
+    address: row.address || '',
+    neighborhood: row.neighborhood || '',
+    city: row.city || '',
+    state: row.state || '',
+    zipCode: row.zip_code || '',
+    indication: row.indication || '',
+    schoolName: row.school_name || '',
+    schoolPhone: row.school_phone || '',
+    schoolAddress: row.school_address || '',
+    schoolNeighborhood: row.school_neighborhood || '',
+    schoolCity: row.school_city || '',
+    schoolState: row.school_state || '',
+    schoolZip: row.school_zip || '',
+    schoolCoordinator: row.school_coordinator || '',
+    doctorInsurance: row.doctor_insurance || '',
+    doctorName: row.doctor_name || '',
+    doctorSpecialty: row.doctor_specialty || '',
+    doctorPhone: row.doctor_phone || '',
     diagnosis: row.diagnosis || '',
     notes: row.notes || '',
     statusId: row.status_id,
@@ -22,6 +43,9 @@ export function mapPatient(row) {
     secondaryTherapistIds: (row.patient_secondary_therapists || []).map(r => r.therapist_id),
     conditionIds: (row.patient_conditions || []).map(r => r.diagnosis_id),
     specialties: (row.patient_specialties || []).map(r => r.specialty),
+    externalTherapists: (row.patient_external_therapists || [])
+      .sort((a, b) => a.sort_order - b.sort_order)
+      .map(r => ({ id: r.id, name: r.name, specialty: r.specialty || '', phone: r.phone || '' })),
     deleted: row.deleted,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -54,6 +78,14 @@ export function mapTherapist(row) {
     phone: row.phone || '',
     bio: row.bio || '',
     credential: row.credential || '',
+    bank: row.bank || '',
+    agency: row.agency || '',
+    accountNumber: row.account_number || '',
+    pixKey: row.pix_key || '',
+    therapistSpecialties: (row.therapist_specialties || []).map(s => ({
+      specialty: s.specialty,
+      credential: s.credential || '',
+    })),
     active: row.active,
     createdAt: row.created_at,
   }
@@ -240,6 +272,32 @@ export async function syncGuardianPatients(guardianId, patientIds = []) {
   if (patientIds.length) {
     await supabase.from('patient_guardians').insert(
       patientIds.map(pid => ({ guardian_id: guardianId, patient_id: pid }))
+    )
+  }
+}
+
+export async function syncTherapistSpecialties(therapistId, specialties = []) {
+  await supabase.from('therapist_specialties').delete().eq('therapist_id', therapistId)
+  const valid = specialties.filter(s => s.specialty)
+  if (valid.length) {
+    await supabase.from('therapist_specialties').insert(
+      valid.map(s => ({ therapist_id: therapistId, specialty: s.specialty, credential: s.credential || null }))
+    )
+  }
+}
+
+export async function syncExternalTherapists(patientId, externalTherapists = []) {
+  await supabase.from('patient_external_therapists').delete().eq('patient_id', patientId)
+  const valid = externalTherapists.filter(t => t.name?.trim())
+  if (valid.length) {
+    await supabase.from('patient_external_therapists').insert(
+      valid.map((t, i) => ({
+        patient_id: patientId,
+        name: t.name.trim(),
+        specialty: t.specialty || null,
+        phone: t.phone || null,
+        sort_order: i,
+      }))
     )
   }
 }

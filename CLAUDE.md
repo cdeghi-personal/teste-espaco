@@ -73,6 +73,7 @@ supabase/
   03_invite_therapist.sql        # Função link_therapist_user + documentação do fluxo
   04_fix_trigger.sql             # Fix: trigger com search_path = public (resolve erro de user_role)
   05_prontuario.sql              # Tabelas do prontuário clínico colaborativo
+  06_new_fields.sql              # Novos campos: dados bancários/especialidades do terapeuta, dados pessoais/escola/médico/externos do paciente
   functions/
     invite-therapist/index.ts    # Edge Function — envia convite por e-mail ao criar terapeuta
 ```
@@ -113,6 +114,8 @@ Encontrar em: Supabase Dashboard → Project Settings → API.
 | `patient_clinical_history` | Histórico clínico, medicamentos, comorbidades — 1:1 com paciente |
 | `patient_assessments` | Avaliação inicial por especialidade — 1 por paciente/especialidade |
 | `therapeutic_plans` | Plano terapêutico por especialidade — colaborativo |
+| `therapist_specialties` | Relação N:N terapeuta ↔ especialidade + nº do conselho regional |
+| `patient_external_therapists` | Terapeutas externos vinculados ao paciente (nome, especialidade, telefone) |
 
 ### Mappers (DB → App)
 
@@ -122,6 +125,8 @@ Todos em `src/lib/supabase.js`. Convertem snake_case do banco para camelCase do 
 - `mapFamilyContext`, `mapClinicalHistory`, `mapAssessment`, `mapTherapeuticPlan`
 - `syncPatientRelations(patientId, { specialties, secondaryTherapistIds, conditionIds })`
 - `syncGuardianPatients(guardianId, patientIds)`
+- `syncTherapistSpecialties(therapistId, [{ specialty, credential }])`
+- `syncExternalTherapists(patientId, [{ name, specialty, phone }])`
 
 ### Como criar admins
 
@@ -244,6 +249,21 @@ Cada especialidade tem `label`, `color` (Tailwind), `bgColor`, `textColor`, `cal
 - Botão "Esqueci minha senha" ao lado do label do campo senha
 - Dispara `supabase.auth.resetPasswordForEmail()` com redirect para `/reset-senha`
 - Exibe tela de confirmação após envio do e-mail
+
+## Campos do Terapeuta
+
+- **Especialidades múltiplas:** tabela `therapist_specialties` — cada linha tem `specialty` (chave do enum) e `credential` (nº do conselho, ex: CRFa 2/12345)
+- O campo `therapists.specialty` guarda a especialidade principal (primeira da lista) para compatibilidade com queries existentes
+- **Dados bancários:** `bank`, `agency`, `account_number`, `pix_key` na tabela `therapists`
+- No formulário, dados bancários ficam em linha (4 campos lado a lado)
+
+## Campos do Paciente (migração 06)
+
+- **Dados pessoais extras:** `rg`, `phone`, `email`, `address`, `neighborhood`, `city`, `state`, `zip_code`, `indication`
+- **Dados escolares:** `school_name`, `school_phone`, `school_address`, `school_neighborhood`, `school_city`, `school_state`, `school_zip`, `school_coordinator`
+- **Médico responsável:** `doctor_insurance`, `doctor_name`, `doctor_specialty`, `doctor_phone`
+- **Terapeutas externos:** tabela `patient_external_therapists` — lista N por paciente, com `name`, `specialty`, `phone`
+- No mapper `mapPatient`: campo `externalTherapists` (array) + todos os novos campos em camelCase
 
 ## Prontuário Clínico (PatientDetailPage)
 

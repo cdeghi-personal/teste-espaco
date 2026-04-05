@@ -5,6 +5,7 @@ import {
   mapSpecialty, mapPaymentMethod, mapDiagnosis, mapPatientStatus, mapRoom,
   mapFamilyContext, mapClinicalHistory, mapAssessment, mapTherapeuticPlan,
   syncPatientRelations, syncGuardianPatients,
+  syncTherapistSpecialties, syncExternalTherapists,
 } from '../lib/supabase'
 import { useToast } from '../components/ui/Toast'
 
@@ -20,11 +21,17 @@ const DataContext = createContext(null)
 // ─── Queries de fetch ─────────────────────────────────────────────────────────
 
 const PATIENT_SELECT = `
-  id, full_name, date_of_birth, sex, cpf, diagnosis, notes, deleted,
+  id, full_name, date_of_birth, sex, cpf, rg, phone, email,
+  address, neighborhood, city, state, zip_code, indication,
+  school_name, school_phone, school_address, school_neighborhood,
+  school_city, school_state, school_zip, school_coordinator,
+  doctor_insurance, doctor_name, doctor_specialty, doctor_phone,
+  diagnosis, notes, deleted,
   status_id, payment_method_id, primary_therapist_id, created_at, updated_at,
   patient_specialties(specialty),
   patient_secondary_therapists(therapist_id),
-  patient_conditions(diagnosis_id)
+  patient_conditions(diagnosis_id),
+  patient_external_therapists(id, name, specialty, phone, sort_order)
 `
 
 const GUARDIAN_SELECT = `
@@ -65,7 +72,7 @@ export function DataProvider({ children }) {
       supabase.from('guardians').select(GUARDIAN_SELECT),
       supabase.from('appointments').select('*').order('date').order('time'),
       supabase.from('consultations').select(CONSULTATION_SELECT).order('date', { ascending: false }),
-      supabase.from('therapists').select('*').order('name'),
+      supabase.from('therapists').select('*, therapist_specialties(specialty, credential)').order('name'),
       supabase.from('specialties').select('*').order('label'),
       supabase.from('payment_methods').select('*').order('name'),
       supabase.from('diagnoses').select('*').order('name'),
@@ -98,6 +105,27 @@ export function DataProvider({ children }) {
         date_of_birth: data.dateOfBirth,
         sex: data.sex,
         cpf: data.cpf || null,
+        rg: data.rg || null,
+        phone: data.phone || null,
+        email: data.email || null,
+        address: data.address || null,
+        neighborhood: data.neighborhood || null,
+        city: data.city || null,
+        state: data.state || null,
+        zip_code: data.zipCode || null,
+        indication: data.indication || null,
+        school_name: data.schoolName || null,
+        school_phone: data.schoolPhone || null,
+        school_address: data.schoolAddress || null,
+        school_neighborhood: data.schoolNeighborhood || null,
+        school_city: data.schoolCity || null,
+        school_state: data.schoolState || null,
+        school_zip: data.schoolZip || null,
+        school_coordinator: data.schoolCoordinator || null,
+        doctor_insurance: data.doctorInsurance || null,
+        doctor_name: data.doctorName || null,
+        doctor_specialty: data.doctorSpecialty || null,
+        doctor_phone: data.doctorPhone || null,
         diagnosis: data.diagnosis || null,
         notes: data.notes || null,
         status_id: data.statusId || null,
@@ -114,12 +142,14 @@ export function DataProvider({ children }) {
       secondaryTherapistIds: data.secondaryTherapistIds || [],
       conditionIds: data.conditionIds || [],
     })
+    await syncExternalTherapists(inserted.id, data.externalTherapists || [])
 
     const newPatient = mapPatient({
       ...inserted,
       patient_specialties: (data.specialties || []).map(s => ({ specialty: s })),
       patient_secondary_therapists: (data.secondaryTherapistIds || []).map(id => ({ therapist_id: id })),
       patient_conditions: (data.conditionIds || []).map(id => ({ diagnosis_id: id })),
+      patient_external_therapists: (data.externalTherapists || []).map((t, i) => ({ ...t, sort_order: i })),
     })
     setPatients(prev => [...prev, newPatient])
     return newPatient
@@ -131,6 +161,27 @@ export function DataProvider({ children }) {
     if (data.dateOfBirth !== undefined) update.date_of_birth = data.dateOfBirth
     if (data.sex !== undefined) update.sex = data.sex
     if (data.cpf !== undefined) update.cpf = data.cpf || null
+    if (data.rg !== undefined) update.rg = data.rg || null
+    if (data.phone !== undefined) update.phone = data.phone || null
+    if (data.email !== undefined) update.email = data.email || null
+    if (data.address !== undefined) update.address = data.address || null
+    if (data.neighborhood !== undefined) update.neighborhood = data.neighborhood || null
+    if (data.city !== undefined) update.city = data.city || null
+    if (data.state !== undefined) update.state = data.state || null
+    if (data.zipCode !== undefined) update.zip_code = data.zipCode || null
+    if (data.indication !== undefined) update.indication = data.indication || null
+    if (data.schoolName !== undefined) update.school_name = data.schoolName || null
+    if (data.schoolPhone !== undefined) update.school_phone = data.schoolPhone || null
+    if (data.schoolAddress !== undefined) update.school_address = data.schoolAddress || null
+    if (data.schoolNeighborhood !== undefined) update.school_neighborhood = data.schoolNeighborhood || null
+    if (data.schoolCity !== undefined) update.school_city = data.schoolCity || null
+    if (data.schoolState !== undefined) update.school_state = data.schoolState || null
+    if (data.schoolZip !== undefined) update.school_zip = data.schoolZip || null
+    if (data.schoolCoordinator !== undefined) update.school_coordinator = data.schoolCoordinator || null
+    if (data.doctorInsurance !== undefined) update.doctor_insurance = data.doctorInsurance || null
+    if (data.doctorName !== undefined) update.doctor_name = data.doctorName || null
+    if (data.doctorSpecialty !== undefined) update.doctor_specialty = data.doctorSpecialty || null
+    if (data.doctorPhone !== undefined) update.doctor_phone = data.doctorPhone || null
     if (data.diagnosis !== undefined) update.diagnosis = data.diagnosis || null
     if (data.notes !== undefined) update.notes = data.notes || null
     if (data.statusId !== undefined) update.status_id = data.statusId || null
@@ -147,6 +198,9 @@ export function DataProvider({ children }) {
       ...(data.secondaryTherapistIds !== undefined && { secondaryTherapistIds: data.secondaryTherapistIds }),
       ...(data.conditionIds !== undefined && { conditionIds: data.conditionIds }),
     })
+    if (data.externalTherapists !== undefined) {
+      await syncExternalTherapists(id, data.externalTherapists)
+    }
 
     setPatients(prev => prev.map(p => p.id === id ? { ...p, ...data, updatedAt: new Date().toISOString() } : p))
   }
@@ -380,22 +434,31 @@ export function DataProvider({ children }) {
   // ─── Therapists ─────────────────────────────────────────────────────────────
 
   async function addTherapist(data) {
+    const primarySpec = (data.therapistSpecialties || []).find(s => s.specialty)
     const { data: inserted, error } = await supabase
       .from('therapists')
       .insert({
         name: data.name,
-        specialty: data.specialty,
+        specialty: primarySpec?.specialty || data.specialty || '',
         email: data.email || null,
         phone: data.phone || null,
         bio: data.bio || null,
-        credential: data.credential || null,
+        credential: primarySpec?.credential || null,
+        bank: data.bank || null,
+        agency: data.agency || null,
+        account_number: data.accountNumber || null,
+        pix_key: data.pixKey || null,
         active: true,
       })
       .select()
       .single()
 
     if (error) return dbError(error, toast)
-    const newTherapist = mapTherapist(inserted)
+    await syncTherapistSpecialties(inserted.id, data.therapistSpecialties || [])
+    const newTherapist = mapTherapist({
+      ...inserted,
+      therapist_specialties: data.therapistSpecialties || [],
+    })
     setTherapists(prev => [...prev, newTherapist])
     return newTherapist
   }
@@ -403,14 +466,28 @@ export function DataProvider({ children }) {
   async function updateTherapist(id, data) {
     const update = {}
     if (data.name !== undefined) update.name = data.name
-    if (data.specialty !== undefined) update.specialty = data.specialty
     if (data.email !== undefined) update.email = data.email || null
     if (data.phone !== undefined) update.phone = data.phone || null
     if (data.bio !== undefined) update.bio = data.bio || null
-    if (data.credential !== undefined) update.credential = data.credential || null
+    if (data.bank !== undefined) update.bank = data.bank || null
+    if (data.agency !== undefined) update.agency = data.agency || null
+    if (data.accountNumber !== undefined) update.account_number = data.accountNumber || null
+    if (data.pixKey !== undefined) update.pix_key = data.pixKey || null
     if (data.active !== undefined) update.active = data.active
 
-    await supabase.from('therapists').update(update).eq('id', id)
+    // Update primary specialty from first in list
+    if (data.therapistSpecialties !== undefined) {
+      const primarySpec = data.therapistSpecialties.find(s => s.specialty)
+      if (primarySpec) {
+        update.specialty = primarySpec.specialty
+        update.credential = primarySpec.credential || null
+      }
+      await syncTherapistSpecialties(id, data.therapistSpecialties)
+    }
+
+    if (Object.keys(update).length) {
+      await supabase.from('therapists').update(update).eq('id', id)
+    }
     setTherapists(prev => prev.map(t => t.id === id ? { ...t, ...data } : t))
   }
 
