@@ -34,8 +34,7 @@ export default function PatientDetailPage() {
   const linkedGuardians = getGuardiansForPatient(id)
   const patientStatus = patientStatuses.find(s => s.id === (patient.statusId || patient.status))
   const primaryTherapist = therapists.find(t => t.id === patient.therapistId)
-  const secondaryTherapists = (patient.secondaryTherapistIds || [])
-    .map(tid => therapists.find(t => t.id === tid)).filter(Boolean)
+  const secondaryTherapists = []
   const paymentMethod = paymentMethods.find(pm => pm.id === patient.paymentMethodId)
   const patientConsultations = consultations
     .filter(c => c.patientId === id)

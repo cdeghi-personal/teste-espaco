@@ -35,6 +35,7 @@ import PaymentMethodsPage from './pages/admin/paymentmethods/PaymentMethodsPage'
 import DiagnosesPage from './pages/admin/diagnoses/DiagnosesPage'
 import PatientStatusPage from './pages/admin/patientstatus/PatientStatusPage'
 import ConsultationStatusPage from './pages/admin/consultationstatus/ConsultationStatusPage'
+import AppointmentTypesPage from './pages/admin/appointmenttypes/AppointmentTypesPage'
 import RoomsPage from './pages/admin/rooms/RoomsPage'
 
 // Common
@@ -87,6 +88,7 @@ export default function App() {
                 <Route path={ROUTES.DIAGNOSES} element={<DiagnosesPage />} />
                 <Route path={ROUTES.PATIENT_STATUS} element={<PatientStatusPage />} />
                 <Route path={ROUTES.CONSULTATION_STATUS} element={<ConsultationStatusPage />} />
+                <Route path={ROUTES.APPOINTMENT_TYPES} element={<AppointmentTypesPage />} />
                 <Route path={ROUTES.ROOMS} element={<RoomsPage />} />
               </Route>
             </Route>

@@ -22,5 +22,6 @@ export const ROUTES = {
   DIAGNOSES:            '/admin/diagnostico',
   PATIENT_STATUS:       '/admin/statuspaciente',
   CONSULTATION_STATUS:  '/admin/statusconsulta',
+  APPOINTMENT_TYPES:    '/admin/tipoatendimento',
   ROOMS:                '/admin/salas',
 }

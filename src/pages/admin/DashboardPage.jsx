@@ -13,10 +13,7 @@ export default function DashboardPage() {
 
   const visiblePatients = isAdmin
     ? patients.filter(p => !p.deleted)
-    : patients.filter(p => !p.deleted && (
-        p.therapistId === user?.id ||
-        (p.secondaryTherapistIds || []).includes(user?.id)
-      ))
+    : patients.filter(p => !p.deleted && p.therapistId === user?.id)
 
   const visibleAppointments = isAdmin
     ? appointments

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
-import { FiGrid, FiCalendar, FiUsers, FiUserCheck, FiClipboard, FiLogOut, FiUserPlus, FiLayers, FiCreditCard, FiActivity, FiFlag, FiHome, FiChevronDown, FiChevronUp, FiBookOpen } from 'react-icons/fi'
+import { FiGrid, FiCalendar, FiUsers, FiUserCheck, FiClipboard, FiLogOut, FiUserPlus, FiLayers, FiCreditCard, FiActivity, FiFlag, FiHome, FiChevronDown, FiChevronUp, FiBookOpen, FiTag } from 'react-icons/fi'
 import { ROUTES } from '../../constants/routes'
 import { useAuth } from '../../context/AuthContext'
 import { SPECIALTIES } from '../../constants/specialties'
@@ -20,7 +20,8 @@ const adminNavItems = [
   { to: ROUTES.PAYMENT_METHODS, icon: FiCreditCard, label: 'Formas de Pagamento' },
   { to: ROUTES.DIAGNOSES, icon: FiActivity, label: 'Diagnósticos' },
   { to: ROUTES.PATIENT_STATUS, icon: FiFlag, label: 'Status do Paciente' },
-  { to: ROUTES.CONSULTATION_STATUS, icon: FiFlag, label: 'Status da Consulta' },
+  { to: ROUTES.CONSULTATION_STATUS, icon: FiFlag, label: 'Status Atendimento' },
+  { to: ROUTES.APPOINTMENT_TYPES, icon: FiTag, label: 'Tipos de Atendimento' },
   { to: ROUTES.ROOMS, icon: FiHome, label: 'Salas' },
 ]
 

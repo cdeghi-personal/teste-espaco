@@ -3,7 +3,7 @@ import {
   supabase,
   mapPatient, mapGuardian, mapTherapist, mapAppointment, mapConsultation,
   mapSpecialty, mapPaymentMethod, mapDiagnosis, mapPatientStatus, mapRoom,
-  mapConsultationStatus, mapExam, mapMedication, mapConduct,
+  mapConsultationStatus, mapAppointmentType, mapExam, mapMedication, mapConduct,
   syncPatientRelations, syncGuardianPatients,
   syncTherapistSpecialties, syncExternalTherapists,
 } from '../lib/supabase'
@@ -29,7 +29,6 @@ const PATIENT_SELECT = `
   diagnosis, notes, deleted,
   status_id, payment_method_id, primary_therapist_id, created_at, updated_at,
   patient_specialties(specialty),
-  patient_secondary_therapists(therapist_id),
   patient_conditions(diagnosis_id),
   patient_external_therapists(id, name, specialty, phone, sort_order)
 `
@@ -41,7 +40,7 @@ const GUARDIAN_SELECT = `
 
 const CONSULTATION_SELECT = `
   id, patient_id, therapist_id, specialty, date, session_number,
-  consultation_status_id,
+  consultation_status_id, appointment_type_id,
   main_objective, evolution_notes, next_objectives, guardian_feedback,
   session_quality, created_at,
   consultation_activities(id, name, description, outcome, sort_order)
@@ -62,13 +61,14 @@ export function DataProvider({ children }) {
   const [patientStatuses, setPatientStatuses] = useState([])
   const [rooms, setRooms] = useState([])
   const [consultationStatuses, setConsultationStatuses] = useState([])
+  const [appointmentTypes, setAppointmentTypes] = useState([])
   const [isLoading, setIsLoading] = useState(true)
 
   const fetchAll = useCallback(async () => {
     setIsLoading(true)
     const [
       patientsRes, guardiansRes, appointmentsRes, consultationsRes,
-      therapistsRes, specialtiesRes, paymentRes, diagnosesRes, statusesRes, roomsRes, consultStatusRes,
+      therapistsRes, specialtiesRes, paymentRes, diagnosesRes, statusesRes, roomsRes, consultStatusRes, apptTypesRes,
     ] = await Promise.all([
       supabase.from('patients').select(PATIENT_SELECT).eq('deleted', false),
       supabase.from('guardians').select(GUARDIAN_SELECT),
@@ -81,6 +81,7 @@ export function DataProvider({ children }) {
       supabase.from('patient_statuses').select('*').order('name'),
       supabase.from('rooms').select('*').order('name'),
       supabase.from('consultation_statuses').select('*').order('name'),
+      supabase.from('appointment_types').select('*').order('name'),
     ])
 
     setPatients((patientsRes.data || []).map(mapPatient))
@@ -94,6 +95,7 @@ export function DataProvider({ children }) {
     setPatientStatuses((statusesRes.data || []).map(mapPatientStatus))
     setRooms((roomsRes.data || []).map(mapRoom))
     setConsultationStatuses((consultStatusRes.data || []).map(mapConsultationStatus))
+    setAppointmentTypes((apptTypesRes.data || []).map(mapAppointmentType))
     setIsLoading(false)
   }, [])
 
@@ -143,7 +145,6 @@ export function DataProvider({ children }) {
 
     await syncPatientRelations(inserted.id, {
       specialties: data.specialties || [],
-      secondaryTherapistIds: data.secondaryTherapistIds || [],
       conditionIds: data.conditionIds || [],
     })
     await syncExternalTherapists(inserted.id, data.externalTherapists || [])
@@ -151,7 +152,6 @@ export function DataProvider({ children }) {
     const newPatient = mapPatient({
       ...inserted,
       patient_specialties: (data.specialties || []).map(s => ({ specialty: s })),
-      patient_secondary_therapists: (data.secondaryTherapistIds || []).map(id => ({ therapist_id: id })),
       patient_conditions: (data.conditionIds || []).map(id => ({ diagnosis_id: id })),
       patient_external_therapists: (data.externalTherapists || []).map((t, i) => ({ ...t, sort_order: i })),
     })
@@ -199,7 +199,6 @@ export function DataProvider({ children }) {
 
     await syncPatientRelations(id, {
       ...(data.specialties !== undefined && { specialties: data.specialties }),
-      ...(data.secondaryTherapistIds !== undefined && { secondaryTherapistIds: data.secondaryTherapistIds }),
       ...(data.conditionIds !== undefined && { conditionIds: data.conditionIds }),
     })
     if (data.externalTherapists !== undefined) {
@@ -356,6 +355,7 @@ export function DataProvider({ children }) {
         date: rest.date,
         session_number: rest.sessionNumber || null,
         consultation_status_id: rest.consultationStatusId || null,
+        appointment_type_id: rest.appointmentTypeId || null,
         main_objective: rest.mainObjective || null,
         evolution_notes: rest.evolutionNotes || null,
         next_objectives: rest.nextObjectives || null,
@@ -404,6 +404,7 @@ export function DataProvider({ children }) {
     if (rest.date !== undefined) update.date = rest.date
     if (rest.sessionNumber !== undefined) update.session_number = rest.sessionNumber
     if (rest.consultationStatusId !== undefined) update.consultation_status_id = rest.consultationStatusId || null
+    if (rest.appointmentTypeId !== undefined) update.appointment_type_id = rest.appointmentTypeId || null
     if (rest.mainObjective !== undefined) update.main_objective = rest.mainObjective
     if (rest.evolutionNotes !== undefined) update.evolution_notes = rest.evolutionNotes
     if (rest.nextObjectives !== undefined) update.next_objectives = rest.nextObjectives
@@ -638,6 +639,27 @@ export function DataProvider({ children }) {
     setConsultationStatuses(prev => prev.map(s => s.id === id ? { ...s, ...data } : s))
   }
 
+  // ─── Appointment Types ────────────────────────────────────────────────────────
+
+  async function addAppointmentType(data) {
+    const { data: inserted, error } = await supabase
+      .from('appointment_types')
+      .insert({ name: data.name, active: true })
+      .select().single()
+    if (error) return dbError(error, toast)
+    const item = mapAppointmentType(inserted)
+    setAppointmentTypes(prev => [...prev, item])
+    return item
+  }
+
+  async function updateAppointmentType(id, data) {
+    const update = {}
+    if (data.name !== undefined) update.name = data.name
+    if (data.active !== undefined) update.active = data.active
+    await supabase.from('appointment_types').update(update).eq('id', id)
+    setAppointmentTypes(prev => prev.map(s => s.id === id ? { ...s, ...data } : s))
+  }
+
   // ─── Medical Records ──────────────────────────────────────────────────────────
 
   async function getOrCreateMedicalRecord(patientId, authUserId) {
@@ -794,6 +816,7 @@ export function DataProvider({ children }) {
     patientStatuses, addPatientStatus, updatePatientStatus,
     rooms, addRoom, updateRoom,
     consultationStatuses, addConsultationStatus, updateConsultationStatus,
+    appointmentTypes, addAppointmentType, updateAppointmentType,
     // Medical Records
     getOrCreateMedicalRecord,
     getExams, addExam, updateExam, deleteExam,

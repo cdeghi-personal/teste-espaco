@@ -15,14 +15,14 @@ const EMPTY_ACTIVITY = { id: '', name: '', description: '', outcome: 'achieved' 
 
 const EMPTY = {
   patientId: '', therapistId: '', specialty: '', date: isoToday(),
-  consultationStatusId: '',
+  consultationStatusId: '', appointmentTypeId: '',
   mainObjective: '', activities: [],
   evolutionNotes: '', nextObjectives: '',
   sessionQuality: 'good', guardianFeedback: '', appointmentId: '',
 }
 
 export default function ConsultationFormModal({ onClose, initial = {} }) {
-  const { patients, therapists, specialtiesData, consultationStatuses, appointments, addConsultation, updateConsultation } = useData()
+  const { patients, therapists, specialtiesData, consultationStatuses, appointmentTypes, appointments, addConsultation, updateConsultation } = useData()
   const { user } = useAuth()
   const isEdit = !!initial.id
 
@@ -72,6 +72,7 @@ export default function ConsultationFormModal({ onClose, initial = {} }) {
   const activeTherapists = therapists.filter(t => t.active !== false)
   const activeSpecialties = specialtiesData.filter(s => s.active !== false)
   const activeStatuses = consultationStatuses.filter(s => s.active !== false)
+  const activeAppointmentTypes = appointmentTypes.filter(t => t.active !== false)
   const patientAppointments = form.patientId
     ? appointments.filter(a => a.patientId === form.patientId && !a.consultationId)
     : []
@@ -112,17 +113,23 @@ export default function ConsultationFormModal({ onClose, initial = {} }) {
               <Input label="Data *" type="date" value={form.date} onChange={e => set('date', e.target.value)} />
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <Select label="Especialidade *" value={form.specialty} onChange={e => set('specialty', e.target.value)} error={errors.specialty}>
                 <option value="">Selecione</option>
                 {activeSpecialties.map(s => (
                   <option key={s.key} value={s.key}>{s.label}</option>
                 ))}
               </Select>
-              <Select label="Status da Consulta" value={form.consultationStatusId} onChange={e => set('consultationStatusId', e.target.value)}>
+              <Select label="Status Atendimento" value={form.consultationStatusId} onChange={e => set('consultationStatusId', e.target.value)}>
                 <option value="">Selecione</option>
                 {activeStatuses.map(s => (
                   <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
+              </Select>
+              <Select label="Tipo de Atendimento" value={form.appointmentTypeId} onChange={e => set('appointmentTypeId', e.target.value)}>
+                <option value="">Selecione</option>
+                {activeAppointmentTypes.map(t => (
+                  <option key={t.id} value={t.id}>{t.name}</option>
                 ))}
               </Select>
             </div>

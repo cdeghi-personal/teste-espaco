@@ -18,7 +18,7 @@ const EMPTY = {
   schoolCity: '', schoolState: '', schoolZip: '', schoolCoordinator: '',
   doctorInsurance: '', doctorName: '', doctorSpecialty: '', doctorPhone: '',
   diagnosis: '', conditionIds: [], specialties: [], therapistId: '',
-  secondaryTherapistIds: [], paymentMethodId: '', notes: '', statusId: '',
+  paymentMethodId: '', notes: '', statusId: '',
   externalTherapists: [],
 }
 
@@ -30,7 +30,6 @@ export default function PatientFormModal({ onClose, initial = {} }) {
     ...EMPTY,
     ...initial,
     conditionIds: initial.conditionIds || [],
-    secondaryTherapistIds: initial.secondaryTherapistIds || [],
     statusId: initial.statusId || initial.status || '',
     externalTherapists: initial.externalTherapists || [],
   })

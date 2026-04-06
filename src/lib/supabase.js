@@ -40,7 +40,7 @@ export function mapPatient(row) {
     statusId: row.status_id,
     paymentMethodId: row.payment_method_id,
     therapistId: row.primary_therapist_id,
-    secondaryTherapistIds: (row.patient_secondary_therapists || []).map(r => r.therapist_id),
+    secondaryTherapistIds: [],
     conditionIds: (row.patient_conditions || []).map(r => r.diagnosis_id),
     specialties: (row.patient_specialties || []).map(r => r.specialty),
     externalTherapists: (row.patient_external_therapists || [])
@@ -118,6 +118,7 @@ export function mapConsultation(row) {
     date: row.date,
     sessionNumber: row.session_number,
     consultationStatusId: row.consultation_status_id,
+    appointmentTypeId: row.appointment_type_id,
     mainObjective: row.main_objective || '',
     evolutionNotes: row.evolution_notes || '',
     nextObjectives: row.next_objectives || '',
@@ -137,6 +138,10 @@ export function mapConsultation(row) {
 
 export function mapConsultationStatus(row) {
   return { id: row.id, name: row.name, color: row.color, active: row.active }
+}
+
+export function mapAppointmentType(row) {
+  return { id: row.id, name: row.name, active: row.active }
 }
 
 export function mapExam(row) {
@@ -213,19 +218,6 @@ export async function syncPatientRelations(patientId, data) {
       ops.push(
         supabase.from('patient_specialties').insert(
           data.specialties.map(s => ({ patient_id: patientId, specialty: s }))
-        )
-      )
-    }
-  }
-
-  if (data.secondaryTherapistIds !== undefined) {
-    ops.push(
-      supabase.from('patient_secondary_therapists').delete().eq('patient_id', patientId)
-    )
-    if (data.secondaryTherapistIds.length) {
-      ops.push(
-        supabase.from('patient_secondary_therapists').insert(
-          data.secondaryTherapistIds.map(tid => ({ patient_id: patientId, therapist_id: tid }))
         )
       )
     }
