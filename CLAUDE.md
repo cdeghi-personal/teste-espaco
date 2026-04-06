@@ -8,8 +8,8 @@ Sistema de gestão para uma clínica de terapias infantis multidisciplinares cha
 
 | Branch | Descrição |
 |---|---|
-| `main` | Versão com localStorage (publicada no Vercel) |
-| `feat/supabase` | Versão com Supabase (PostgreSQL + Auth real) — em desenvolvimento |
+| `main` | Versão com Supabase (publicada no Vercel) — versão principal |
+| `feat/supabase` | Branch de desenvolvimento — merges periódicos para main |
 
 ## Stack
 
@@ -18,7 +18,7 @@ Sistema de gestão para uma clínica de terapias infantis multidisciplinares cha
 - **React Router v7**
 - **react-icons** (prefixo `Fi` do Feather Icons)
 - **date-fns** para manipulação de datas
-- **@supabase/supabase-js** (na branch feat/supabase)
+- **@supabase/supabase-js**
 
 ## Estrutura de pastas relevante
 
@@ -33,15 +33,11 @@ src/
     specialties.js               # SPECIALTIES, CONDITIONS, APPOINTMENT_STATUS, PATIENT_STATUS, SESSION_QUALITY
   context/
     AuthContext.jsx              # useAuth() — user, isAuthenticated, needsPasswordReset, login, logout, updatePassword
-    DataContext.jsx              # useData() — todos os dados e CRUD (Supabase na feat/supabase, localStorage na main)
+    DataContext.jsx              # useData() — todos os dados e CRUD (Supabase)
   utils/
-    storageUtils.js              # storageGet, storageSet, storageRemove, generateId (usado só na main)
+    storageUtils.js              # generateId (helpers locais)
     dateUtils.js                 # formatDateBR, formatDateShort, formatWeekDay, isoToday, calculateAge, getWeekDays, formatMonthYear
     validators.js
-  data/
-    mockPatients.js, mockGuardians.js, mockAppointments.js, mockConsultations.js
-    mockTherapists.js, mockSpecialties.js, mockPaymentMethods.js
-    mockDiagnoses.js, mockPatientStatuses.js, mockRooms.js, mockUsers.js
   components/
     layout/
       PublicLayout.jsx, PublicHeader.jsx, PublicFooter.jsx
@@ -57,26 +53,30 @@ src/
     auth/     LoginPage, ResetPasswordPage
     admin/
       DashboardPage.jsx
-      agenda/       AgendaPage, AppointmentFormModal
-      patients/     PatientsPage, PatientDetailPage, PatientFormModal, ProntuarioTab, PlanoTerapeuticoTab
-      guardians/    GuardiansPage, GuardianFormModal
-      consultations/ ConsultationsPage, ConsultationFormModal
-      medicalrecords/ MedicalRecordsPage
-      therapists/   TherapistsPage, TherapistFormModal
-      specialties/  SpecialtiesPage, SpecialtyFormModal
-      paymentmethods/ PaymentMethodsPage, PaymentMethodFormModal
-      diagnoses/    DiagnosesPage, DiagnosisFormModal
-      patientstatus/ PatientStatusPage, PatientStatusFormModal
+      agenda/           AgendaPage, AppointmentFormModal
+      patients/         PatientsPage, PatientDetailPage, PatientFormModal
+      guardians/        GuardiansPage, GuardianFormModal
+      consultations/    ConsultationsPage, ConsultationFormModal
+      medicalrecords/   MedicalRecordsPage
+      therapists/       TherapistsPage, TherapistFormModal
+      specialties/      SpecialtiesPage, SpecialtyFormModal
+      paymentmethods/   PaymentMethodsPage, PaymentMethodFormModal
+      diagnoses/        DiagnosesPage, DiagnosisFormModal
+      patientstatus/    PatientStatusPage, PatientStatusFormModal
       consultationstatus/ ConsultationStatusPage, ConsultationStatusFormModal
-      rooms/        RoomsPage, RoomFormModal
+      appointmenttypes/ AppointmentTypesPage, AppointmentTypeFormModal
+      rooms/            RoomsPage, RoomFormModal
 supabase/
   01_schema.sql                  # Tabelas, enums, índices, trigger de criação de profile
   02_rls.sql                     # Row Level Security — admin vê tudo, terapeuta vê só os seus
   03_invite_therapist.sql        # Função link_therapist_user + documentação do fluxo
   04_fix_trigger.sql             # Fix: trigger com search_path = public (resolve erro de user_role)
-  05_prontuario.sql              # Tabelas do prontuário clínico colaborativo (legado — substituído por 07)
+  05_prontuario.sql              # Legado — substituído por 07
   06_new_fields.sql              # Novos campos: dados bancários/especialidades do terapeuta, dados pessoais/escola/médico/externos do paciente
-  07_medical_records.sql         # Prontuário novo: medical_records, medical_record_exams, medical_record_medications, medical_record_conducts, consultation_statuses
+  07_medical_records.sql         # Prontuário novo + DROP patient_secondary_therapists CASCADE + recria RLS
+  08_appointment_types.sql       # Tabela appointment_types + coluna appointment_type_id em consultations
+  09_consultation_status_automatic.sql  # Flag automatic em consultation_statuses
+  10_guardian_neighborhood.sql   # Campo neighborhood em guardians
   functions/
     invite-therapist/index.ts    # Edge Function — envia convite por e-mail ao criar terapeuta
 ```
@@ -101,12 +101,11 @@ Encontrar em: Supabase Dashboard → Project Settings → API.
 | `therapists` | Terapeutas — tem `user_id` que referencia `auth.users` |
 | `patients` | Pacientes — soft delete com `deleted = true` |
 | `patient_specialties` | Relação N:N paciente ↔ especialidade |
-| `patient_secondary_therapists` | Relação N:N paciente ↔ terapeutas secundários |
-| `patient_conditions` | Relação N:N paciente ↔ diagnósticos |
-| `guardians` | Responsáveis — soft delete com `active = false` |
+| `patient_conditions` | Relação N:N paciente ↔ diagnósticos (comorbidades) |
+| `guardians` | Responsáveis — soft delete com `active = false`; tem campo `neighborhood` |
 | `patient_guardians` | Relação N:N paciente ↔ responsável |
 | `appointments` | Agendamentos — hard delete |
-| `consultations` | Consultas/evolução — hard delete |
+| `consultations` | Consultas/evolução — hard delete; tem `appointment_type_id` |
 | `consultation_activities` | Atividades dentro de uma consulta |
 | `specialties` | Tabela de config — toggle `active` |
 | `payment_methods` | Tabela de config — toggle `active` |
@@ -115,7 +114,8 @@ Encontrar em: Supabase Dashboard → Project Settings → API.
 | `rooms` | Salas — toggle `active` |
 | `therapist_specialties` | Relação N:N terapeuta ↔ especialidade + nº do conselho regional |
 | `patient_external_therapists` | Terapeutas externos vinculados ao paciente (nome, especialidade, telefone) |
-| `consultation_statuses` | Status da consulta (ex: Realizada, Faltou, Cancelada) — toggle `active` |
+| `consultation_statuses` | Status do atendimento — toggle `active`, cor configurável, flag `automatic` |
+| `appointment_types` | Tipos de atendimento (Sessão Individual, Grupo etc.) — toggle `active` |
 | `medical_records` | Prontuário do paciente — 1:1, criado automaticamente ao abrir |
 | `medical_record_exams` | Exames complementares do paciente — N por prontuário |
 | `medical_record_medications` | Medicamentos do paciente — N por prontuário |
@@ -124,10 +124,10 @@ Encontrar em: Supabase Dashboard → Project Settings → API.
 ### Mappers (DB → App)
 
 Todos em `src/lib/supabase.js`. Convertem snake_case do banco para camelCase do app:
-- `mapPatient`, `mapGuardian`, `mapTherapist`, `mapAppointment`, `mapConsultation`
+- `mapPatient`, `mapGuardian` (inclui `neighborhood`), `mapTherapist`, `mapAppointment`, `mapConsultation`
 - `mapSpecialty`, `mapPaymentMethod`, `mapDiagnosis`, `mapPatientStatus`, `mapRoom`
-- `mapConsultationStatus`, `mapExam`, `mapMedication`, `mapConduct`
-- `syncPatientRelations(patientId, { specialties, secondaryTherapistIds, conditionIds })`
+- `mapConsultationStatus` (inclui `automatic`), `mapAppointmentType`, `mapExam`, `mapMedication`, `mapConduct`
+- `syncPatientRelations(patientId, { specialties, conditionIds })`
 - `syncGuardianPatients(guardianId, patientIds)`
 - `syncTherapistSpecialties(therapistId, [{ specialty, credential }])`
 - `syncExternalTherapists(patientId, [{ name, specialty, phone }])`
@@ -145,7 +145,7 @@ VALUES
 ON CONFLICT (id) DO UPDATE SET role = 'admin';
 ```
 
-## Autenticação e Roles (feat/supabase)
+## Autenticação e Roles
 
 - Autenticação via **Supabase Auth** (JWT real)
 - Dois roles: `admin` e `therapist` — armazenados na tabela `profiles`
@@ -164,6 +164,15 @@ Admin cria terapeuta no TherapistFormModal
   → Terapeuta clica no link → abre ResetPasswordPage
   → Define senha → therapists.user_id é vinculado automaticamente
 ```
+
+### Deploy da Edge Function
+
+```
+npx supabase functions deploy invite-therapist --project-ref SEU_PROJECT_REF
+```
+
+O Project Ref está em: Supabase Dashboard → Project Settings → General → Reference ID.
+Também configurar a secret `SITE_URL` em: Edge Functions → invite-therapist → Secrets.
 
 ### Fluxo de reset de senha / convite
 
@@ -199,6 +208,7 @@ Recomendado: **Resend** (resend.com) — 3.000 e-mails/mês grátis.
 | appointments | Hard delete | — |
 | consultations | Hard delete | — |
 | consultationStatuses | Toggle | `active` |
+| appointmentTypes | Toggle | `active` |
 | medical_records | Hard delete | — |
 | medical_record_exams | Hard delete | — |
 | medical_record_medications | Hard delete | — |
@@ -224,7 +234,8 @@ Cada especialidade tem `label`, `color` (Tailwind), `bgColor`, `textColor`, `cal
 '/admin', '/admin/agenda', '/admin/pacientes', '/admin/pacientes/:id'
 '/admin/responsaveis', '/admin/consultas', '/admin/prontuario'
 '/admin/terapeutas', '/admin/especialidades', '/admin/formapagamento'
-'/admin/diagnostico', '/admin/statuspaciente', '/admin/statusconsulta', '/admin/salas'
+'/admin/diagnostico', '/admin/statuspaciente', '/admin/statusconsulta'
+'/admin/tipoatendimento', '/admin/salas'
 ```
 
 ## Padrões de código
@@ -234,7 +245,7 @@ Cada especialidade tem `label`, `color` (Tailwind), `bgColor`, `textColor`, `cal
 - `Badge` component aceita props `specialty`, `quality` ou `patientStatus`
 - Datas armazenadas como string ISO `YYYY-MM-DD`; timestamps como ISO completo
 - Quando um agendamento vira consulta: `appointment.consultationId = consultation.id` e `appointment.status = 'completed'`
-- Na branch feat/supabase, o DataContext é **async** — todas as funções CRUD retornam Promise
+- DataContext é **async** — todas as funções CRUD retornam Promise
 - Erros do Supabase são exibidos via `Toast` (notificação na parte inferior da tela, 4s)
 - Funções CRUD retornam `{ error: string }` em caso de falha, ou o objeto criado em caso de sucesso
 - AuthContext usa `.maybeSingle()` no fetch de profile — nunca trava o login mesmo sem perfil cadastrado
@@ -266,30 +277,41 @@ Cada especialidade tem `label`, `color` (Tailwind), `bgColor`, `textColor`, `cal
 - **Dados bancários:** `bank`, `agency`, `account_number`, `pix_key` na tabela `therapists`
 - No formulário, dados bancários ficam em linha (4 campos lado a lado)
 
-## Campos do Paciente (migração 06)
+## Campos do Paciente
 
 - **Dados pessoais extras:** `rg`, `phone`, `email`, `address`, `neighborhood`, `city`, `state`, `zip_code`, `indication`
 - **Dados escolares:** `school_name`, `school_phone`, `school_address`, `school_neighborhood`, `school_city`, `school_state`, `school_zip`, `school_coordinator`
 - **Médico responsável:** `doctor_insurance`, `doctor_name`, `doctor_specialty`, `doctor_phone`
 - **Terapeutas externos:** tabela `patient_external_therapists` — lista N por paciente, com `name`, `specialty`, `phone`
-- No mapper `mapPatient`: campo `externalTherapists` (array) + todos os novos campos em camelCase
+- **Diagnóstico Principal:** campo `diagnosis` (texto) — no formulário é um Select do cadastro de diagnósticos
+- **Comorbidades:** tabela `patient_conditions` — exclui automaticamente o diagnóstico principal da lista
+
+## Campos do Responsável
+
+- Endereço completo: `address`, `neighborhood`, `city`, `state`, `cep`
+- Seleção de pacientes vinculados: lista pesquisável com checkboxes (suporta muitos pacientes)
+- Busca na listagem: por nome do responsável, CPF, telefone ou **nome do paciente vinculado**
 
 ## PatientDetailPage
 
 Tem 3 abas: **Resumo**, **Consultas**, **Responsáveis**.
 
+- **Resumo:** Dados Pessoais (inclui Terapeuta Principal), Informações Clínicas (Diagnóstico + Comorbidades), card de Responsáveis, Observações, Últimas 10 Consultas (com Status/Tipo/Objetivo)
+- **Consultas:** lista completa com paginação de 10 por página, mostra Status Atendimento e Tipo de Atendimento
+- **Responsáveis:** cards detalhados com Nome, Parentesco, Tel, E-mail
+
 ## Prontuário Clínico (MedicalRecordsPage — `/admin/prontuario`)
 
 Página independente de prontuário. Fluxo: busca paciente → carrega/cria `medical_record` → exibe 4 seções colapsáveis:
 
-| Seção | Tabela | Descrição |
-|---|---|---|
-| Exames Complementares | `medical_record_exams` | Descrição, data, link/anexo, observações |
-| Medicamentos | `medical_record_medications` | Medicamento, data, status (ativa/interrompida), observações |
-| Conduta & Objetivo Terapêutico | `medical_record_conducts` | Terapeuta, especialidade, conduta, objetivo, datas, status |
-| Histórico de Atendimentos | `consultations` | Navegação por mês, leitura das consultas já registradas |
+| Seção | Tabela | Inicia | Descrição |
+|---|---|---|---|
+| Exames Complementares | `medical_record_exams` | **Fechada** | Descrição, data, link/anexo, observações |
+| Medicamentos | `medical_record_medications` | **Fechada** | Medicamento, data, status (ativa/interrompida), observações |
+| Conduta & Objetivo Terapêutico | `medical_record_conducts` | **Fechada** | Terapeuta, especialidade, conduta, objetivo, datas, status |
+| Histórico de Atendimentos | `consultations` | **Aberta** | Navegação por mês; card compacto com Data/Especialidade/Terapeuta/Status/Tipo/Objetivo; lápis abre `ConsultationFormModal`; link "Adicionar atendimento" no rodapé |
 
-**Padrão de edição inline:** cada linha tem lápis (abre draft local) e lixeira. Novo item usa formulário dashed expandido.
+**Padrão de edição inline:** cada linha tem lápis (abre draft local) e lixeira. Novo item usa formulário dashed expandido (link `+ Adicionar ...`).
 
 **Funções do DataContext para prontuário:**
 - `getOrCreateMedicalRecord(patientId, authUserId)` → retorna `medicalRecordId`
@@ -297,12 +319,25 @@ Página independente de prontuário. Fluxo: busca paciente → carrega/cria `med
 - `getMedications(mrId)` / `addMedication(mrId, data)` / `updateMedication(id, data)` / `deleteMedication(id)`
 - `getConducts(mrId)` / `addConduct(mrId, data)` / `updateConduct(id, data)` / `deleteConduct(id)`
 
-**Componentes internos (não exportados):** `ExamRow`, `MedRow`, `ConductRow`, `InlineRow`, `Section` — cada Row gerencia seu próprio estado de edição via `useState` local.
+**Componentes internos (não exportados):** `ExamRow`, `MedRow`, `ConductRow`, `InlineRow`, `Section(defaultOpen)` — cada Row gerencia seu próprio estado de edição via `useState` local.
 
-## Status da Consulta (`/admin/statusconsulta`)
+## Status Atendimento (`/admin/statusconsulta`)
 
-Tabela `consultation_statuses` — toggle `active`, cor do badge configurável.
-Funções no DataContext: `addConsultationStatus(data)` / `updateConsultationStatus(id, data)`.
+Tabela `consultation_statuses` — toggle `active`, cor do badge configurável, flag `automatic`.
+
+- Status marcados como `automatic = true` **não aparecem** no Select de Status Atendimento do `ConsultationFormModal` (reservados para atribuição automática pelo sistema)
+- Funções no DataContext: `addConsultationStatus(data)` / `updateConsultationStatus(id, data)`
+
+## Tipos de Atendimento (`/admin/tipoatendimento`)
+
+Tabela `appointment_types` — toggle `active`. Dados iniciais: Sessão Individual, Grupo Terapêutico, Avaliação, Devolutiva.
+Funções no DataContext: `addAppointmentType(data)` / `updateAppointmentType(id, data)`
+
+## Consultas (`/admin/consultas`)
+
+- Campo **Status Atendimento** filtra automáticos (só mostra os manuais)
+- Campo **Tipo de Atendimento** vinculado à tabela `appointment_types`
+- Adicionar atividades usa link inline expandido (padrão prontuário): `+ Adicionar atividade`
 
 ## Especialidades (tabela `specialties` no banco)
 
@@ -316,7 +351,9 @@ Funções no DataContext: `addConsultationStatus(data)` / `updateConsultationSta
 - **Vercel** — conectado ao GitHub (branch `main`)
 - `vercel.json` com rewrite `/* → /index.html` para SPA routing
 - Variáveis de ambiente do Supabase configuradas em Vercel → Settings → Environment Variables
-- Edge Functions deployadas via: `npx supabase functions deploy invite-therapist --project-ref SEU_PROJECT_ID`
+- Edge Functions: `npx supabase functions deploy invite-therapist --project-ref SEU_PROJECT_REF`
+  - Project Ref: Supabase Dashboard → Project Settings → General → Reference ID
+  - Secret necessária: `SITE_URL` (URL do app)
 
 ## Site público
 
