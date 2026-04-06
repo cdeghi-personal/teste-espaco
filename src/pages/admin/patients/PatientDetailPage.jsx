@@ -1,12 +1,14 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { FiArrowLeft, FiEdit2, FiClipboard, FiUser, FiPhone, FiMail } from 'react-icons/fi'
+import { FiArrowLeft, FiEdit2, FiClipboard, FiUser, FiPhone, FiMail, FiChevronLeft, FiChevronRight } from 'react-icons/fi'
 import { useData } from '../../../context/DataContext'
 import Badge from '../../../components/ui/Badge'
 import Button from '../../../components/ui/Button'
 import PatientFormModal from './PatientFormModal'
 import { calculateAge, formatDateBR, formatDateShort } from '../../../utils/dateUtils'
 import { SPECIALTIES } from '../../../constants/specialties'
+
+const CONSULTATIONS_PER_PAGE = 10
 
 const tabs = [
   { id: 'resumo',       label: 'Resumo',       icon: FiUser },
@@ -17,9 +19,10 @@ const tabs = [
 export default function PatientDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { getPatientById, getGuardiansForPatient, consultations, therapists, paymentMethods, patientStatuses, diagnoses } = useData()
+  const { getPatientById, getGuardiansForPatient, consultations, therapists, paymentMethods, patientStatuses, diagnoses, consultationStatuses, appointmentTypes } = useData()
   const [activeTab, setActiveTab] = useState('resumo')
   const [showEdit, setShowEdit] = useState(false)
+  const [consultPage, setConsultPage] = useState(0)
 
   const patient = getPatientById(id)
   if (!patient) {
@@ -34,11 +37,16 @@ export default function PatientDetailPage() {
   const linkedGuardians = getGuardiansForPatient(id)
   const patientStatus = patientStatuses.find(s => s.id === (patient.statusId || patient.status))
   const primaryTherapist = therapists.find(t => t.id === patient.therapistId)
-  const secondaryTherapists = []
   const paymentMethod = paymentMethods.find(pm => pm.id === patient.paymentMethodId)
   const patientConsultations = consultations
     .filter(c => c.patientId === id)
     .sort((a, b) => b.date.localeCompare(a.date))
+
+  const totalPages = Math.ceil(patientConsultations.length / CONSULTATIONS_PER_PAGE)
+  const pagedConsultations = patientConsultations.slice(
+    consultPage * CONSULTATIONS_PER_PAGE,
+    (consultPage + 1) * CONSULTATIONS_PER_PAGE
+  )
 
   const outcomeColors = {
     achieved: 'text-green-600 bg-green-50',
@@ -46,6 +54,12 @@ export default function PatientDetailPage() {
     not_achieved: 'text-red-600 bg-red-50',
   }
   const outcomeLabels = { achieved: 'Alcançado', partial: 'Parcial', not_achieved: 'Não alcançado' }
+
+  // For comorbidades: filter out the primary diagnosis
+  const comorbidadeIds = (patient.conditionIds || patient.conditions || []).filter(condId => {
+    const diag = diagnoses.find(d => d.id === condId)
+    return diag && diag.name !== patient.diagnosis
+  })
 
   return (
     <div className="p-3 md:p-6 space-y-4">
@@ -78,7 +92,7 @@ export default function PatientDetailPage() {
         </div>
       </div>
 
-      {/* Tabs — scroll horizontal no mobile */}
+      {/* Tabs */}
       <div className="border-b border-gray-200 overflow-x-auto scrollbar-none">
         <div className="flex gap-0 min-w-max">
           {tabs.map(({ id: tid, label, icon: Icon }) => (
@@ -115,6 +129,19 @@ export default function PatientDetailPage() {
                 <span className="font-medium text-gray-900 text-right">{value}</span>
               </div>
             ))}
+            {/* Terapeuta Principal */}
+            <div className="flex justify-between items-center text-sm pt-1 border-t border-gray-50">
+              <span className="text-gray-500">Terapeuta Principal</span>
+              {primaryTherapist ? (
+                <div className="flex items-center gap-1.5">
+                  <div className="w-5 h-5 rounded-full bg-brand-blue text-white flex items-center justify-center text-xs font-bold">
+                    {primaryTherapist.name.charAt(0)}
+                  </div>
+                  <span className="font-medium text-gray-900">{primaryTherapist.name}</span>
+                  {primaryTherapist.specialty && <Badge specialty={primaryTherapist.specialty} />}
+                </div>
+              ) : <span className="text-gray-400">—</span>}
+            </div>
           </div>
 
           {/* Informações Clínicas */}
@@ -125,20 +152,18 @@ export default function PatientDetailPage() {
               <span className="font-medium text-gray-900">{patient.diagnosis || '—'}</span>
             </div>
             <div className="text-sm">
-              <span className="text-gray-500 block mb-1.5">Condições Associadas</span>
+              <span className="text-gray-500 block mb-1.5">Comorbidades</span>
               <div className="flex flex-wrap gap-1">
-                {(() => {
-                  const ids = patient.conditionIds || patient.conditions || []
-                  if (!ids.length) return <span className="text-gray-400">—</span>
-                  return ids.map(idOrName => {
-                    const diag = diagnoses.find(d => d.id === idOrName || d.name === idOrName)
-                    return (
-                      <span key={idOrName} className="px-2 py-0.5 bg-gray-100 rounded-full text-xs text-gray-700">
-                        {diag ? diag.name : idOrName}
-                      </span>
-                    )
-                  })
-                })()}
+                {comorbidadeIds.length === 0 ? (
+                  <span className="text-gray-400">—</span>
+                ) : comorbidadeIds.map(condId => {
+                  const diag = diagnoses.find(d => d.id === condId)
+                  return (
+                    <span key={condId} className="px-2 py-0.5 bg-gray-100 rounded-full text-xs text-gray-700">
+                      {diag ? diag.name : condId}
+                    </span>
+                  )
+                })}
               </div>
             </div>
             <div className="text-sm flex justify-between">
@@ -147,38 +172,29 @@ export default function PatientDetailPage() {
             </div>
           </div>
 
-          {/* Terapeutas */}
-          <div className="bg-white rounded-2xl border border-gray-100 p-5 space-y-3">
-            <h3 className="font-semibold text-gray-900 text-sm">Terapeutas</h3>
-            <div className="text-sm">
-              <span className="text-gray-500 block mb-1.5">Terapeuta Principal</span>
-              {primaryTherapist ? (
-                <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-full bg-brand-blue text-white flex items-center justify-center text-xs font-bold">
-                    {primaryTherapist.name.charAt(0)}
-                  </div>
-                  <span className="font-medium text-gray-900">{primaryTherapist.name}</span>
-                  {primaryTherapist.specialty && <Badge specialty={primaryTherapist.specialty} className="ml-1" />}
-                </div>
-              ) : <span className="text-gray-400">—</span>}
-            </div>
-            {secondaryTherapists.length > 0 && (
-              <div className="text-sm">
-                <span className="text-gray-500 block mb-1.5">Terapeutas Secundários</span>
-                <div className="space-y-1.5">
-                  {secondaryTherapists.map(t => (
-                    <div key={t.id} className="flex items-center gap-2">
-                      <div className="w-7 h-7 rounded-full bg-gray-200 text-gray-600 flex items-center justify-center text-xs font-bold">
-                        {t.name.charAt(0)}
-                      </div>
-                      <span className="text-gray-900 text-sm">{t.name}</span>
-                      {t.specialty && <Badge specialty={t.specialty} />}
+          {/* Responsáveis */}
+          {linkedGuardians.length > 0 && (
+            <div className="bg-white rounded-2xl border border-gray-100 p-5">
+              <h3 className="font-semibold text-gray-900 text-sm mb-3">Responsáveis</h3>
+              <div className="space-y-3">
+                {linkedGuardians.map(g => (
+                  <div key={g.id} className="flex items-start gap-3 py-2 border-b border-gray-50 last:border-0">
+                    <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center text-purple-700 font-bold text-xs shrink-0">
+                      {g.fullName?.charAt(0)}
                     </div>
-                  ))}
-                </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium text-sm text-gray-900">{g.fullName}</div>
+                      <div className="text-xs text-gray-500">{g.relationship}</div>
+                      <div className="flex items-center gap-3 mt-0.5 flex-wrap">
+                        {g.phone && <span className="flex items-center gap-1 text-xs text-gray-500"><FiPhone size={10} />{g.phone}</span>}
+                        {g.email && <span className="flex items-center gap-1 text-xs text-gray-500"><FiMail size={10} />{g.email}</span>}
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
-            )}
-          </div>
+            </div>
+          )}
 
           {/* Observações */}
           {patient.notes && (
@@ -188,24 +204,33 @@ export default function PatientDetailPage() {
             </div>
           )}
 
-          {/* Últimas consultas — preview rápido */}
+          {/* Últimas consultas */}
           {patientConsultations.length > 0 && (
             <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-100 p-5">
               <div className="flex items-center justify-between mb-3">
-                <h3 className="font-semibold text-gray-900 text-sm">Últimas Consultas</h3>
+                <h3 className="font-semibold text-gray-900 text-sm">
+                  Últimas Consultas
+                  <span className="ml-2 text-xs font-normal text-gray-400">({patientConsultations.length} no total)</span>
+                </h3>
                 <button onClick={() => setActiveTab('consultas')} className="text-xs text-brand-blue hover:underline">
-                  Ver todas ({patientConsultations.length})
+                  Ver todas
                 </button>
               </div>
               <div className="space-y-2">
-                {patientConsultations.slice(0, 3).map(c => {
+                {patientConsultations.slice(0, 10).map(c => {
                   const t = therapists.find(th => th.id === c.therapistId)
+                  const status = consultationStatuses.find(s => s.id === c.consultationStatusId)
+                  const apptType = appointmentTypes.find(at => at.id === c.appointmentTypeId)
                   return (
-                    <div key={c.id} className="flex items-center gap-3 py-2 border-b border-gray-50 last:border-0">
-                      <Badge specialty={c.specialty} />
-                      <span className="text-sm text-gray-600">{formatDateShort(c.date)}</span>
-                      <span className="text-xs text-gray-400 truncate">{t?.name}</span>
-                      <Badge quality={c.sessionQuality} />
+                    <div key={c.id} className="bg-gray-50 rounded-xl px-4 py-2.5 border border-gray-100">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-medium text-sm text-gray-900">{formatDateShort(c.date)}</span>
+                        <Badge specialty={c.specialty} />
+                        {status && <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${status.color}`}>{status.name}</span>}
+                        {apptType && <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-200 text-gray-600">{apptType.name}</span>}
+                        <span className="text-xs text-gray-500">{t?.name || '—'}</span>
+                      </div>
+                      {c.mainObjective && <p className="text-xs text-gray-600 mt-1 line-clamp-1">{c.mainObjective}</p>}
                     </div>
                   )
                 })}
@@ -218,7 +243,28 @@ export default function PatientDetailPage() {
       {/* ── Consultas ── */}
       {activeTab === 'consultas' && (
         <div className="space-y-4">
-          <h3 className="font-semibold text-gray-900">{patientConsultations.length} Registro(s) de Consulta</h3>
+          <div className="flex items-center justify-between">
+            <h3 className="font-semibold text-gray-900">{patientConsultations.length} Registro(s) de Consulta</h3>
+            {totalPages > 1 && (
+              <div className="flex items-center gap-2 text-sm text-gray-600">
+                <button
+                  onClick={() => setConsultPage(p => Math.max(0, p - 1))}
+                  disabled={consultPage === 0}
+                  className="p-1.5 rounded-lg border border-gray-200 disabled:opacity-30 hover:bg-gray-50"
+                >
+                  <FiChevronLeft size={14} />
+                </button>
+                <span className="text-xs">{consultPage + 1} / {totalPages}</span>
+                <button
+                  onClick={() => setConsultPage(p => Math.min(totalPages - 1, p + 1))}
+                  disabled={consultPage === totalPages - 1}
+                  className="p-1.5 rounded-lg border border-gray-200 disabled:opacity-30 hover:bg-gray-50"
+                >
+                  <FiChevronRight size={14} />
+                </button>
+              </div>
+            )}
+          </div>
           {patientConsultations.length === 0 ? (
             <div className="bg-white rounded-2xl border border-gray-100 p-12 text-center text-gray-400">
               <FiClipboard size={32} className="mx-auto mb-3 opacity-40" />
@@ -226,17 +272,18 @@ export default function PatientDetailPage() {
             </div>
           ) : (
             <div className="space-y-3">
-              {patientConsultations.map(c => {
+              {pagedConsultations.map(c => {
                 const therapist = therapists.find(t => t.id === c.therapistId)
+                const status = consultationStatuses.find(s => s.id === c.consultationStatusId)
+                const apptType = appointmentTypes.find(at => at.id === c.appointmentTypeId)
                 return (
                   <div key={c.id} className="bg-white rounded-2xl border border-gray-100 p-5">
-                    <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <Badge specialty={c.specialty} />
-                        <span className="text-sm font-medium text-gray-900">{formatDateShort(c.date)}</span>
-                        <span className="text-xs text-gray-500">Sessão #{c.sessionNumber}</span>
-                      </div>
-                      <Badge quality={c.sessionQuality} />
+                    <div className="flex items-center gap-2 flex-wrap mb-2">
+                      <Badge specialty={c.specialty} />
+                      <span className="text-sm font-medium text-gray-900">{formatDateShort(c.date)}</span>
+                      {status && <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${status.color}`}>{status.name}</span>}
+                      {apptType && <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">{apptType.name}</span>}
+                      <span className="text-xs text-gray-400">{therapist?.name}</span>
                     </div>
                     {c.mainObjective && <p className="text-sm text-gray-700 mb-2"><strong>Objetivo:</strong> {c.mainObjective}</p>}
                     {c.evolutionNotes && <p className="text-sm text-gray-600 mb-2">{c.evolutionNotes}</p>}
@@ -261,7 +308,6 @@ export default function PatientDetailPage() {
                         <p className="text-sm text-gray-700">{c.guardianFeedback}</p>
                       </div>
                     )}
-                    <p className="text-xs text-gray-400 mt-2">{therapist?.name}</p>
                   </div>
                 )
               })}

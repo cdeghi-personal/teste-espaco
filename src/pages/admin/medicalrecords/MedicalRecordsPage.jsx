@@ -192,8 +192,8 @@ function InlineRow({ children, onSave, onCancel, onEdit, onDelete, editing }) {
 }
 
 // ─── Seção com título colapsável ─────────────────────────────
-function Section({ title, count, children }) {
-  const [open, setOpen] = useState(true)
+function Section({ title, count, children, defaultOpen = true }) {
+  const [open, setOpen] = useState(defaultOpen)
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
       <button
@@ -213,7 +213,7 @@ function Section({ title, count, children }) {
 
 export default function MedicalRecordsPage() {
   const {
-    patients, therapists, specialtiesData, consultations,
+    patients, therapists, specialtiesData, consultations, consultationStatuses, appointmentTypes,
     getOrCreateMedicalRecord,
     getExams, addExam, updateExam, deleteExam,
     getMedications, addMedication, updateMedication, deleteMedication,
@@ -416,7 +416,7 @@ export default function MedicalRecordsPage() {
             <div className="space-y-4">
 
               {/* ── Exames Complementares ── */}
-              <Section title="Exames Complementares" count={exams.length}>
+              <Section title="Exames Complementares" count={exams.length} defaultOpen={false}>
                 <div className="space-y-2">
                   {exams.map(ex => (
                     <ExamRow key={ex.id} ex={ex} onSave={saveExamEdit} onDelete={removeExam} />
@@ -448,7 +448,7 @@ export default function MedicalRecordsPage() {
               </Section>
 
               {/* ── Medicamentos ── */}
-              <Section title="Medicamentos" count={medications.length}>
+              <Section title="Medicamentos" count={medications.length} defaultOpen={false}>
                 <div className="space-y-2">
                   {medications.map(med => (
                     <MedRow key={med.id} med={med} onSave={saveMedEdit} onDelete={removeMed} />
@@ -482,7 +482,7 @@ export default function MedicalRecordsPage() {
               </Section>
 
               {/* ── Conduta & Objetivo Terapêutico ── */}
-              <Section title="Conduta & Objetivo Terapêutico" count={conducts.length}>
+              <Section title="Conduta & Objetivo Terapêutico" count={conducts.length} defaultOpen={false}>
                 <div className="space-y-2">
                   {conducts.map(cd => (
                     <ConductRow
@@ -570,32 +570,25 @@ export default function MedicalRecordsPage() {
                   <div className="space-y-3">
                     {monthConsultations.map(c => {
                       const therapist = therapists.find(t => t.id === c.therapistId)
-                      const outcomeColors = { achieved: 'text-green-600 bg-green-50', partial: 'text-yellow-600 bg-yellow-50', not_achieved: 'text-red-600 bg-red-50' }
-                      const outcomeLabels = { achieved: 'Alcançado', partial: 'Parcial', not_achieved: 'Não alcançado' }
+                      const status = consultationStatuses.find(s => s.id === c.consultationStatusId)
+                      const apptType = appointmentTypes.find(t => t.id === c.appointmentTypeId)
                       return (
-                        <div key={c.id} className="bg-gray-50 rounded-xl p-4 border border-gray-100">
-                          <div className="flex items-center gap-3 flex-wrap mb-2">
+                        <div key={c.id} className="bg-gray-50 rounded-xl px-4 py-3 border border-gray-100">
+                          <div className="flex items-center gap-2 flex-wrap">
                             <span className="font-medium text-sm text-gray-900">{formatDateShort(c.date)}</span>
                             <Badge specialty={c.specialty} />
+                            {status && <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${status.color}`}>{status.name}</span>}
+                            {apptType && <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-200 text-gray-600">{apptType.name}</span>}
                             <span className="text-xs text-gray-500">{therapist?.name || '—'}</span>
                             <button
                               onClick={() => { setEditConsultation(c); setShowConsultationModal(true) }}
-                              className="ml-auto p-1.5 rounded-lg text-gray-400 hover:text-brand-blue hover:bg-blue-50 transition-colors"
+                              className="ml-auto p-1 rounded-lg text-gray-400 hover:text-brand-blue hover:bg-blue-50 transition-colors"
                             >
-                              <FiEdit2 size={14} />
+                              <FiEdit2 size={13} />
                             </button>
                           </div>
-                          {c.mainObjective && <p className="text-xs text-gray-600 mb-2"><strong>Objetivo:</strong> {c.mainObjective}</p>}
-                          {c.activities?.length > 0 && (
-                            <div className="space-y-1">
-                              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Atividades</p>
-                              {c.activities.map(act => (
-                                <div key={act.id} className="flex items-start gap-2">
-                                  <span className={`shrink-0 px-1.5 py-0.5 rounded-full text-xs ${outcomeColors[act.outcome]}`}>{outcomeLabels[act.outcome]}</span>
-                                  <span className="text-xs text-gray-700">{act.name}</span>
-                                </div>
-                              ))}
-                            </div>
+                          {c.mainObjective && (
+                            <p className="text-xs text-gray-600 mt-1.5 line-clamp-2">{c.mainObjective}</p>
                           )}
                         </div>
                       )

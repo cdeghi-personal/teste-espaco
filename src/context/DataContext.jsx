@@ -34,7 +34,7 @@ const PATIENT_SELECT = `
 `
 
 const GUARDIAN_SELECT = `
-  id, full_name, relationship, phone, email, cpf, occupation, notes, active, created_at,
+  id, full_name, relationship, phone, email, cpf, occupation, notes, neighborhood, active, created_at,
   patient_guardians(patient_id)
 `
 
@@ -237,6 +237,7 @@ export function DataProvider({ children }) {
         cpf: data.cpf || null,
         occupation: data.occupation || null,
         notes: data.notes || null,
+        neighborhood: data.neighborhood || null,
         active: true,
       })
       .select()
@@ -263,6 +264,7 @@ export function DataProvider({ children }) {
     if (data.cpf !== undefined) update.cpf = data.cpf || null
     if (data.occupation !== undefined) update.occupation = data.occupation || null
     if (data.notes !== undefined) update.notes = data.notes || null
+    if (data.neighborhood !== undefined) update.neighborhood = data.neighborhood || null
     if (data.active !== undefined) update.active = data.active
 
     if (Object.keys(update).length) {

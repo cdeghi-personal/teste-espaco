@@ -62,6 +62,7 @@ export function mapGuardian(row) {
     cpf: row.cpf || '',
     occupation: row.occupation || '',
     notes: row.notes || '',
+    neighborhood: row.neighborhood || '',
     active: row.active,
     patientIds: (row.patient_guardians || []).map(r => r.patient_id),
     createdAt: row.created_at,

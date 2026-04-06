@@ -266,12 +266,16 @@ export default function PatientFormModal({ onClose, initial = {} }) {
             Informações Clínicas
           </h3>
           <div className="space-y-3">
-            <Input
+            <Select
               label="Diagnóstico Principal"
               value={form.diagnosis}
               onChange={e => set('diagnosis', e.target.value)}
-              placeholder="Ex: TEA Nível 2, TDAH Tipo Combinado..."
-            />
+            >
+              <option value="">Selecione</option>
+              {activeDiagnoses.map(d => (
+                <option key={d.id} value={d.name}>{d.name}</option>
+              ))}
+            </Select>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Comorbidades</label>
@@ -279,7 +283,7 @@ export default function PatientFormModal({ onClose, initial = {} }) {
                 <p className="text-xs text-gray-400">Cadastre diagnósticos em Administração → Diagnósticos.</p>
               ) : (
                 <div className="flex flex-wrap gap-2">
-                  {activeDiagnoses.map(d => (
+                  {activeDiagnoses.filter(d => d.name !== form.diagnosis).map(d => (
                     <button
                       key={d.id}
                       type="button"
