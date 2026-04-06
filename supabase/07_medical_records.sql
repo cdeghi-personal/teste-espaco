@@ -10,7 +10,82 @@ DROP TABLE IF EXISTS patient_clinical_history;
 DROP TABLE IF EXISTS patient_family_context;
 
 -- ─── Remove tabela de terapeutas secundários ─────────────────
-DROP TABLE IF EXISTS patient_secondary_therapists;
+-- CASCADE remove as policies que dependem desta tabela; elas são recriadas abaixo
+DROP TABLE IF EXISTS patient_secondary_therapists CASCADE;
+
+-- ─── Recriar policies afetadas pelo CASCADE ───────────────────
+-- (terapeuta agora acessa apenas pacientes onde é terapeuta principal)
+
+DROP POLICY IF EXISTS "patients: terapeuta acessa os seus" ON patients;
+CREATE POLICY "patients: terapeuta acessa os seus"
+  ON patients FOR SELECT
+  USING (deleted = false AND primary_therapist_id = my_therapist_id());
+
+DROP POLICY IF EXISTS "patients: terapeuta edita os seus" ON patients;
+CREATE POLICY "patients: terapeuta edita os seus"
+  ON patients FOR UPDATE
+  USING (deleted = false AND primary_therapist_id = my_therapist_id());
+
+DROP POLICY IF EXISTS "patient_specialties: terapeuta lê os seus" ON patient_specialties;
+CREATE POLICY "patient_specialties: terapeuta lê os seus"
+  ON patient_specialties FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1 FROM patients p
+      WHERE p.id = patient_specialties.patient_id
+        AND p.deleted = false
+        AND p.primary_therapist_id = my_therapist_id()
+    )
+  );
+
+DROP POLICY IF EXISTS "patient_conditions: terapeuta lê os seus" ON patient_conditions;
+CREATE POLICY "patient_conditions: terapeuta lê os seus"
+  ON patient_conditions FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1 FROM patients p
+      WHERE p.id = patient_conditions.patient_id
+        AND p.deleted = false
+        AND p.primary_therapist_id = my_therapist_id()
+    )
+  );
+
+DROP POLICY IF EXISTS "guardians: terapeuta lê dos seus pacientes" ON guardians;
+CREATE POLICY "guardians: terapeuta lê dos seus pacientes"
+  ON guardians FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1 FROM patient_guardians pg
+      JOIN patients p ON p.id = pg.patient_id
+      WHERE pg.guardian_id = guardians.id
+        AND p.deleted = false
+        AND p.primary_therapist_id = my_therapist_id()
+    )
+  );
+
+DROP POLICY IF EXISTS "patient_guardians: terapeuta lê dos seus" ON patient_guardians;
+CREATE POLICY "patient_guardians: terapeuta lê dos seus"
+  ON patient_guardians FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1 FROM patients p
+      WHERE p.id = patient_guardians.patient_id
+        AND p.deleted = false
+        AND p.primary_therapist_id = my_therapist_id()
+    )
+  );
+
+DROP POLICY IF EXISTS "therapist_read_ext_therapists" ON patient_external_therapists;
+CREATE POLICY "therapist_read_ext_therapists"
+  ON patient_external_therapists FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1 FROM patients p
+      WHERE p.id = patient_external_therapists.patient_id
+        AND p.deleted = false
+        AND p.primary_therapist_id = my_therapist_id()
+    )
+  );
 
 -- ─── CPF no terapeuta ─────────────────────────────────────────
 ALTER TABLE therapists ADD COLUMN IF NOT EXISTS cpf text;
