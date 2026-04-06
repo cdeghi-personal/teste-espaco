@@ -137,7 +137,7 @@ export function mapConsultation(row) {
 }
 
 export function mapConsultationStatus(row) {
-  return { id: row.id, name: row.name, color: row.color, active: row.active }
+  return { id: row.id, name: row.name, color: row.color, active: row.active, automatic: row.automatic || false }
 }
 
 export function mapAppointmentType(row) {

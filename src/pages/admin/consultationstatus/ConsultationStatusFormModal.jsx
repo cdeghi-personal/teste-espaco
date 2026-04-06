@@ -15,7 +15,7 @@ const COLOR_OPTIONS = [
   { value: 'bg-purple-100 text-purple-700', label: 'Roxo' },
 ]
 
-const EMPTY = { name: '', color: 'bg-green-100 text-green-700', active: true }
+const EMPTY = { name: '', color: 'bg-green-100 text-green-700', active: true, automatic: false }
 
 export default function ConsultationStatusFormModal({ onClose, initial = {} }) {
   const { addConsultationStatus, updateConsultationStatus } = useData()
@@ -68,6 +68,19 @@ export default function ConsultationStatusFormModal({ onClose, initial = {} }) {
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">Prévia</label>
           <span className={`inline-flex px-3 py-1 rounded-full text-xs font-medium ${form.color}`}>{form.name || 'Status'}</span>
+        </div>
+        <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
+          <input
+            id="cs-automatic"
+            type="checkbox"
+            checked={form.automatic}
+            onChange={e => set('automatic', e.target.checked)}
+            className="w-4 h-4 rounded accent-brand-blue"
+          />
+          <div>
+            <label htmlFor="cs-automatic" className="text-sm font-medium text-gray-700">Automático</label>
+            <p className="text-xs text-gray-400 mt-0.5">Status atribuído automaticamente pelo sistema (não aparece para seleção manual)</p>
+          </div>
         </div>
         {isEdit && (
           <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">

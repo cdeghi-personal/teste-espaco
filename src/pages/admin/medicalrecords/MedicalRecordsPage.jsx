@@ -7,6 +7,7 @@ import Input from '../../../components/ui/Input'
 import Select from '../../../components/ui/Select'
 import Textarea from '../../../components/ui/Textarea'
 import Badge from '../../../components/ui/Badge'
+import ConsultationFormModal from '../consultations/ConsultationFormModal'
 import { formatDateBR, formatDateShort, isoToday } from '../../../utils/dateUtils'
 import { SPECIALTIES } from '../../../constants/specialties'
 
@@ -236,6 +237,8 @@ export default function MedicalRecordsPage() {
 
   // Month navigation for history
   const [consultMonth, setConsultMonth] = useState(currentYearMonth())
+  const [showConsultationModal, setShowConsultationModal] = useState(false)
+  const [editConsultation, setEditConsultation] = useState(null)
 
   const activePatients = patients.filter(p => !p.deleted)
   const filtered = search
@@ -567,7 +570,6 @@ export default function MedicalRecordsPage() {
                   <div className="space-y-3">
                     {monthConsultations.map(c => {
                       const therapist = therapists.find(t => t.id === c.therapistId)
-                      const specLabel = SPECIALTIES[c.specialty]?.label || c.specialty
                       const outcomeColors = { achieved: 'text-green-600 bg-green-50', partial: 'text-yellow-600 bg-yellow-50', not_achieved: 'text-red-600 bg-red-50' }
                       const outcomeLabels = { achieved: 'Alcançado', partial: 'Parcial', not_achieved: 'Não alcançado' }
                       return (
@@ -576,6 +578,12 @@ export default function MedicalRecordsPage() {
                             <span className="font-medium text-sm text-gray-900">{formatDateShort(c.date)}</span>
                             <Badge specialty={c.specialty} />
                             <span className="text-xs text-gray-500">{therapist?.name || '—'}</span>
+                            <button
+                              onClick={() => { setEditConsultation(c); setShowConsultationModal(true) }}
+                              className="ml-auto p-1.5 rounded-lg text-gray-400 hover:text-brand-blue hover:bg-blue-50 transition-colors"
+                            >
+                              <FiEdit2 size={14} />
+                            </button>
                           </div>
                           {c.mainObjective && <p className="text-xs text-gray-600 mb-2"><strong>Objetivo:</strong> {c.mainObjective}</p>}
                           {c.activities?.length > 0 && (
@@ -594,11 +602,24 @@ export default function MedicalRecordsPage() {
                     })}
                   </div>
                 )}
+                <button
+                  onClick={() => { setEditConsultation(null); setShowConsultationModal(true) }}
+                  className="flex items-center gap-1.5 text-sm text-brand-blue hover:underline mt-2"
+                >
+                  <FiPlus size={14} /> Adicionar atendimento
+                </button>
               </Section>
 
             </div>
           )}
         </>
+      )}
+
+      {showConsultationModal && (
+        <ConsultationFormModal
+          onClose={() => setShowConsultationModal(false)}
+          initial={editConsultation || (selectedPatientId ? { patientId: selectedPatientId } : {})}
+        />
       )}
     </div>
   )

@@ -622,7 +622,7 @@ export function DataProvider({ children }) {
   async function addConsultationStatus(data) {
     const { data: inserted, error } = await supabase
       .from('consultation_statuses')
-      .insert({ name: data.name, color: data.color || 'bg-gray-100 text-gray-700', active: true })
+      .insert({ name: data.name, color: data.color || 'bg-gray-100 text-gray-700', active: true, automatic: data.automatic || false })
       .select().single()
     if (error) return dbError(error, toast)
     const item = mapConsultationStatus(inserted)
@@ -635,6 +635,7 @@ export function DataProvider({ children }) {
     if (data.name !== undefined) update.name = data.name
     if (data.color !== undefined) update.color = data.color
     if (data.active !== undefined) update.active = data.active
+    if (data.automatic !== undefined) update.automatic = data.automatic
     await supabase.from('consultation_statuses').update(update).eq('id', id)
     setConsultationStatuses(prev => prev.map(s => s.id === id ? { ...s, ...data } : s))
   }

@@ -55,7 +55,10 @@ export default function ConsultationStatusPage() {
               return (
                 <div key={s.id} className={`flex items-center gap-3 px-4 py-3 hover:bg-gray-50/50 transition-colors ${isInactive ? 'opacity-60' : ''}`}>
                   <div className="flex-1 min-w-0">
-                    <div className="font-medium text-sm text-gray-900">{s.name}</div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-sm text-gray-900">{s.name}</span>
+                      {s.automatic && <span className="px-1.5 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-700">Automático</span>}
+                    </div>
                     {count > 0 && <div className="text-xs text-gray-400 mt-0.5">{count} consulta(s)</div>}
                   </div>
                   <span className={`shrink-0 px-2.5 py-0.5 rounded-full text-xs font-medium ${s.color || 'bg-gray-100 text-gray-700'}`}>
