@@ -1,16 +1,18 @@
 import { useState } from 'react'
 import { FiMail, FiCheck, FiPlus, FiTrash2 } from 'react-icons/fi'
+import { formatCPF, validateCPF } from '../../../utils/validators'
 import Modal from '../../../components/ui/Modal'
 import Button from '../../../components/ui/Button'
 import Input from '../../../components/ui/Input'
 import Select from '../../../components/ui/Select'
 import { useData } from '../../../context/DataContext'
+import { useToast } from '../../../components/ui/Toast'
 import { SPECIALTY_LIST, SPECIALTIES } from '../../../constants/specialties'
 
 const EMPTY_SPEC = { specialty: '', credential: '' }
 
 const EMPTY = {
-  name: '', email: '', phone: '',
+  name: '', email: '', phone: '', cpf: '',
   therapistSpecialties: [{ ...EMPTY_SPEC }],
   bank: '', agency: '', accountNumber: '', pixKey: '',
   active: true,
@@ -18,6 +20,7 @@ const EMPTY = {
 
 export default function TherapistFormModal({ onClose, initial = {} }) {
   const { addTherapist, updateTherapist } = useData()
+  const toast = useToast()
   const isEdit = !!initial.id
 
   const [form, setForm] = useState({
@@ -62,6 +65,7 @@ export default function TherapistFormModal({ onClose, initial = {} }) {
     const hasSpec = form.therapistSpecialties.some(s => s.specialty)
     if (!hasSpec) e.specialties = 'Adicione ao menos uma especialidade'
     if (!isEdit && !form.email.trim()) e.email = 'E-mail obrigatório para enviar o convite'
+    if (form.cpf && form.cpf.replace(/\D/g, '').length === 11 && !validateCPF(form.cpf)) e.cpf = 'CPF inválido'
     return e
   }
 
@@ -78,11 +82,18 @@ export default function TherapistFormModal({ onClose, initial = {} }) {
         const therapist = await addTherapist(form)
         if (!therapist || therapist.error) throw new Error(therapist?.error || 'Erro ao criar terapeuta')
 
-        const { supabase } = await import('../../../lib/supabase')
-        const { error } = await supabase.functions.invoke('invite-therapist', {
-          body: { email: form.email, therapistId: therapist.id, therapistName: form.name },
-        })
-        if (error) throw error
+        // Tenta enviar convite — mesmo se falhar, terapeuta já está criado
+        try {
+          const { supabase } = await import('../../../lib/supabase')
+          const result = await supabase.functions.invoke('invite-therapist', {
+            body: { email: form.email, therapistId: therapist.id, therapistName: form.name },
+          })
+          if (result.error) {
+            toast.show(`Terapeuta cadastrado, mas o e-mail de convite falhou: ${result.error.message || 'erro desconhecido'}. Você pode reenviar depois.`, 'error')
+          }
+        } catch (emailErr) {
+          toast.show('Terapeuta cadastrado, mas o e-mail de convite não pôde ser enviado. Verifique a Edge Function.', 'error')
+        }
         setInviteSent(true)
       }
     } catch (err) {
@@ -156,6 +167,15 @@ export default function TherapistFormModal({ onClose, initial = {} }) {
                 value={form.phone}
                 onChange={e => set('phone', e.target.value)}
                 placeholder="(11) 9 9999-9999"
+              />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Input
+                label="CPF"
+                value={form.cpf}
+                onChange={e => set('cpf', formatCPF(e.target.value))}
+                error={errors.cpf}
+                placeholder="000.000.000-00"
               />
             </div>
           </div>

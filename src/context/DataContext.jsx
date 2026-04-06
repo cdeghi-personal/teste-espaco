@@ -3,7 +3,7 @@ import {
   supabase,
   mapPatient, mapGuardian, mapTherapist, mapAppointment, mapConsultation,
   mapSpecialty, mapPaymentMethod, mapDiagnosis, mapPatientStatus, mapRoom,
-  mapFamilyContext, mapClinicalHistory, mapAssessment, mapTherapeuticPlan,
+  mapConsultationStatus, mapExam, mapMedication, mapConduct,
   syncPatientRelations, syncGuardianPatients,
   syncTherapistSpecialties, syncExternalTherapists,
 } from '../lib/supabase'
@@ -41,6 +41,7 @@ const GUARDIAN_SELECT = `
 
 const CONSULTATION_SELECT = `
   id, patient_id, therapist_id, specialty, date, session_number,
+  consultation_status_id,
   main_objective, evolution_notes, next_objectives, guardian_feedback,
   session_quality, created_at,
   consultation_activities(id, name, description, outcome, sort_order)
@@ -60,13 +61,14 @@ export function DataProvider({ children }) {
   const [diagnoses, setDiagnoses] = useState([])
   const [patientStatuses, setPatientStatuses] = useState([])
   const [rooms, setRooms] = useState([])
+  const [consultationStatuses, setConsultationStatuses] = useState([])
   const [isLoading, setIsLoading] = useState(true)
 
   const fetchAll = useCallback(async () => {
     setIsLoading(true)
     const [
       patientsRes, guardiansRes, appointmentsRes, consultationsRes,
-      therapistsRes, specialtiesRes, paymentRes, diagnosesRes, statusesRes, roomsRes,
+      therapistsRes, specialtiesRes, paymentRes, diagnosesRes, statusesRes, roomsRes, consultStatusRes,
     ] = await Promise.all([
       supabase.from('patients').select(PATIENT_SELECT).eq('deleted', false),
       supabase.from('guardians').select(GUARDIAN_SELECT),
@@ -78,6 +80,7 @@ export function DataProvider({ children }) {
       supabase.from('diagnoses').select('*').order('name'),
       supabase.from('patient_statuses').select('*').order('name'),
       supabase.from('rooms').select('*').order('name'),
+      supabase.from('consultation_statuses').select('*').order('name'),
     ])
 
     setPatients((patientsRes.data || []).map(mapPatient))
@@ -90,6 +93,7 @@ export function DataProvider({ children }) {
     setDiagnoses((diagnosesRes.data || []).map(mapDiagnosis))
     setPatientStatuses((statusesRes.data || []).map(mapPatientStatus))
     setRooms((roomsRes.data || []).map(mapRoom))
+    setConsultationStatuses((consultStatusRes.data || []).map(mapConsultationStatus))
     setIsLoading(false)
   }, [])
 
@@ -351,6 +355,7 @@ export function DataProvider({ children }) {
         specialty: rest.specialty,
         date: rest.date,
         session_number: rest.sessionNumber || null,
+        consultation_status_id: rest.consultationStatusId || null,
         main_objective: rest.mainObjective || null,
         evolution_notes: rest.evolutionNotes || null,
         next_objectives: rest.nextObjectives || null,
@@ -398,6 +403,7 @@ export function DataProvider({ children }) {
     if (rest.specialty !== undefined) update.specialty = rest.specialty
     if (rest.date !== undefined) update.date = rest.date
     if (rest.sessionNumber !== undefined) update.session_number = rest.sessionNumber
+    if (rest.consultationStatusId !== undefined) update.consultation_status_id = rest.consultationStatusId || null
     if (rest.mainObjective !== undefined) update.main_objective = rest.mainObjective
     if (rest.evolutionNotes !== undefined) update.evolution_notes = rest.evolutionNotes
     if (rest.nextObjectives !== undefined) update.next_objectives = rest.nextObjectives
@@ -442,6 +448,7 @@ export function DataProvider({ children }) {
         specialty: primarySpec?.specialty || data.specialty || '',
         email: data.email || null,
         phone: data.phone || null,
+        cpf: data.cpf || null,
         bio: data.bio || null,
         credential: primarySpec?.credential || null,
         bank: data.bank || null,
@@ -468,6 +475,7 @@ export function DataProvider({ children }) {
     if (data.name !== undefined) update.name = data.name
     if (data.email !== undefined) update.email = data.email || null
     if (data.phone !== undefined) update.phone = data.phone || null
+    if (data.cpf !== undefined) update.cpf = data.cpf || null
     if (data.bio !== undefined) update.bio = data.bio || null
     if (data.bank !== undefined) update.bank = data.bank || null
     if (data.agency !== undefined) update.agency = data.agency || null
@@ -608,151 +616,167 @@ export function DataProvider({ children }) {
     setRooms(prev => prev.map(r => r.id === id ? { ...r, ...data } : r))
   }
 
-  // ─── Prontuário: Contexto Familiar ───────────────────────────────────────────
+  // ─── Consultation Statuses ────────────────────────────────────────────────────
 
-  async function getFamilyContext(patientId) {
-    const { data, error } = await supabase
-      .from('patient_family_context')
-      .select('*, updater:updated_by(name)')
-      .eq('patient_id', patientId)
-      .maybeSingle()
-    if (error) return dbError(error, toast)
-    return mapFamilyContext(data)
-  }
-
-  async function saveFamilyContext(patientId, data, authUserId) {
-    const payload = {
-      patient_id: patientId,
-      family_composition: data.familyComposition || null,
-      guardian_relationship: data.guardianRelationship || null,
-      daily_routine: data.dailyRoutine || null,
-      school_context: data.schoolContext || null,
-      family_environment: data.familyEnvironment || null,
-      updated_by: authUserId,
-      updated_at: new Date().toISOString(),
-    }
-    const { data: saved, error } = await supabase
-      .from('patient_family_context')
-      .upsert(payload, { onConflict: 'patient_id' })
+  async function addConsultationStatus(data) {
+    const { data: inserted, error } = await supabase
+      .from('consultation_statuses')
+      .insert({ name: data.name, color: data.color || 'bg-gray-100 text-gray-700', active: true })
       .select().single()
     if (error) return dbError(error, toast)
-    return mapFamilyContext(saved)
+    const item = mapConsultationStatus(inserted)
+    setConsultationStatuses(prev => [...prev, item])
+    return item
   }
 
-  // ─── Prontuário: Histórico Clínico ────────────────────────────────────────────
-
-  async function getClinicalHistory(patientId) {
-    const { data, error } = await supabase
-      .from('patient_clinical_history')
-      .select('*, updater:updated_by(name)')
-      .eq('patient_id', patientId)
-      .maybeSingle()
-    if (error) return dbError(error, toast)
-    return mapClinicalHistory(data)
+  async function updateConsultationStatus(id, data) {
+    const update = {}
+    if (data.name !== undefined) update.name = data.name
+    if (data.color !== undefined) update.color = data.color
+    if (data.active !== undefined) update.active = data.active
+    await supabase.from('consultation_statuses').update(update).eq('id', id)
+    setConsultationStatuses(prev => prev.map(s => s.id === id ? { ...s, ...data } : s))
   }
 
-  async function saveClinicalHistory(patientId, data, authUserId) {
-    const payload = {
-      patient_id: patientId,
-      main_complaint: data.mainComplaint || null,
-      diagnostic_hypotheses: data.diagnosticHypotheses || null,
-      current_medications: data.currentMedications || null,
-      medical_history: data.medicalHistory || null,
-      previous_therapy_history: data.previousTherapyHistory || null,
-      comorbidities: data.comorbidities || null,
-      updated_by: authUserId,
-      updated_at: new Date().toISOString(),
-    }
-    const { data: saved, error } = await supabase
-      .from('patient_clinical_history')
-      .upsert(payload, { onConflict: 'patient_id' })
-      .select().single()
-    if (error) return dbError(error, toast)
-    return mapClinicalHistory(saved)
-  }
+  // ─── Medical Records ──────────────────────────────────────────────────────────
 
-  // ─── Prontuário: Avaliações Iniciais ─────────────────────────────────────────
-
-  async function getAssessments(patientId) {
-    const { data, error } = await supabase
-      .from('patient_assessments')
-      .select('*, therapist:therapist_id(name)')
-      .eq('patient_id', patientId)
-      .order('specialty')
-    if (error) return dbError(error, toast)
-    return (data || []).map(mapAssessment)
-  }
-
-  async function saveAssessment(patientId, specialty, data, therapistId) {
-    const payload = {
-      patient_id: patientId,
-      specialty,
-      therapist_id: therapistId || null,
-      assessment_date: data.assessmentDate || new Date().toISOString().slice(0, 10),
-      main_complaint: data.mainComplaint || null,
-      initial_objectives: data.initialObjectives || null,
-      applied_tests: data.appliedTests || null,
-      clinical_observations: data.clinicalObservations || null,
-      updated_at: new Date().toISOString(),
-    }
-    const { data: saved, error } = await supabase
-      .from('patient_assessments')
-      .upsert(payload, { onConflict: 'patient_id,specialty' })
-      .select('*, therapist:therapist_id(name)')
-      .single()
-    if (error) return dbError(error, toast)
-    return mapAssessment(saved)
-  }
-
-  // ─── Prontuário: Plano Terapêutico ────────────────────────────────────────────
-
-  async function getTherapeuticPlans(patientId) {
-    const { data, error } = await supabase
-      .from('therapeutic_plans')
-      .select('*, updater:updated_by(name)')
-      .eq('patient_id', patientId)
-      .order('specialty')
-    if (error) return dbError(error, toast)
-    return (data || []).map(mapTherapeuticPlan)
-  }
-
-  async function saveTherapeuticPlan(patientId, specialty, data, authUserId) {
-    const payload = {
-      patient_id: patientId,
-      specialty,
-      general_objectives: data.generalObjectives || null,
-      specific_objectives: data.specificObjectives || null,
-      attendance_frequency: data.attendanceFrequency || null,
-      intervention_strategy: data.interventionStrategy || null,
-      revision_notes: data.revisionNotes || null,
-      updated_by: authUserId,
-      updated_at: new Date().toISOString(),
-    }
-    // upsert: insert ou update baseado em patient_id + specialty
+  async function getOrCreateMedicalRecord(patientId, authUserId) {
     const { data: existing } = await supabase
-      .from('therapeutic_plans')
+      .from('medical_records')
       .select('id')
       .eq('patient_id', patientId)
-      .eq('specialty', specialty)
       .maybeSingle()
+    if (existing) return existing.id
 
-    let saved, error
-    if (existing) {
-      ;({ data: saved, error } = await supabase
-        .from('therapeutic_plans')
-        .update(payload)
-        .eq('id', existing.id)
-        .select('*, updater:updated_by(name)')
-        .single())
-    } else {
-      ;({ data: saved, error } = await supabase
-        .from('therapeutic_plans')
-        .insert({ ...payload, created_by: authUserId })
-        .select('*, updater:updated_by(name)')
-        .single())
-    }
+    const { data: created, error } = await supabase
+      .from('medical_records')
+      .insert({ patient_id: patientId, created_by: authUserId || null })
+      .select('id').single()
+    if (error) { dbError(error, toast); return null }
+    return created.id
+  }
+
+  async function getExams(medicalRecordId) {
+    const { data, error } = await supabase
+      .from('medical_record_exams')
+      .select('*')
+      .eq('medical_record_id', medicalRecordId)
+      .order('created_at')
     if (error) return dbError(error, toast)
-    return mapTherapeuticPlan(saved)
+    return (data || []).map(mapExam)
+  }
+
+  async function addExam(medicalRecordId, data) {
+    const { data: inserted, error } = await supabase
+      .from('medical_record_exams')
+      .insert({
+        medical_record_id: medicalRecordId,
+        description: data.description,
+        exam_date: data.examDate || null,
+        attachment_url: data.attachmentUrl || null,
+        notes: data.notes || null,
+      })
+      .select().single()
+    if (error) return dbError(error, toast)
+    return mapExam(inserted)
+  }
+
+  async function updateExam(id, data) {
+    const update = {}
+    if (data.description !== undefined) update.description = data.description
+    if (data.examDate !== undefined) update.exam_date = data.examDate || null
+    if (data.attachmentUrl !== undefined) update.attachment_url = data.attachmentUrl || null
+    if (data.notes !== undefined) update.notes = data.notes || null
+    update.updated_at = new Date().toISOString()
+    await supabase.from('medical_record_exams').update(update).eq('id', id)
+  }
+
+  async function deleteExam(id) {
+    await supabase.from('medical_record_exams').delete().eq('id', id)
+  }
+
+  async function getMedications(medicalRecordId) {
+    const { data, error } = await supabase
+      .from('medical_record_medications')
+      .select('*')
+      .eq('medical_record_id', medicalRecordId)
+      .order('created_at')
+    if (error) return dbError(error, toast)
+    return (data || []).map(mapMedication)
+  }
+
+  async function addMedication(medicalRecordId, data) {
+    const { data: inserted, error } = await supabase
+      .from('medical_record_medications')
+      .insert({
+        medical_record_id: medicalRecordId,
+        medication: data.medication,
+        registration_date: data.registrationDate || new Date().toISOString().slice(0, 10),
+        status: data.status || 'ativa',
+        notes: data.notes || null,
+      })
+      .select().single()
+    if (error) return dbError(error, toast)
+    return mapMedication(inserted)
+  }
+
+  async function updateMedication(id, data) {
+    const update = {}
+    if (data.medication !== undefined) update.medication = data.medication
+    if (data.registrationDate !== undefined) update.registration_date = data.registrationDate
+    if (data.status !== undefined) update.status = data.status
+    if (data.notes !== undefined) update.notes = data.notes || null
+    update.updated_at = new Date().toISOString()
+    await supabase.from('medical_record_medications').update(update).eq('id', id)
+  }
+
+  async function deleteMedication(id) {
+    await supabase.from('medical_record_medications').delete().eq('id', id)
+  }
+
+  async function getConducts(medicalRecordId) {
+    const { data, error } = await supabase
+      .from('medical_record_conducts')
+      .select('*, therapist:therapist_id(name)')
+      .eq('medical_record_id', medicalRecordId)
+      .order('created_at')
+    if (error) return dbError(error, toast)
+    return (data || []).map(mapConduct)
+  }
+
+  async function addConduct(medicalRecordId, data) {
+    const { data: inserted, error } = await supabase
+      .from('medical_record_conducts')
+      .insert({
+        medical_record_id: medicalRecordId,
+        therapist_id: data.therapistId || null,
+        specialty: data.specialty || null,
+        conduct: data.conduct || null,
+        objective: data.objective || null,
+        start_date: data.startDate || null,
+        end_date: data.endDate || null,
+        status: data.status || 'nao_iniciada',
+      })
+      .select('*, therapist:therapist_id(name)').single()
+    if (error) return dbError(error, toast)
+    return mapConduct(inserted)
+  }
+
+  async function updateConduct(id, data) {
+    const update = {}
+    if (data.therapistId !== undefined) update.therapist_id = data.therapistId || null
+    if (data.specialty !== undefined) update.specialty = data.specialty || null
+    if (data.conduct !== undefined) update.conduct = data.conduct || null
+    if (data.objective !== undefined) update.objective = data.objective || null
+    if (data.startDate !== undefined) update.start_date = data.startDate || null
+    if (data.endDate !== undefined) update.end_date = data.endDate || null
+    if (data.status !== undefined) update.status = data.status
+    update.updated_at = new Date().toISOString()
+    await supabase.from('medical_record_conducts').update(update).eq('id', id)
+  }
+
+  async function deleteConduct(id) {
+    await supabase.from('medical_record_conducts').delete().eq('id', id)
   }
 
   // ─── Value ───────────────────────────────────────────────────────────────────
@@ -769,11 +793,12 @@ export function DataProvider({ children }) {
     diagnoses, addDiagnosis, updateDiagnosis,
     patientStatuses, addPatientStatus, updatePatientStatus,
     rooms, addRoom, updateRoom,
-    // Prontuário
-    getFamilyContext, saveFamilyContext,
-    getClinicalHistory, saveClinicalHistory,
-    getAssessments, saveAssessment,
-    getTherapeuticPlans, saveTherapeuticPlan,
+    consultationStatuses, addConsultationStatus, updateConsultationStatus,
+    // Medical Records
+    getOrCreateMedicalRecord,
+    getExams, addExam, updateExam, deleteExam,
+    getMedications, addMedication, updateMedication, deleteMedication,
+    getConducts, addConduct, updateConduct, deleteConduct,
   }
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>

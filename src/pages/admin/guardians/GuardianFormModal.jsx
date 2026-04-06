@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { formatCPF, validateCPF } from '../../../utils/validators'
 import Modal from '../../../components/ui/Modal'
 import Button from '../../../components/ui/Button'
 import Input from '../../../components/ui/Input'
@@ -36,6 +37,7 @@ export default function GuardianFormModal({ onClose, initial = {} }) {
     const e = {}
     if (!form.fullName.trim()) e.fullName = 'Nome obrigatório'
     if (!form.phone.trim()) e.phone = 'Telefone obrigatório'
+    if (form.cpf && form.cpf.replace(/\D/g, '').length === 11 && !validateCPF(form.cpf)) e.cpf = 'CPF inválido'
     return e
   }
 
@@ -75,7 +77,7 @@ export default function GuardianFormModal({ onClose, initial = {} }) {
               </Select>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <Input label="CPF" value={form.cpf} onChange={e => set('cpf', e.target.value)} placeholder="000.000.000-00" />
+              <Input label="CPF" value={form.cpf} onChange={e => set('cpf', formatCPF(e.target.value))} error={errors.cpf} placeholder="000.000.000-00" />
               <Input label="RG" value={form.rg} onChange={e => set('rg', e.target.value)} />
             </div>
             <Input label="Profissão" value={form.occupation} onChange={e => set('occupation', e.target.value)} />

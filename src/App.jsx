@@ -26,6 +26,7 @@ import PatientsPage from './pages/admin/patients/PatientsPage'
 import PatientDetailPage from './pages/admin/patients/PatientDetailPage'
 import GuardiansPage from './pages/admin/guardians/GuardiansPage'
 import ConsultationsPage from './pages/admin/consultations/ConsultationsPage'
+import MedicalRecordsPage from './pages/admin/medicalrecords/MedicalRecordsPage'
 
 // Admin - Cadastros
 import TherapistsPage from './pages/admin/therapists/TherapistsPage'
@@ -33,6 +34,7 @@ import SpecialtiesPage from './pages/admin/specialties/SpecialtiesPage'
 import PaymentMethodsPage from './pages/admin/paymentmethods/PaymentMethodsPage'
 import DiagnosesPage from './pages/admin/diagnoses/DiagnosesPage'
 import PatientStatusPage from './pages/admin/patientstatus/PatientStatusPage'
+import ConsultationStatusPage from './pages/admin/consultationstatus/ConsultationStatusPage'
 import RoomsPage from './pages/admin/rooms/RoomsPage'
 
 // Common
@@ -78,11 +80,13 @@ export default function App() {
                 <Route path={ROUTES.PATIENT_DETAIL} element={<PatientDetailPage />} />
                 <Route path={ROUTES.GUARDIANS} element={<GuardiansPage />} />
                 <Route path={ROUTES.CONSULTATIONS} element={<ConsultationsPage />} />
+                <Route path={ROUTES.MEDICAL_RECORDS} element={<MedicalRecordsPage />} />
                 <Route path={ROUTES.THERAPISTS} element={<TherapistsPage />} />
                 <Route path={ROUTES.SPECIALTIES_ADMIN} element={<SpecialtiesPage />} />
                 <Route path={ROUTES.PAYMENT_METHODS} element={<PaymentMethodsPage />} />
                 <Route path={ROUTES.DIAGNOSES} element={<DiagnosesPage />} />
                 <Route path={ROUTES.PATIENT_STATUS} element={<PatientStatusPage />} />
+                <Route path={ROUTES.CONSULTATION_STATUS} element={<ConsultationStatusPage />} />
                 <Route path={ROUTES.ROOMS} element={<RoomsPage />} />
               </Route>
             </Route>

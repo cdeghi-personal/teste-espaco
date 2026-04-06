@@ -1,21 +1,17 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { FiArrowLeft, FiEdit2, FiClipboard, FiUser, FiPhone, FiMail, FiBookOpen, FiTarget } from 'react-icons/fi'
+import { FiArrowLeft, FiEdit2, FiClipboard, FiUser, FiPhone, FiMail } from 'react-icons/fi'
 import { useData } from '../../../context/DataContext'
 import Badge from '../../../components/ui/Badge'
 import Button from '../../../components/ui/Button'
 import PatientFormModal from './PatientFormModal'
-import ProntuarioTab from './ProntuarioTab'
-import PlanoTerapeuticoTab from './PlanoTerapeuticoTab'
 import { calculateAge, formatDateBR, formatDateShort } from '../../../utils/dateUtils'
 import { SPECIALTIES } from '../../../constants/specialties'
 
 const tabs = [
-  { id: 'resumo',      label: 'Resumo',            icon: FiUser },
-  { id: 'prontuario',  label: 'Prontuário',         icon: FiBookOpen },
-  { id: 'plano',       label: 'Plano Terapêutico',  icon: FiTarget },
-  { id: 'consultas',   label: 'Consultas',          icon: FiClipboard },
-  { id: 'responsaveis',label: 'Responsáveis',       icon: FiUser },
+  { id: 'resumo',       label: 'Resumo',       icon: FiUser },
+  { id: 'consultas',    label: 'Consultas',    icon: FiClipboard },
+  { id: 'responsaveis', label: 'Responsáveis', icon: FiUser },
 ]
 
 export default function PatientDetailPage() {
@@ -218,16 +214,6 @@ export default function PatientDetailPage() {
             </div>
           )}
         </div>
-      )}
-
-      {/* ── Prontuário ── */}
-      {activeTab === 'prontuario' && (
-        <ProntuarioTab patientId={id} patientSpecialties={patient.specialties} />
-      )}
-
-      {/* ── Plano Terapêutico ── */}
-      {activeTab === 'plano' && (
-        <PlanoTerapeuticoTab patientId={id} patientSpecialties={patient.specialties} />
       )}
 
       {/* ── Consultas ── */}

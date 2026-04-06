@@ -74,16 +74,17 @@ export default function HomePage() {
                 Cuidado interdisciplinar com acolhimento e ciência
               </div>
 
-				<h1 className="text-3xl md:text-5xl font-bold leading-tight mb-6">
-				  Cada criança tem seu tempo.
-				  <br />
-				  <span className="text-brand-yellow">Nós respeitamos isso.</span>
-				</h1>
+              <h1 className="text-3xl md:text-5xl font-bold leading-tight mb-6">
+                Cada criança tem seu tempo.
+                <br />
+                <span className="text-brand-yellow">Nós respeitamos isso.</span>
+              </h1>
 
-				<p className="text-lg text-blue-100 leading-relaxed max-w-xl">
-					Desenvolvimento infantil com abordagem interdisciplinar,
-					unindo ciência, acolhimento e parceria com as famílias.
-				</p>
+              <p className="text-lg text-blue-100 leading-relaxed max-w-xl">
+                Desenvolvimento infantil com abordagem interdisciplinar,
+                unindo ciência, acolhimento e parceria com as famílias.
+              </p>
+
               <div className="flex flex-col sm:flex-row gap-4">
                 <Link
                   to={ROUTES.CONTACT}
@@ -147,7 +148,7 @@ export default function HomePage() {
             {Object.entries(SPECIALTIES).map(([key, spec]) => (
               <Link
                 key={key}
-                to={ROUTES.SERVICES}
+                to={`${ROUTES.SERVICES}#${key}`}
                 className="group p-6 rounded-2xl border border-gray-100 bg-white shadow-sm hover:-translate-y-1 hover:shadow-xl transition-all duration-300 text-center"
               >
                 <div className="text-5xl mb-5">{specialtyIcons[key]}</div>

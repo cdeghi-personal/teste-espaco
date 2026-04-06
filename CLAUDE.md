@@ -61,19 +61,22 @@ src/
       patients/     PatientsPage, PatientDetailPage, PatientFormModal, ProntuarioTab, PlanoTerapeuticoTab
       guardians/    GuardiansPage, GuardianFormModal
       consultations/ ConsultationsPage, ConsultationFormModal
+      medicalrecords/ MedicalRecordsPage
       therapists/   TherapistsPage, TherapistFormModal
       specialties/  SpecialtiesPage, SpecialtyFormModal
       paymentmethods/ PaymentMethodsPage, PaymentMethodFormModal
       diagnoses/    DiagnosesPage, DiagnosisFormModal
       patientstatus/ PatientStatusPage, PatientStatusFormModal
+      consultationstatus/ ConsultationStatusPage, ConsultationStatusFormModal
       rooms/        RoomsPage, RoomFormModal
 supabase/
   01_schema.sql                  # Tabelas, enums, índices, trigger de criação de profile
   02_rls.sql                     # Row Level Security — admin vê tudo, terapeuta vê só os seus
   03_invite_therapist.sql        # Função link_therapist_user + documentação do fluxo
   04_fix_trigger.sql             # Fix: trigger com search_path = public (resolve erro de user_role)
-  05_prontuario.sql              # Tabelas do prontuário clínico colaborativo
+  05_prontuario.sql              # Tabelas do prontuário clínico colaborativo (legado — substituído por 07)
   06_new_fields.sql              # Novos campos: dados bancários/especialidades do terapeuta, dados pessoais/escola/médico/externos do paciente
+  07_medical_records.sql         # Prontuário novo: medical_records, medical_record_exams, medical_record_medications, medical_record_conducts, consultation_statuses
   functions/
     invite-therapist/index.ts    # Edge Function — envia convite por e-mail ao criar terapeuta
 ```
@@ -110,19 +113,20 @@ Encontrar em: Supabase Dashboard → Project Settings → API.
 | `diagnoses` | Tabela de config — toggle `active` |
 | `patient_statuses` | Tabela de config — toggle `active` |
 | `rooms` | Salas — toggle `active` |
-| `patient_family_context` | Contexto familiar e escolar — 1:1 com paciente |
-| `patient_clinical_history` | Histórico clínico, medicamentos, comorbidades — 1:1 com paciente |
-| `patient_assessments` | Avaliação inicial por especialidade — 1 por paciente/especialidade |
-| `therapeutic_plans` | Plano terapêutico por especialidade — colaborativo |
 | `therapist_specialties` | Relação N:N terapeuta ↔ especialidade + nº do conselho regional |
 | `patient_external_therapists` | Terapeutas externos vinculados ao paciente (nome, especialidade, telefone) |
+| `consultation_statuses` | Status da consulta (ex: Realizada, Faltou, Cancelada) — toggle `active` |
+| `medical_records` | Prontuário do paciente — 1:1, criado automaticamente ao abrir |
+| `medical_record_exams` | Exames complementares do paciente — N por prontuário |
+| `medical_record_medications` | Medicamentos do paciente — N por prontuário |
+| `medical_record_conducts` | Conduta & objetivo terapêutico — N por prontuário, vinculado ao terapeuta/especialidade |
 
 ### Mappers (DB → App)
 
 Todos em `src/lib/supabase.js`. Convertem snake_case do banco para camelCase do app:
 - `mapPatient`, `mapGuardian`, `mapTherapist`, `mapAppointment`, `mapConsultation`
 - `mapSpecialty`, `mapPaymentMethod`, `mapDiagnosis`, `mapPatientStatus`, `mapRoom`
-- `mapFamilyContext`, `mapClinicalHistory`, `mapAssessment`, `mapTherapeuticPlan`
+- `mapConsultationStatus`, `mapExam`, `mapMedication`, `mapConduct`
 - `syncPatientRelations(patientId, { specialties, secondaryTherapistIds, conditionIds })`
 - `syncGuardianPatients(guardianId, patientIds)`
 - `syncTherapistSpecialties(therapistId, [{ specialty, credential }])`
@@ -194,6 +198,11 @@ Recomendado: **Resend** (resend.com) — 3.000 e-mails/mês grátis.
 | rooms | Toggle | `active` |
 | appointments | Hard delete | — |
 | consultations | Hard delete | — |
+| consultationStatuses | Toggle | `active` |
+| medical_records | Hard delete | — |
+| medical_record_exams | Hard delete | — |
+| medical_record_medications | Hard delete | — |
+| medical_record_conducts | Hard delete | — |
 
 ## Especialidades
 
@@ -213,9 +222,9 @@ Cada especialidade tem `label`, `color` (Tailwind), `bgColor`, `textColor`, `cal
 '/login', '/reset-senha'
 // Admin (protegidas por PrivateRoute)
 '/admin', '/admin/agenda', '/admin/pacientes', '/admin/pacientes/:id'
-'/admin/responsaveis', '/admin/consultas'
+'/admin/responsaveis', '/admin/consultas', '/admin/prontuario'
 '/admin/terapeutas', '/admin/especialidades', '/admin/formapagamento'
-'/admin/diagnostico', '/admin/statuspaciente', '/admin/salas'
+'/admin/diagnostico', '/admin/statuspaciente', '/admin/statusconsulta', '/admin/salas'
 ```
 
 ## Padrões de código
@@ -265,32 +274,35 @@ Cada especialidade tem `label`, `color` (Tailwind), `bgColor`, `textColor`, `cal
 - **Terapeutas externos:** tabela `patient_external_therapists` — lista N por paciente, com `name`, `specialty`, `phone`
 - No mapper `mapPatient`: campo `externalTherapists` (array) + todos os novos campos em camelCase
 
-## Prontuário Clínico (PatientDetailPage)
+## PatientDetailPage
 
-`PatientDetailPage` tem 5 abas:
+Tem 3 abas: **Resumo**, **Consultas**, **Responsáveis**.
 
-| Aba | Componente | Conteúdo |
+## Prontuário Clínico (MedicalRecordsPage — `/admin/prontuario`)
+
+Página independente de prontuário. Fluxo: busca paciente → carrega/cria `medical_record` → exibe 4 seções colapsáveis:
+
+| Seção | Tabela | Descrição |
 |---|---|---|
-| Resumo | inline | Dados cadastrais + prévia das últimas 3 consultas |
-| Prontuário | `ProntuarioTab` | Contexto familiar · Histórico clínico · Avaliações por especialidade |
-| Plano Terapêutico | `PlanoTerapeuticoTab` | Um painel por especialidade — cada terapeuta edita só a sua |
-| Consultas | inline | Evolução por sessão (existente) |
-| Responsáveis | inline | Responsáveis vinculados (existente) |
+| Exames Complementares | `medical_record_exams` | Descrição, data, link/anexo, observações |
+| Medicamentos | `medical_record_medications` | Medicamento, data, status (ativa/interrompida), observações |
+| Conduta & Objetivo Terapêutico | `medical_record_conducts` | Terapeuta, especialidade, conduta, objetivo, datas, status |
+| Histórico de Atendimentos | `consultations` | Navegação por mês, leitura das consultas já registradas |
 
-**Padrão de edição inline:** botão lápis abre campos no lugar, salva sem modal.
-Cada seção exibe `Atualizado por [nome] · [data]` para rastreabilidade colaborativa.
-
-**Controle de acesso no Plano Terapêutico:**
-- Admin: edita todos os planos de todas as especialidades
-- Terapeuta: edita apenas o plano da sua própria especialidade; vê os demais somente leitura
+**Padrão de edição inline:** cada linha tem lápis (abre draft local) e lixeira. Novo item usa formulário dashed expandido.
 
 **Funções do DataContext para prontuário:**
-- `getFamilyContext(patientId)` / `saveFamilyContext(patientId, data, authUserId)`
-- `getClinicalHistory(patientId)` / `saveClinicalHistory(patientId, data, authUserId)`
-- `getAssessments(patientId)` / `saveAssessment(patientId, specialty, data, therapistId)`
-- `getTherapeuticPlans(patientId)` / `saveTherapeuticPlan(patientId, specialty, data, authUserId)`
+- `getOrCreateMedicalRecord(patientId, authUserId)` → retorna `medicalRecordId`
+- `getExams(mrId)` / `addExam(mrId, data)` / `updateExam(id, data)` / `deleteExam(id)`
+- `getMedications(mrId)` / `addMedication(mrId, data)` / `updateMedication(id, data)` / `deleteMedication(id)`
+- `getConducts(mrId)` / `addConduct(mrId, data)` / `updateConduct(id, data)` / `deleteConduct(id)`
 
-Todas usam `upsert` — criam ou atualizam sem duplicar.
+**Componentes internos (não exportados):** `ExamRow`, `MedRow`, `ConductRow`, `InlineRow`, `Section` — cada Row gerencia seu próprio estado de edição via `useState` local.
+
+## Status da Consulta (`/admin/statusconsulta`)
+
+Tabela `consultation_statuses` — toggle `active`, cor do badge configurável.
+Funções no DataContext: `addConsultationStatus(data)` / `updateConsultationStatus(id, data)`.
 
 ## Especialidades (tabela `specialties` no banco)
 

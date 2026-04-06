@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import { FiPlus, FiTrash2 } from 'react-icons/fi'
+import { formatCPF, validateCPF } from '../../../utils/validators'
 import Modal from '../../../components/ui/Modal'
 import Button from '../../../components/ui/Button'
 import Input from '../../../components/ui/Input'
 import Select from '../../../components/ui/Select'
 import Textarea from '../../../components/ui/Textarea'
 import { useData } from '../../../context/DataContext'
-import { SPECIALTY_LIST, SPECIALTIES } from '../../../constants/specialties'
+import { SPECIALTIES } from '../../../constants/specialties'
 
 const EMPTY_EXT = { name: '', specialty: '', phone: '' }
 
@@ -22,7 +23,7 @@ const EMPTY = {
 }
 
 export default function PatientFormModal({ onClose, initial = {} }) {
-  const { paymentMethods, therapists, diagnoses, patientStatuses, addPatient, updatePatient } = useData()
+  const { paymentMethods, therapists, diagnoses, patientStatuses, specialtiesData, addPatient, updatePatient } = useData()
   const isEdit = !!initial.id
 
   const [form, setForm] = useState({
@@ -66,6 +67,7 @@ export default function PatientFormModal({ onClose, initial = {} }) {
     if (!form.fullName.trim()) e.fullName = 'Nome obrigatório'
     if (!form.dateOfBirth) e.dateOfBirth = 'Data de nascimento obrigatória'
     if (!form.sex) e.sex = 'Selecione'
+    if (form.cpf && form.cpf.replace(/\D/g, '').length === 11 && !validateCPF(form.cpf)) e.cpf = 'CPF inválido'
     return e
   }
 
@@ -84,7 +86,7 @@ export default function PatientFormModal({ onClose, initial = {} }) {
   const activePaymentMethods = paymentMethods.filter(pm => pm.active !== false)
   const activeDiagnoses = diagnoses.filter(d => d.active !== false)
   const activeStatuses = patientStatuses.filter(s => s.active !== false)
-  const secondaryOptions = activeTherapists.filter(t => t.id !== form.therapistId)
+  const activeSpecialties = specialtiesData.filter(s => s.active !== false)
 
   return (
     <Modal
@@ -127,7 +129,7 @@ export default function PatientFormModal({ onClose, initial = {} }) {
                 <option value="F">Feminino</option>
                 <option value="O">Outro</option>
               </Select>
-              <Input label="CPF" value={form.cpf} onChange={e => set('cpf', e.target.value)} placeholder="000.000.000-00" />
+              <Input label="CPF" value={form.cpf} onChange={e => set('cpf', formatCPF(e.target.value))} error={errors.cpf} placeholder="000.000.000-00" />
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <Input label="RG" value={form.rg} onChange={e => set('rg', e.target.value)} placeholder="00.000.000-0" />
@@ -145,6 +147,26 @@ export default function PatientFormModal({ onClose, initial = {} }) {
               <Input label="Estado" value={form.state} onChange={e => set('state', e.target.value)} placeholder="SP" />
               <Input label="CEP" value={form.zipCode} onChange={e => set('zipCode', e.target.value)} placeholder="00000-000" />
               <Input label="Indicação" value={form.indication} onChange={e => set('indication', e.target.value)} placeholder="Como nos conheceu?" />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <Select label="Gerente do Caso" value={form.therapistId} onChange={e => set('therapistId', e.target.value)}>
+                <option value="">Selecione</option>
+                {activeTherapists.map(t => (
+                  <option key={t.id} value={t.id}>{t.name} — {SPECIALTIES[t.specialty]?.label || t.specialty}</option>
+                ))}
+              </Select>
+              <Select label="Status" value={form.statusId} onChange={e => set('statusId', e.target.value)}>
+                <option value="">Selecione</option>
+                {activeStatuses.map(s => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
+              </Select>
+              <Select label="Forma de Pagamento" value={form.paymentMethodId} onChange={e => set('paymentMethodId', e.target.value)}>
+                <option value="">Selecione</option>
+                {activePaymentMethods.map(pm => (
+                  <option key={pm.id} value={pm.id}>{pm.name}</option>
+                ))}
+              </Select>
             </div>
           </div>
         </section>
@@ -253,7 +275,7 @@ export default function PatientFormModal({ onClose, initial = {} }) {
             />
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Condições / Diagnósticos Associados</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Comorbidades</label>
               {activeDiagnoses.length === 0 ? (
                 <p className="text-xs text-gray-400">Cadastre diagnósticos em Administração → Diagnósticos.</p>
               ) : (
@@ -277,85 +299,34 @@ export default function PatientFormModal({ onClose, initial = {} }) {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Especialidades em Atendimento</label>
-              <div className="flex flex-wrap gap-2">
-                {SPECIALTY_LIST.map(k => (
-                  <button
-                    key={k}
-                    type="button"
-                    onClick={() => toggleList('specialties', k)}
-                    className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all border-2 ${
-                      form.specialties?.includes(k)
-                        ? `${SPECIALTIES[k].color} border-current`
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border-transparent'
-                    }`}
-                  >
-                    {SPECIALTIES[k].label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <Select label="Status" value={form.statusId} onChange={e => set('statusId', e.target.value)}>
-                <option value="">Selecione</option>
-                {activeStatuses.map(s => (
-                  <option key={s.id} value={s.id}>{s.name}</option>
-                ))}
-              </Select>
-              <Select label="Forma de Pagamento" value={form.paymentMethodId} onChange={e => set('paymentMethodId', e.target.value)}>
-                <option value="">Selecione</option>
-                {activePaymentMethods.map(pm => (
-                  <option key={pm.id} value={pm.id}>{pm.name}</option>
-                ))}
-              </Select>
-            </div>
-          </div>
-        </section>
-
-        {/* Terapeutas da Clínica */}
-        <section>
-          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3 pb-2 border-b border-gray-100">
-            Terapeutas da Clínica
-          </h3>
-          <div className="space-y-3">
-            <Select
-              label="Terapeuta Principal"
-              value={form.therapistId}
-              onChange={e => {
-                set('therapistId', e.target.value)
-                set('secondaryTherapistIds', (form.secondaryTherapistIds || []).filter(id => id !== e.target.value))
-              }}
-            >
-              <option value="">Selecione o terapeuta principal</option>
-              {activeTherapists.map(t => (
-                <option key={t.id} value={t.id}>{t.name} — {SPECIALTIES[t.specialty]?.label || t.specialty}</option>
-              ))}
-            </Select>
-
-            <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Terapeutas Secundários
-                <span className="text-xs text-gray-400 font-normal ml-1">(selecione um ou mais)</span>
+                Especialidades em Atendimento
+                <span className="text-xs text-gray-400 font-normal ml-1">(múltipla seleção)</span>
               </label>
-              {secondaryOptions.length === 0 ? (
-                <p className="text-xs text-gray-400">Selecione um terapeuta principal primeiro.</p>
+              {activeSpecialties.length === 0 ? (
+                <p className="text-xs text-gray-400">Cadastre especialidades em Administração → Especialidades.</p>
               ) : (
                 <div className="flex flex-wrap gap-2">
-                  {secondaryOptions.map(t => (
-                    <button
-                      key={t.id}
-                      type="button"
-                      onClick={() => toggleList('secondaryTherapistIds', t.id)}
-                      className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-                        form.secondaryTherapistIds?.includes(t.id)
-                          ? 'bg-brand-blue text-white'
-                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                      }`}
-                    >
-                      {t.name}
-                    </button>
-                  ))}
+                  {activeSpecialties.map(s => {
+                    const colors = SPECIALTIES[s.key]
+                    const isSelected = form.specialties?.includes(s.key)
+                    return (
+                      <button
+                        key={s.key}
+                        type="button"
+                        onClick={() => toggleList('specialties', s.key)}
+                        className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all border-2 ${
+                          isSelected
+                            ? colors
+                              ? `${colors.color} border-current`
+                              : 'bg-brand-blue text-white border-brand-blue'
+                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border-transparent'
+                        }`}
+                      >
+                        {s.label}
+                      </button>
+                    )
+                  })}
                 </div>
               )}
             </div>

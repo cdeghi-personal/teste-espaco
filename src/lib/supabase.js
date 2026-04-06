@@ -76,6 +76,7 @@ export function mapTherapist(row) {
     specialty: row.specialty,
     email: row.email || '',
     phone: row.phone || '',
+    cpf: row.cpf || '',
     bio: row.bio || '',
     credential: row.credential || '',
     bank: row.bank || '',
@@ -116,6 +117,7 @@ export function mapConsultation(row) {
     specialty: row.specialty,
     date: row.date,
     sessionNumber: row.session_number,
+    consultationStatusId: row.consultation_status_id,
     mainObjective: row.main_objective || '',
     evolutionNotes: row.evolution_notes || '',
     nextObjectives: row.next_objectives || '',
@@ -129,6 +131,50 @@ export function mapConsultation(row) {
         description: a.description || '',
         outcome: a.outcome,
       })),
+    createdAt: row.created_at,
+  }
+}
+
+export function mapConsultationStatus(row) {
+  return { id: row.id, name: row.name, color: row.color, active: row.active }
+}
+
+export function mapExam(row) {
+  return {
+    id: row.id,
+    medicalRecordId: row.medical_record_id,
+    description: row.description,
+    examDate: row.exam_date || '',
+    attachmentUrl: row.attachment_url || '',
+    notes: row.notes || '',
+    createdAt: row.created_at,
+  }
+}
+
+export function mapMedication(row) {
+  return {
+    id: row.id,
+    medicalRecordId: row.medical_record_id,
+    medication: row.medication,
+    registrationDate: row.registration_date,
+    status: row.status,
+    notes: row.notes || '',
+    createdAt: row.created_at,
+  }
+}
+
+export function mapConduct(row) {
+  return {
+    id: row.id,
+    medicalRecordId: row.medical_record_id,
+    therapistId: row.therapist_id,
+    therapistName: row.therapist?.name || '',
+    specialty: row.specialty || '',
+    conduct: row.conduct || '',
+    objective: row.objective || '',
+    startDate: row.start_date || '',
+    endDate: row.end_date || '',
+    status: row.status,
     createdAt: row.created_at,
   }
 }
@@ -153,72 +199,6 @@ export function mapRoom(row) {
   return { id: row.id, name: row.name, description: row.description || '', active: row.active }
 }
 
-export function mapFamilyContext(row) {
-  if (!row) return null
-  return {
-    id: row.id,
-    patientId: row.patient_id,
-    familyComposition: row.family_composition || '',
-    guardianRelationship: row.guardian_relationship || '',
-    dailyRoutine: row.daily_routine || '',
-    schoolContext: row.school_context || '',
-    familyEnvironment: row.family_environment || '',
-    updatedBy: row.updated_by,
-    updatedAt: row.updated_at,
-    updatedByName: row.updater?.name || null,
-  }
-}
-
-export function mapClinicalHistory(row) {
-  if (!row) return null
-  return {
-    id: row.id,
-    patientId: row.patient_id,
-    mainComplaint: row.main_complaint || '',
-    diagnosticHypotheses: row.diagnostic_hypotheses || '',
-    currentMedications: row.current_medications || '',
-    medicalHistory: row.medical_history || '',
-    previousTherapyHistory: row.previous_therapy_history || '',
-    comorbidities: row.comorbidities || '',
-    updatedBy: row.updated_by,
-    updatedAt: row.updated_at,
-    updatedByName: row.updater?.name || null,
-  }
-}
-
-export function mapAssessment(row) {
-  return {
-    id: row.id,
-    patientId: row.patient_id,
-    therapistId: row.therapist_id,
-    therapistName: row.therapist?.name || null,
-    specialty: row.specialty,
-    assessmentDate: row.assessment_date,
-    mainComplaint: row.main_complaint || '',
-    initialObjectives: row.initial_objectives || '',
-    appliedTests: row.applied_tests || '',
-    clinicalObservations: row.clinical_observations || '',
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-  }
-}
-
-export function mapTherapeuticPlan(row) {
-  return {
-    id: row.id,
-    patientId: row.patient_id,
-    specialty: row.specialty,
-    generalObjectives: row.general_objectives || '',
-    specificObjectives: row.specific_objectives || '',
-    attendanceFrequency: row.attendance_frequency || '',
-    interventionStrategy: row.intervention_strategy || '',
-    revisionNotes: row.revision_notes || '',
-    createdBy: row.created_by,
-    updatedBy: row.updated_by,
-    updatedAt: row.updated_at,
-    updatedByName: row.updater?.name || null,
-  }
-}
 
 // ─── Helpers para salvar relações de paciente ─────────────────────────────────
 
