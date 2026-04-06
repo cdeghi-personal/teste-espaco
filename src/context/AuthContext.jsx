@@ -1,37 +1,113 @@
 import { createContext, useContext, useState, useEffect } from 'react'
-import { MOCK_USERS } from '../data/mockUsers'
-import { storageGet, storageSet, storageRemove } from '../utils/storageUtils'
+import { supabase } from '../lib/supabase'
 
 const AuthContext = createContext(null)
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [needsPasswordReset, setNeedsPasswordReset] = useState(false)
 
   useEffect(() => {
-    const stored = storageGet('auth_user')
-    if (stored) setUser(stored)
-    setIsLoading(false)
+    // Sessão inicial
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        loadUser(session.user)
+      } else {
+        setIsLoading(false)
+      }
+    })
+
+    // Mudanças de auth (login, logout, convite aceito, reset de senha)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        // Link de reset de senha clicado — redireciona para tela de definição de senha
+        setNeedsPasswordReset(true)
+        setIsLoading(false)
+        return
+      }
+      if (session) {
+        loadUser(session.user)
+      } else {
+        setUser(null)
+        setIsLoading(false)
+      }
+    })
+
+    return () => subscription.unsubscribe()
   }, [])
 
-  function login(email, password) {
-    const found = MOCK_USERS.find(
-      (u) => u.email === email.trim().toLowerCase() && u.password === password
-    )
-    if (!found) return { success: false, error: 'E-mail ou senha incorretos.' }
-    const { password: _pw, ...safeUser } = found
-    setUser(safeUser)
-    storageSet('auth_user', safeUser)
+  async function loadUser(authUser) {
+    try {
+      // Busca o role do usuário — maybeSingle não lança erro se não encontrar
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', authUser.id)
+        .maybeSingle()
+
+      if (profileError) console.error('Erro ao buscar profile:', profileError)
+
+      const role = profile?.role || 'admin' // fallback seguro: se não tem profile, trata como admin
+
+      // Se for terapeuta, busca o registro de terapeuta para pegar o ID
+      let therapist = null
+      if (role === 'therapist') {
+        const { data } = await supabase
+          .from('therapists')
+          .select('id, name, specialty')
+          .eq('user_id', authUser.id)
+          .maybeSingle()
+        therapist = data
+      }
+
+      setUser({
+        authId: authUser.id,
+        // id = therapist table ID — usado para filtrar consultas/agendamentos
+        id: therapist?.id || null,
+        email: authUser.email,
+        role,
+        name: therapist?.name || authUser.email,
+        specialty: therapist?.specialty || null,
+      })
+    } catch (err) {
+      console.error('Erro ao carregar usuário:', err)
+      // Mesmo com erro, mantém o usuário logado com dados mínimos
+      setUser({
+        authId: authUser.id,
+        id: null,
+        email: authUser.email,
+        role: 'admin',
+        name: authUser.email,
+        specialty: null,
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  async function login(email, password) {
+    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    if (error) {
+      console.error('Supabase login error:', error)
+      return { success: false, error: error.message }
+    }
     return { success: true }
   }
 
-  function logout() {
-    setUser(null)
-    storageRemove('auth_user')
+  async function logout() {
+    await supabase.auth.signOut()
+  }
+
+  async function updatePassword(newPassword) {
+    const { error } = await supabase.auth.updateUser({ password: newPassword })
+    if (error) return { success: false, error: error.message }
+    setNeedsPasswordReset(false)
+    return { success: true }
   }
 
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated: !!user, isLoading, login, logout }}>
+    <AuthContext.Provider value={{ user, isAuthenticated: !!user, isLoading, needsPasswordReset, login, logout, updatePassword }}>
       {children}
     </AuthContext.Provider>
   )

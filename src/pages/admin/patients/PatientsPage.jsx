@@ -23,10 +23,7 @@ export default function PatientsPage() {
 
   const accessiblePatients = user?.role === 'admin'
     ? patients
-    : patients.filter(p =>
-        p.therapistId === user?.id ||
-        (p.secondaryTherapistIds || []).includes(user?.id)
-      )
+    : patients.filter(p => p.therapistId === user?.id)
 
   const filtered = accessiblePatients.filter(p => {
     const matchDeleted = showDeleted ? p.deleted === true : !p.deleted

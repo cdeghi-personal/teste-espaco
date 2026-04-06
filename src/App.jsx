@@ -17,6 +17,7 @@ import ContactPage from './pages/public/ContactPage'
 
 // Auth
 import LoginPage from './pages/auth/LoginPage'
+import ResetPasswordPage from './pages/auth/ResetPasswordPage'
 
 // Admin Pages
 import DashboardPage from './pages/admin/DashboardPage'
@@ -25,6 +26,7 @@ import PatientsPage from './pages/admin/patients/PatientsPage'
 import PatientDetailPage from './pages/admin/patients/PatientDetailPage'
 import GuardiansPage from './pages/admin/guardians/GuardiansPage'
 import ConsultationsPage from './pages/admin/consultations/ConsultationsPage'
+import MedicalRecordsPage from './pages/admin/medicalrecords/MedicalRecordsPage'
 
 // Admin - Cadastros
 import TherapistsPage from './pages/admin/therapists/TherapistsPage'
@@ -32,16 +34,29 @@ import SpecialtiesPage from './pages/admin/specialties/SpecialtiesPage'
 import PaymentMethodsPage from './pages/admin/paymentmethods/PaymentMethodsPage'
 import DiagnosesPage from './pages/admin/diagnoses/DiagnosesPage'
 import PatientStatusPage from './pages/admin/patientstatus/PatientStatusPage'
+import ConsultationStatusPage from './pages/admin/consultationstatus/ConsultationStatusPage'
+import AppointmentTypesPage from './pages/admin/appointmenttypes/AppointmentTypesPage'
 import RoomsPage from './pages/admin/rooms/RoomsPage'
 
 // Common
 import ScrollToTop from './components/common/ScrollToTop'
+import { useAuth } from './context/AuthContext'
+import { ToastProvider } from './components/ui/Toast'
+
+// Redireciona para reset de senha quando o link de convite/recuperação é clicado
+function AuthRedirect() {
+  const { needsPasswordReset } = useAuth()
+  if (needsPasswordReset) return <Navigate to="/reset-senha" replace />
+  return null
+}
 
 export default function App() {
   return (
     <BrowserRouter>
       <ScrollToTop />
       <AuthProvider>
+        <ToastProvider>
+        <AuthRedirect />
         <DataProvider>
           <Routes>
             {/* Public */}
@@ -55,6 +70,7 @@ export default function App() {
 
             {/* Auth */}
             <Route path={ROUTES.LOGIN} element={<LoginPage />} />
+            <Route path="/reset-senha" element={<ResetPasswordPage />} />
 
             {/* Admin (protected) */}
             <Route element={<PrivateRoute />}>
@@ -65,11 +81,14 @@ export default function App() {
                 <Route path={ROUTES.PATIENT_DETAIL} element={<PatientDetailPage />} />
                 <Route path={ROUTES.GUARDIANS} element={<GuardiansPage />} />
                 <Route path={ROUTES.CONSULTATIONS} element={<ConsultationsPage />} />
+                <Route path={ROUTES.MEDICAL_RECORDS} element={<MedicalRecordsPage />} />
                 <Route path={ROUTES.THERAPISTS} element={<TherapistsPage />} />
                 <Route path={ROUTES.SPECIALTIES_ADMIN} element={<SpecialtiesPage />} />
                 <Route path={ROUTES.PAYMENT_METHODS} element={<PaymentMethodsPage />} />
                 <Route path={ROUTES.DIAGNOSES} element={<DiagnosesPage />} />
                 <Route path={ROUTES.PATIENT_STATUS} element={<PatientStatusPage />} />
+                <Route path={ROUTES.CONSULTATION_STATUS} element={<ConsultationStatusPage />} />
+                <Route path={ROUTES.APPOINTMENT_TYPES} element={<AppointmentTypesPage />} />
                 <Route path={ROUTES.ROOMS} element={<RoomsPage />} />
               </Route>
             </Route>
@@ -78,6 +97,7 @@ export default function App() {
             <Route path="*" element={<Navigate to={ROUTES.HOME} replace />} />
           </Routes>
         </DataProvider>
+        </ToastProvider>
       </AuthProvider>
     </BrowserRouter>
   )

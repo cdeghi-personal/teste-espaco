@@ -7,9 +7,9 @@ import Button from '../../../components/ui/Button'
 import EmptyState from '../../../components/ui/EmptyState'
 import ConsultationFormModal from './ConsultationFormModal'
 import { formatDateShort } from '../../../utils/dateUtils'
-import { SPECIALTY_LIST, SPECIALTIES } from '../../../constants/specialties'
+
 export default function ConsultationsPage() {
-  const { consultations, patients, therapists, deleteConsultation } = useData()
+  const { consultations, patients, therapists, specialtiesData, consultationStatuses, appointmentTypes, deleteConsultation } = useData()
   const { user } = useAuth()
   const [search, setSearch] = useState('')
   const [filterSpecialty, setFilterSpecialty] = useState('')
@@ -19,8 +19,10 @@ export default function ConsultationsPage() {
 
   function getPatient(id) { return patients.find(p => p.id === id) }
   function getTherapist(id) { return therapists.find(t => t.id === id) }
+  function getStatus(id) { return consultationStatuses.find(s => s.id === id) }
 
-  // Role-based: therapists see only their own consultations
+  const activeSpecialties = specialtiesData.filter(s => s.active !== false)
+
   const visibleConsultations = user?.role === 'admin'
     ? consultations
     : consultations.filter(c => c.therapistId === user?.id)
@@ -35,7 +37,7 @@ export default function ConsultationsPage() {
     .sort((a, b) => b.date.localeCompare(a.date))
 
   function handleDelete(id) {
-    if (confirm('Excluir este registro de consulta?')) deleteConsultation(id)
+    if (confirm('Excluir este registro de atendimento?')) deleteConsultation(id)
   }
 
   const outcomeColors = {
@@ -49,7 +51,7 @@ export default function ConsultationsPage() {
     <div className="p-3 md:p-6 space-y-4">
       <div className="flex items-center justify-between gap-2">
         <div>
-          <h1 className="text-xl md:text-2xl font-bold text-gray-900">Consultas</h1>
+          <h1 className="text-xl md:text-2xl font-bold text-gray-900">Atendimentos</h1>
           <p className="text-xs text-gray-500 mt-0.5">{filtered.length} registro(s)</p>
         </div>
         <Button variant="primary" onClick={() => { setEditConsultation(null); setShowModal(true) }}>
@@ -75,7 +77,7 @@ export default function ConsultationsPage() {
           className="px-3 py-2 text-sm border border-gray-200 rounded-xl bg-white focus:ring-2 focus:ring-brand-blue outline-none"
         >
           <option value="">Especialidade</option>
-          {SPECIALTY_LIST.map(k => <option key={k} value={k}>{SPECIALTIES[k].label}</option>)}
+          {activeSpecialties.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
         </select>
       </div>
 
@@ -85,13 +87,15 @@ export default function ConsultationsPage() {
             <EmptyState
               icon={FiClipboard}
               title="Nenhum registro encontrado"
-              description="Registre a primeira consulta clicando em 'Novo Registro'."
+              description="Registre o primeiro atendimento clicando em 'Novo Registro'."
               action={<Button variant="primary" onClick={() => setShowModal(true)}><FiPlus size={14} /> Novo Registro</Button>}
             />
           </div>
         ) : filtered.map(c => {
           const patient = getPatient(c.patientId)
           const therapist = getTherapist(c.therapistId)
+          const status = getStatus(c.consultationStatusId)
+          const apptType = appointmentTypes.find(t => t.id === c.appointmentTypeId)
           const isExpanded = expanded === c.id
           return (
             <div key={c.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
@@ -100,13 +104,17 @@ export default function ConsultationsPage() {
                   <div className="flex items-center gap-2 flex-wrap mb-1">
                     <span className="font-semibold text-gray-900 text-sm">{patient?.fullName || '—'}</span>
                     <Badge specialty={c.specialty} />
-                    <Badge quality={c.sessionQuality} />
-                    <span className="text-xs text-gray-400">Sessão #{c.sessionNumber}</span>
+                    {status && (
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${status.color}`}>{status.name}</span>
+                    )}
+                    {apptType && (
+                      <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">{apptType.name}</span>
+                    )}
                   </div>
                   <div className="flex items-center gap-3 text-xs text-gray-500">
                     <span>{formatDateShort(c.date)}</span>
                     <span>•</span>
-                    <span>{therapist?.name}</span>
+                    <span>{therapist?.name || '—'}</span>
                     <span>•</span>
                     <span>{c.activities?.length || 0} atividade(s)</span>
                   </div>
@@ -135,10 +143,12 @@ export default function ConsultationsPage() {
 
               {isExpanded && (
                 <div className="border-t border-gray-100 px-5 py-4 space-y-4 bg-gray-50/50">
-                  <div>
-                    <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Objetivo Principal</h4>
-                    <p className="text-sm text-gray-700">{c.mainObjective}</p>
-                  </div>
+                  {c.mainObjective && (
+                    <div>
+                      <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Objetivo Principal</h4>
+                      <p className="text-sm text-gray-700">{c.mainObjective}</p>
+                    </div>
+                  )}
 
                   {c.activities?.length > 0 && (
                     <div>
@@ -163,13 +173,6 @@ export default function ConsultationsPage() {
                     <div>
                       <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Notas de Evolução</h4>
                       <p className="text-sm text-gray-700">{c.evolutionNotes}</p>
-                    </div>
-                  )}
-
-                  {c.nextObjectives && (
-                    <div>
-                      <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Próximos Objetivos</h4>
-                      <p className="text-sm text-gray-700">{c.nextObjectives}</p>
                     </div>
                   )}
 

@@ -1,3 +1,5 @@
+import { useEffect } from 'react'
+import { useLocation } from 'react-router-dom'
 import { FiCheckCircle } from 'react-icons/fi'
 import { SPECIALTIES } from '../../constants/specialties'
 
@@ -33,9 +35,26 @@ const specialtyDetails = {
 }
 
 export default function ServicesPage() {
+  const location = useLocation()
+
+  useEffect(() => {
+    if (!location.hash) return
+
+    const id = location.hash.replace('#', '')
+    const element = document.getElementById(id)
+
+    if (element) {
+      setTimeout(() => {
+        element.scrollIntoView({
+          behavior: 'smooth',
+          block: 'start',
+        })
+      }, 100)
+    }
+  }, [location])
+
   return (
     <div>
-
       {/* HERO */}
       <section className="relative overflow-hidden bg-gradient-to-br from-brand-blue to-brand-blue-dark py-24 text-white">
         <div className="absolute inset-0 opacity-10 bg-[radial-gradient(circle_at_top_right,_#facc15,_transparent_30%)]" />
@@ -55,14 +74,16 @@ export default function ServicesPage() {
       {/* ESPECIALIDADES */}
       <section className="py-20 bg-white">
         <div className="max-w-6xl mx-auto px-4 space-y-20">
-
           {Object.entries(SPECIALTIES).map(([key, spec], index) => {
             const detail = specialtyDetails[key]
             const isEven = index % 2 === 0
 
             return (
-              <div key={key} className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-
+              <div
+                key={key}
+                id={key}
+                className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center scroll-mt-28"
+              >
                 {/* IMAGEM */}
                 <div className={`${isEven ? '' : 'lg:order-2'}`}>
                   <div className="overflow-hidden rounded-3xl shadow-md">
@@ -76,7 +97,6 @@ export default function ServicesPage() {
 
                 {/* TEXTO */}
                 <div className={`${isEven ? '' : 'lg:order-1'}`}>
-
                   <div className="flex items-center gap-4 mb-6">
                     <div className="text-5xl">{detail.emoji}</div>
                     <div>
@@ -88,7 +108,6 @@ export default function ServicesPage() {
                   </div>
 
                   <div className="space-y-6">
-
                     <div>
                       <h3 className="text-sm uppercase tracking-wide text-gray-500 mb-2">
                         O que fazemos
@@ -118,7 +137,6 @@ export default function ServicesPage() {
                         ))}
                       </ul>
                     </div>
-
                   </div>
                 </div>
               </div>
@@ -130,7 +148,6 @@ export default function ServicesPage() {
       {/* BLOCO DIFERENCIAL */}
       <section className="py-20 bg-gray-50">
         <div className="max-w-5xl mx-auto px-4 text-center">
-
           <span className="text-sm uppercase tracking-widest text-gray-400">
             Diferencial Casa Amarela
           </span>
@@ -140,7 +157,7 @@ export default function ServicesPage() {
           </h2>
 
           <p className="text-gray-600 text-lg leading-relaxed mb-10">
-            Nosso grande diferencial é a atuação interdisciplinar. As especialidades não trabalham isoladas — 
+            Nosso grande diferencial é a atuação interdisciplinar. As especialidades não trabalham isoladas —
             elas se conectam, compartilham evolução e constroem estratégias conjuntas para potencializar o desenvolvimento de cada criança.
           </p>
 
@@ -159,10 +176,8 @@ export default function ServicesPage() {
           <div className="mt-6 text-gray-400 text-sm">
             Comunicação contínua entre toda a equipe
           </div>
-
         </div>
       </section>
-
     </div>
   )
 }

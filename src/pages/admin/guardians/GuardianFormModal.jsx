@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { FiSearch } from 'react-icons/fi'
+import { formatCPF, validateCPF } from '../../../utils/validators'
 import Modal from '../../../components/ui/Modal'
 import Button from '../../../components/ui/Button'
 import Input from '../../../components/ui/Input'
@@ -8,7 +10,7 @@ import { useData } from '../../../context/DataContext'
 
 const EMPTY = {
   fullName: '', relationship: '', cpf: '', rg: '', phone: '', phone2: '',
-  email: '', address: '', city: '', state: 'SP', cep: '', occupation: '', notes: '',
+  email: '', address: '', neighborhood: '', city: '', state: 'SP', cep: '', occupation: '', notes: '',
   patientIds: [],
 }
 
@@ -19,6 +21,7 @@ export default function GuardianFormModal({ onClose, initial = {} }) {
   const isEdit = !!initial.id
   const [form, setForm] = useState({ ...EMPTY, ...initial, patientIds: initial.patientIds || [] })
   const [errors, setErrors] = useState({})
+  const [patientSearch, setPatientSearch] = useState('')
 
   function set(field, value) {
     setForm(f => ({ ...f, [field]: value }))
@@ -31,11 +34,15 @@ export default function GuardianFormModal({ onClose, initial = {} }) {
   }
 
   const activePatients = patients.filter(p => !p.deleted)
+  const filteredPatients = patientSearch
+    ? activePatients.filter(p => p.fullName.toLowerCase().includes(patientSearch.toLowerCase()))
+    : activePatients
 
   function validate() {
     const e = {}
     if (!form.fullName.trim()) e.fullName = 'Nome obrigatório'
     if (!form.phone.trim()) e.phone = 'Telefone obrigatório'
+    if (form.cpf && form.cpf.replace(/\D/g, '').length === 11 && !validateCPF(form.cpf)) e.cpf = 'CPF inválido'
     return e
   }
 
@@ -75,7 +82,7 @@ export default function GuardianFormModal({ onClose, initial = {} }) {
               </Select>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <Input label="CPF" value={form.cpf} onChange={e => set('cpf', e.target.value)} placeholder="000.000.000-00" />
+              <Input label="CPF" value={form.cpf} onChange={e => set('cpf', formatCPF(e.target.value))} error={errors.cpf} placeholder="000.000.000-00" />
               <Input label="RG" value={form.rg} onChange={e => set('rg', e.target.value)} />
             </div>
             <Input label="Profissão" value={form.occupation} onChange={e => set('occupation', e.target.value)} />
@@ -101,14 +108,17 @@ export default function GuardianFormModal({ onClose, initial = {} }) {
           </h3>
           <div className="space-y-3">
             <Input label="Endereço" value={form.address} onChange={e => set('address', e.target.value)} placeholder="Rua, número, complemento" />
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <div className="col-span-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Input label="Bairro" value={form.neighborhood} onChange={e => set('neighborhood', e.target.value)} placeholder="Bairro" />
+              <Input label="CEP" value={form.cep} onChange={e => set('cep', e.target.value)} placeholder="00000-000" />
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              <div className="col-span-2 sm:col-span-2">
                 <Input label="Cidade" value={form.city} onChange={e => set('city', e.target.value)} />
               </div>
               <Select label="Estado" value={form.state} onChange={e => set('state', e.target.value)}>
                 {BR_STATES.map(s => <option key={s}>{s}</option>)}
               </Select>
-              <Input label="CEP" value={form.cep} onChange={e => set('cep', e.target.value)} placeholder="00000-000" />
             </div>
           </div>
         </section>
@@ -116,29 +126,47 @@ export default function GuardianFormModal({ onClose, initial = {} }) {
         <section>
           <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-3 pb-2 border-b border-gray-100">
             Pacientes Vinculados
+            {form.patientIds?.length > 0 && (
+              <span className="ml-2 text-xs font-normal text-brand-blue normal-case">
+                {form.patientIds.length} selecionado(s)
+              </span>
+            )}
           </h3>
           {activePatients.length === 0 ? (
             <p className="text-xs text-gray-400">Nenhum paciente cadastrado.</p>
           ) : (
-            <div className="flex flex-wrap gap-2">
-              {activePatients.map(p => (
-                <button
-                  key={p.id}
-                  type="button"
-                  onClick={() => togglePatient(p.id)}
-                  className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-                    form.patientIds?.includes(p.id)
-                      ? 'bg-brand-yellow text-brand-blue font-semibold'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  }`}
-                >
-                  {p.fullName}
-                </button>
-              ))}
+            <div className="space-y-2">
+              <div className="relative">
+                <FiSearch size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  value={patientSearch}
+                  onChange={e => setPatientSearch(e.target.value)}
+                  placeholder="Buscar paciente..."
+                  className="w-full pl-8 pr-3 py-1.5 text-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-brand-blue outline-none"
+                />
+              </div>
+              <div className="border border-gray-200 rounded-xl overflow-hidden max-h-48 overflow-y-auto">
+                {filteredPatients.length === 0 ? (
+                  <div className="px-4 py-3 text-sm text-gray-400 text-center">Nenhum paciente encontrado</div>
+                ) : filteredPatients.map(p => {
+                  const checked = form.patientIds?.includes(p.id)
+                  return (
+                    <label
+                      key={p.id}
+                      className={`flex items-center gap-3 px-4 py-2.5 cursor-pointer hover:bg-gray-50 transition-colors border-b border-gray-50 last:border-0 ${checked ? 'bg-brand-yellow/10' : ''}`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => togglePatient(p.id)}
+                        className="w-4 h-4 rounded accent-brand-blue shrink-0"
+                      />
+                      <span className="text-sm text-gray-800">{p.fullName}</span>
+                    </label>
+                  )
+                })}
+              </div>
             </div>
-          )}
-          {form.patientIds?.length > 0 && (
-            <p className="text-xs text-gray-500 mt-2">{form.patientIds.length} paciente(s) selecionado(s)</p>
           )}
         </section>
 

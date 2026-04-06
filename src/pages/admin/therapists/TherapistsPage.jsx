@@ -17,7 +17,7 @@ export default function TherapistsPage() {
   function getPatientCount(therapistId) {
     return patients.filter(p =>
       !p.deleted && p.status === 'active' &&
-      (p.therapistId === therapistId || (p.secondaryTherapistIds || []).includes(therapistId))
+      p.therapistId === therapistId
     ).length
   }
 
