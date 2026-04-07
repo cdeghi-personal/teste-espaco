@@ -90,7 +90,9 @@ export default function TherapistsPage() {
                     <div className="flex-1 min-w-0">
                       <div className="font-medium text-sm text-gray-900 truncate">{t.name}</div>
                       <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                        {t.specialty && <Badge specialty={t.specialty} />}
+                        {(t.therapistSpecialties?.length ? t.therapistSpecialties : t.specialty ? [{ specialty: t.specialty }] : []).map((s, i) => (
+                          <Badge key={i} specialty={s.specialty} />
+                        ))}
                         <span className="text-xs text-gray-500">{count} paciente(s)</span>
                         {isInactive && <span className="text-xs text-red-500">Inativo</span>}
                       </div>
@@ -140,7 +142,14 @@ export default function TherapistsPage() {
                             </div>
                           </div>
                         </td>
-                        <td className="px-4 py-3">{t.specialty ? <Badge specialty={t.specialty} /> : <span className="text-gray-400 text-sm">—</span>}</td>
+                        <td className="px-4 py-3">
+                          <div className="flex flex-wrap gap-1">
+                            {(t.therapistSpecialties?.length ? t.therapistSpecialties : t.specialty ? [{ specialty: t.specialty }] : []).map((s, i) => (
+                              <Badge key={i} specialty={s.specialty} />
+                            ))}
+                            {!t.therapistSpecialties?.length && !t.specialty && <span className="text-gray-400 text-sm">—</span>}
+                          </div>
+                        </td>
                         <td className="px-4 py-3 hidden md:table-cell">
                           <div className="text-xs text-gray-600 space-y-0.5">
                             {t.email && <div>{t.email}</div>}

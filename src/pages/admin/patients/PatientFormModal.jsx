@@ -7,7 +7,6 @@ import Input from '../../../components/ui/Input'
 import Select from '../../../components/ui/Select'
 import Textarea from '../../../components/ui/Textarea'
 import { useData } from '../../../context/DataContext'
-import { SPECIALTIES } from '../../../constants/specialties'
 
 const EMPTY_EXT = { name: '', specialty: '', phone: '' }
 
@@ -151,7 +150,7 @@ export default function PatientFormModal({ onClose, initial = {} }) {
               <Select label="Gerente do Caso" value={form.therapistId} onChange={e => set('therapistId', e.target.value)}>
                 <option value="">Selecione</option>
                 {activeTherapists.map(t => (
-                  <option key={t.id} value={t.id}>{t.name} — {SPECIALTIES[t.specialty]?.label || t.specialty}</option>
+                  <option key={t.id} value={t.id}>{t.name}</option>
                 ))}
               </Select>
               <Select label="Status" value={form.statusId} onChange={e => set('statusId', e.target.value)}>
@@ -311,19 +310,16 @@ export default function PatientFormModal({ onClose, initial = {} }) {
               ) : (
                 <div className="flex flex-wrap gap-2">
                   {activeSpecialties.map(s => {
-                    const colors = SPECIALTIES[s.key]
                     const isSelected = form.specialties?.includes(s.key)
+                    const color = s.color || '#6b7280'
                     return (
                       <button
                         key={s.key}
                         type="button"
                         onClick={() => toggleList('specialties', s.key)}
+                        style={isSelected ? { backgroundColor: color, borderColor: color, color: 'white' } : {}}
                         className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all border-2 ${
-                          isSelected
-                            ? colors
-                              ? `${colors.color} border-current`
-                              : 'bg-brand-blue text-white border-brand-blue'
-                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border-transparent'
+                          isSelected ? '' : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border-transparent'
                         }`}
                       >
                         {s.label}

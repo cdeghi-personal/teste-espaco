@@ -5,6 +5,17 @@ export default function Badge({ specialty, status, patientStatus, quality, child
   const { specialtiesData } = useData()
 
   if (specialty) {
+    const dynamic = specialtiesData?.find(s => s.key === specialty)
+    if (dynamic?.color) {
+      return (
+        <span
+          style={{ backgroundColor: dynamic.color + '20', color: dynamic.color }}
+          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${className}`}
+        >
+          {dynamic.label || specialty}
+        </span>
+      )
+    }
     const hardcoded = SPECIALTIES[specialty]
     if (hardcoded) {
       return (
@@ -13,7 +24,6 @@ export default function Badge({ specialty, status, patientStatus, quality, child
         </span>
       )
     }
-    const dynamic = specialtiesData?.find(s => s.key === specialty)
     return (
       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700 ${className}`}>
         {dynamic?.label || specialty}

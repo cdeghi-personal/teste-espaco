@@ -9,7 +9,6 @@ import Textarea from '../../../components/ui/Textarea'
 import Badge from '../../../components/ui/Badge'
 import ConsultationFormModal from '../consultations/ConsultationFormModal'
 import { formatDateBR, formatDateShort, isoToday } from '../../../utils/dateUtils'
-import { SPECIALTIES } from '../../../constants/specialties'
 
 const CONDUCT_STATUS = {
   nao_iniciada: { label: 'Não Iniciada',  color: 'bg-gray-100 text-gray-600' },
@@ -214,6 +213,7 @@ function Section({ title, count, children, defaultOpen = true }) {
 export default function MedicalRecordsPage() {
   const {
     patients, therapists, rooms, specialtiesData, consultations, consultationStatuses, appointmentTypes,
+    updateConsultation,
     getOrCreateMedicalRecord,
     getExams, addExam, updateExam, deleteExam,
     getMedications, addMedication, updateMedication, deleteMedication,
@@ -239,6 +239,7 @@ export default function MedicalRecordsPage() {
   const [consultMonth, setConsultMonth] = useState(currentYearMonth())
   const [showConsultationModal, setShowConsultationModal] = useState(false)
   const [editConsultation, setEditConsultation] = useState(null)
+  const [selectedConsultIds, setSelectedConsultIds] = useState(new Set())
 
   const activePatients = patients.filter(p => !p.deleted)
   const filtered = search
@@ -276,6 +277,7 @@ export default function MedicalRecordsPage() {
     setSearch('')
     setExamDraft(null); setMedDraft(null); setConductDraft(null)
     setConsultMonth(currentYearMonth())
+    setSelectedConsultIds(new Set())
     if (id) await loadData(id)
     else setMedicalRecordId(null)
   }
@@ -323,10 +325,10 @@ export default function MedicalRecordsPage() {
     if (t.therapistSpecialties?.length) {
       return t.therapistSpecialties.map(s => ({
         key: s.specialty,
-        label: SPECIALTIES[s.specialty]?.label || s.specialty,
+        label: specialtiesData.find(sp => sp.key === s.specialty)?.label || s.specialty,
       }))
     }
-    if (t.specialty) return [{ key: t.specialty, label: SPECIALTIES[t.specialty]?.label || t.specialty }]
+    if (t.specialty) return [{ key: t.specialty, label: specialtiesData.find(sp => sp.key === t.specialty)?.label || t.specialty }]
     return activeSpecialties.map(s => ({ key: s.key, label: s.label }))
   }
 
@@ -346,6 +348,24 @@ export default function MedicalRecordsPage() {
     if (!confirm('Remover conduta?')) return
     await deleteConduct(id)
     setConducts(prev => prev.filter(c => c.id !== id))
+  }
+
+  function toggleConsultSelect(id) {
+    setSelectedConsultIds(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
+  async function batchSetStatus(statusName) {
+    const status = consultationStatuses.find(s => s.name === statusName)
+    if (!status) { alert(`Status "${statusName}" não encontrado. Verifique o cadastro de Status Atendimento.`); return }
+    const ids = [...selectedConsultIds]
+    const action = statusName === 'Faturado' ? 'Faturar' : 'Registrar Pagamento'
+    if (!confirm(`${action} ${ids.length} atendimento(s)?`)) return
+    await Promise.all(ids.map(id => updateConsultation(id, { consultationStatusId: status.id })))
+    setSelectedConsultIds(new Set())
   }
 
   return (
@@ -538,6 +558,31 @@ export default function MedicalRecordsPage() {
 
               {/* ── Histórico de Atendimentos ── */}
               <Section title="Histórico de Atendimentos" count={patientConsultations.length}>
+                {/* Ações em lote (admin) */}
+                {user?.role === 'admin' && selectedConsultIds.size > 0 && (
+                  <div className="flex items-center gap-2 mb-3 p-2 bg-brand-blue/5 rounded-xl border border-brand-blue/20">
+                    <span className="text-xs text-gray-600 flex-1">{selectedConsultIds.size} selecionado(s)</span>
+                    <button
+                      onClick={() => batchSetStatus('Faturado')}
+                      className="px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-100 text-amber-700 hover:bg-amber-200 transition-colors"
+                    >
+                      Faturado
+                    </button>
+                    <button
+                      onClick={() => batchSetStatus('Pago')}
+                      className="px-3 py-1.5 rounded-lg text-xs font-medium bg-green-100 text-green-700 hover:bg-green-200 transition-colors"
+                    >
+                      Pago
+                    </button>
+                    <button
+                      onClick={() => setSelectedConsultIds(new Set())}
+                      className="px-2 py-1.5 rounded-lg text-xs text-gray-400 hover:text-gray-600"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                )}
+
                 {/* Navegação de meses */}
                 <div className="flex items-center gap-2 mb-4 flex-wrap">
                   <button
@@ -573,15 +618,32 @@ export default function MedicalRecordsPage() {
                       const status = consultationStatuses.find(s => s.id === c.consultationStatusId)
                       const apptType = appointmentTypes.find(t => t.id === c.appointmentTypeId)
                       const room = rooms.find(r => r.id === c.roomId)
+                      const isSelected = selectedConsultIds.has(c.id)
                       return (
-                        <div key={c.id} className="bg-gray-50 rounded-xl px-4 py-3 border border-gray-100">
+                        <div key={c.id} className={`bg-gray-50 rounded-xl px-4 py-3 border transition-colors ${isSelected ? 'border-brand-blue bg-blue-50/30' : 'border-gray-100'}`}>
                           <div className="flex items-center gap-2 flex-wrap">
+                            {user?.role === 'admin' && (
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={() => toggleConsultSelect(c.id)}
+                                className="w-4 h-4 rounded accent-brand-blue shrink-0"
+                              />
+                            )}
                             <span className="font-medium text-sm text-gray-900">{formatDateShort(c.date)}{c.time && <span className="font-normal text-gray-500"> {c.time}</span>}</span>
                             <Badge specialty={c.specialty} />
                             {status && <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${status.color}`}>{status.name}</span>}
                             {apptType && <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-200 text-gray-600">{apptType.name}</span>}
-                            <span className="text-xs text-gray-500">{therapist?.name || '—'}</span>
-                            {room && <span className="text-xs text-gray-400">{room.name}</span>}
+                            <span className="flex items-center gap-1 text-xs text-gray-500">
+                              {therapist?.color && <span className="w-2 h-2 rounded-full shrink-0 inline-block" style={{ backgroundColor: therapist.color }} />}
+                              {therapist?.name || '—'}
+                            </span>
+                            {room && (
+                              <span className="flex items-center gap-1 text-xs text-gray-400">
+                                {room.color && <span className="w-2 h-2 rounded-full shrink-0 inline-block" style={{ backgroundColor: room.color }} />}
+                                {room.name}
+                              </span>
+                            )}
                             <button
                               onClick={() => { setEditConsultation(c); setShowConsultationModal(true) }}
                               className="ml-auto p-1 rounded-lg text-gray-400 hover:text-brand-blue hover:bg-blue-50 transition-colors"

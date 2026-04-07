@@ -115,8 +115,17 @@ export default function ConsultationsPage() {
                   <div className="flex items-center gap-3 text-xs text-gray-500 flex-wrap">
                     <span>{formatDateShort(c.date)}{c.time && <span className="text-gray-400"> {c.time}</span>}</span>
                     <span>•</span>
-                    <span>{therapist?.name || '—'}</span>
-                    {room && <><span>•</span><span>{room.name}</span></>}
+                    <span className="flex items-center gap-1">
+                      {therapist?.color && <span className="w-2 h-2 rounded-full shrink-0 inline-block" style={{ backgroundColor: therapist.color }} />}
+                      {therapist?.name || '—'}
+                    </span>
+                    {room && (
+                      <><span>•</span>
+                      <span className="flex items-center gap-1">
+                        {room.color && <span className="w-2 h-2 rounded-full shrink-0 inline-block" style={{ backgroundColor: room.color }} />}
+                        {room.name}
+                      </span></>
+                    )}
                     <span>•</span>
                     <span>{c.activities?.length || 0} atividade(s)</span>
                   </div>

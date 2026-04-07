@@ -7,7 +7,6 @@ import Select from '../../../components/ui/Select'
 import Textarea from '../../../components/ui/Textarea'
 import { useData } from '../../../context/DataContext'
 import { useAuth } from '../../../context/AuthContext'
-import { SPECIALTIES } from '../../../constants/specialties'
 import { generateId } from '../../../utils/storageUtils'
 import { isoToday } from '../../../utils/dateUtils'
 
@@ -75,6 +74,8 @@ export default function ConsultationFormModal({ onClose, initial = {} }) {
   const activeTherapists = therapists.filter(t => t.active !== false)
   const activeSpecialties = specialtiesData.filter(s => s.active !== false)
   const activeStatuses = consultationStatuses.filter(s => s.active !== false && !s.automatic)
+  const currentStatus = isEdit ? consultationStatuses.find(s => s.id === initial.consultationStatusId) : null
+  const isBlocked = isEdit && currentStatus?.automatic && user?.role !== 'admin'
   const activeAppointmentTypes = appointmentTypes.filter(t => t.active !== false)
   const activeRooms = rooms.filter(r => r.active !== false)
   const patientAppointments = form.patientId
@@ -89,11 +90,17 @@ export default function ConsultationFormModal({ onClose, initial = {} }) {
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>Cancelar</Button>
-          <Button variant="primary" onClick={handleSave}>{isEdit ? 'Salvar' : 'Registrar Atendimento'}</Button>
+          {!isBlocked && <Button variant="primary" onClick={handleSave}>{isEdit ? 'Salvar' : 'Registrar Atendimento'}</Button>}
         </>
       }
     >
       <div className="space-y-6">
+        {isBlocked && (
+          <div className="flex items-start gap-2 p-3 bg-amber-50 rounded-xl text-xs text-amber-700 border border-amber-200">
+            <span className="shrink-0 mt-0.5">⚠️</span>
+            Este atendimento está com status <strong>{currentStatus?.name}</strong> (automático) e não pode ser editado.
+          </div>
+        )}
         {/* Dados do Atendimento */}
         <section>
           <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3 pb-2 border-b border-gray-100">
@@ -111,7 +118,7 @@ export default function ConsultationFormModal({ onClose, initial = {} }) {
               <Select label="Terapeuta" value={form.therapistId} onChange={e => set('therapistId', e.target.value)}>
                 <option value="">Selecione</option>
                 {activeTherapists.map(t => (
-                  <option key={t.id} value={t.id}>{t.name} — {SPECIALTIES[t.specialty]?.label || t.specialty}</option>
+                  <option key={t.id} value={t.id}>{t.name}</option>
                 ))}
               </Select>
               <Input label="Data *" type="date" value={form.date} onChange={e => set('date', e.target.value)} />
@@ -151,7 +158,7 @@ export default function ConsultationFormModal({ onClose, initial = {} }) {
               <Select label="Vincular ao Agendamento" value={form.appointmentId} onChange={e => set('appointmentId', e.target.value)}>
                 <option value="">Nenhum / Avulso</option>
                 {patientAppointments.map(a => (
-                  <option key={a.id} value={a.id}>{a.date} {a.time} — {SPECIALTIES[a.specialty]?.label || a.specialty}</option>
+                  <option key={a.id} value={a.id}>{a.date} {a.time} — {specialtiesData.find(s => s.key === a.specialty)?.label || a.specialty}</option>
                 ))}
               </Select>
             )}
