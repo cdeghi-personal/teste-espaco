@@ -121,7 +121,17 @@ export function DataProvider({ children }) {
     setIsLoading(false)
   }, [])
 
-  useEffect(() => { fetchAll() }, [fetchAll])
+  // Aguarda a sessão ser restaurada pelo Supabase (async no v2) antes de buscar dados.
+  // INITIAL_SESSION = sessão restaurada do localStorage no reload
+  // SIGNED_IN = login acabou de acontecer
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (session && (event === 'INITIAL_SESSION' || event === 'SIGNED_IN')) {
+        fetchAll()
+      }
+    })
+    return () => subscription.unsubscribe()
+  }, [fetchAll])
 
   // ─── Patients ───────────────────────────────────────────────────────────────
 
