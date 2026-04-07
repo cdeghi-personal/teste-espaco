@@ -49,9 +49,7 @@ export default function RoomsPage() {
               const isInactive = r.active === false
               return (
                 <div key={r.id} className={`flex items-center gap-3 px-4 py-3 hover:bg-gray-50/50 transition-colors ${isInactive ? 'opacity-60' : ''}`}>
-                  <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center shrink-0">
-                    <FiHome size={14} className="text-gray-500" />
-                  </div>
+                  <div className="w-8 h-8 rounded-lg shrink-0 border border-gray-200" style={{ backgroundColor: r.color || '#e5e7eb' }} />
                   <div className="flex-1 min-w-0">
                     <div className="font-medium text-sm text-gray-900">{r.name}</div>
                     {r.description && <div className="text-xs text-gray-500 truncate">{r.description}</div>}

@@ -476,6 +476,7 @@ export function DataProvider({ children }) {
         agency: data.agency || null,
         account_number: data.accountNumber || null,
         pix_key: data.pixKey || null,
+        color: data.color || null,
         active: true,
       })
       .select()
@@ -502,6 +503,7 @@ export function DataProvider({ children }) {
     if (data.agency !== undefined) update.agency = data.agency || null
     if (data.accountNumber !== undefined) update.account_number = data.accountNumber || null
     if (data.pixKey !== undefined) update.pix_key = data.pixKey || null
+    if (data.color !== undefined) update.color = data.color || null
     if (data.active !== undefined) update.active = data.active
 
     // Update primary specialty from first in list
@@ -534,7 +536,7 @@ export function DataProvider({ children }) {
   async function addSpecialtyData(data) {
     const { data: inserted, error } = await supabase
       .from('specialties')
-      .insert({ key: data.key, label: data.label, active: true })
+      .insert({ key: data.key, label: data.label, color: data.color || null, active: true })
       .select().single()
     if (error) return dbError(error, toast)
     const item = mapSpecialty(inserted)
@@ -546,6 +548,7 @@ export function DataProvider({ children }) {
     const update = {}
     if (data.key !== undefined) update.key = data.key
     if (data.label !== undefined) update.label = data.label
+    if (data.color !== undefined) update.color = data.color || null
     if (data.active !== undefined) update.active = data.active
     await supabase.from('specialties').update(update).eq('id', id)
     setSpecialtiesData(prev => prev.map(s => s.id === id ? { ...s, ...data } : s))
@@ -620,7 +623,7 @@ export function DataProvider({ children }) {
   async function addRoom(data) {
     const { data: inserted, error } = await supabase
       .from('rooms')
-      .insert({ name: data.name, description: data.description || null, active: true })
+      .insert({ name: data.name, description: data.description || null, color: data.color || null, active: true })
       .select().single()
     if (error) return dbError(error, toast)
     const item = mapRoom(inserted)
@@ -632,6 +635,7 @@ export function DataProvider({ children }) {
     const update = {}
     if (data.name !== undefined) update.name = data.name
     if (data.description !== undefined) update.description = data.description || null
+    if (data.color !== undefined) update.color = data.color || null
     if (data.active !== undefined) update.active = data.active
     await supabase.from('rooms').update(update).eq('id', id)
     setRooms(prev => prev.map(r => r.id === id ? { ...r, ...data } : r))

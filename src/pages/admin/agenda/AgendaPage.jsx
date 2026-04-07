@@ -5,7 +5,6 @@ import { useAuth } from '../../../context/AuthContext'
 import Badge from '../../../components/ui/Badge'
 import Button from '../../../components/ui/Button'
 import AppointmentFormModal from './AppointmentFormModal'
-import { SPECIALTIES } from '../../../constants/specialties'
 import { getWeekDays, formatWeekDay, formatMonthYear, isoToday } from '../../../utils/dateUtils'
 import { format } from 'date-fns'
 
@@ -53,7 +52,7 @@ export default function AgendaPage() {
       .sort((a, b) => (a.startTime || '').localeCompare(b.startTime || ''))
   }
 
-  const specColor = (key) => SPECIALTIES[key]?.calendarColor || '#6b7280'
+  const specColor = (key) => specialtiesData.find(s => s.key === key)?.color || '#6b7280'
 
   return (
     <div className="p-3 md:p-6 space-y-4">

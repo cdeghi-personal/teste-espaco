@@ -84,6 +84,7 @@ export function mapTherapist(row) {
     agency: row.agency || '',
     accountNumber: row.account_number || '',
     pixKey: row.pix_key || '',
+    color: row.color || '',
     therapistSpecialties: (row.therapist_specialties || []).map(s => ({
       specialty: s.specialty,
       credential: s.credential || '',
@@ -199,7 +200,7 @@ export function mapConduct(row) {
 }
 
 export function mapSpecialty(row) {
-  return { id: row.id, key: row.key, label: row.label, active: row.active }
+  return { id: row.id, key: row.key, label: row.label, color: row.color || '', active: row.active }
 }
 
 export function mapPaymentMethod(row) {
@@ -215,7 +216,7 @@ export function mapPatientStatus(row) {
 }
 
 export function mapRoom(row) {
-  return { id: row.id, name: row.name, description: row.description || '', active: row.active }
+  return { id: row.id, name: row.name, description: row.description || '', color: row.color || '', active: row.active }
 }
 
 

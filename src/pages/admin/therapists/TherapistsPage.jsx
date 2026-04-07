@@ -5,7 +5,6 @@ import Badge from '../../../components/ui/Badge'
 import Button from '../../../components/ui/Button'
 import EmptyState from '../../../components/ui/EmptyState'
 import TherapistFormModal from './TherapistFormModal'
-import { SPECIALTIES } from '../../../constants/specialties'
 
 export default function TherapistsPage() {
   const { therapists, updateTherapist, patients } = useData()
@@ -81,17 +80,17 @@ export default function TherapistsPage() {
             <div className="sm:hidden divide-y divide-gray-50">
               {filtered.map(t => {
                 const isInactive = t.active === false
-                const spec = t.specialty ? SPECIALTIES[t.specialty] : null
                 const count = getPatientCount(t.id)
+                const avatarColor = t.color || '#6b7280'
                 return (
                   <div key={t.id} className={`px-3 py-3 flex items-center gap-3 ${isInactive ? 'opacity-60' : ''}`}>
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold text-sm shrink-0 ${isInactive ? 'bg-gray-100 text-gray-400' : 'bg-brand-yellow/20 text-brand-blue'}`}>
+                    <div className="w-10 h-10 rounded-full flex items-center justify-center font-semibold text-sm shrink-0 text-white" style={{ backgroundColor: isInactive ? '#9ca3af' : avatarColor }}>
                       {t.name?.charAt(0)}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="font-medium text-sm text-gray-900 truncate">{t.name}</div>
                       <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                        {spec && <Badge specialty={t.specialty} />}
+                        {t.specialty && <Badge specialty={t.specialty} />}
                         <span className="text-xs text-gray-500">{count} paciente(s)</span>
                         {isInactive && <span className="text-xs text-red-500">Inativo</span>}
                       </div>
@@ -127,12 +126,12 @@ export default function TherapistsPage() {
                 <tbody className="divide-y divide-gray-50">
                   {filtered.map(t => {
                     const isInactive = t.active === false
-                    const spec = t.specialty ? SPECIALTIES[t.specialty] : null
+                    const avatarColor = t.color || '#6b7280'
                     return (
                       <tr key={t.id} className={`hover:bg-gray-50/50 transition-colors ${isInactive ? 'opacity-60' : ''}`}>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-3">
-                            <div className={`w-9 h-9 rounded-full flex items-center justify-center font-semibold text-sm shrink-0 ${isInactive ? 'bg-gray-100 text-gray-400' : 'bg-brand-yellow/20 text-brand-blue'}`}>
+                            <div className="w-9 h-9 rounded-full flex items-center justify-center font-semibold text-sm shrink-0 text-white" style={{ backgroundColor: isInactive ? '#9ca3af' : avatarColor }}>
                               {t.name?.charAt(0)}
                             </div>
                             <div>
@@ -141,7 +140,7 @@ export default function TherapistsPage() {
                             </div>
                           </div>
                         </td>
-                        <td className="px-4 py-3">{spec ? <Badge specialty={t.specialty} /> : <span className="text-gray-400 text-sm">—</span>}</td>
+                        <td className="px-4 py-3">{t.specialty ? <Badge specialty={t.specialty} /> : <span className="text-gray-400 text-sm">—</span>}</td>
                         <td className="px-4 py-3 hidden md:table-cell">
                           <div className="text-xs text-gray-600 space-y-0.5">
                             {t.email && <div>{t.email}</div>}
