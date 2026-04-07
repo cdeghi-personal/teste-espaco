@@ -39,7 +39,7 @@ const GUARDIAN_SELECT = `
 `
 
 const CONSULTATION_SELECT = `
-  id, patient_id, therapist_id, specialty, date, session_number,
+  id, patient_id, therapist_id, specialty, date, time, room_id, session_number,
   consultation_status_id, appointment_type_id,
   main_objective, evolution_notes, next_objectives, guardian_feedback,
   session_quality, created_at,
