@@ -35,6 +35,20 @@ const PATIENT_SELECT = `
   patient_involved_therapists(therapist_id)
 `
 
+// Fallback para quando a migração 12 ainda não foi aplicada
+const PATIENT_SELECT_FALLBACK = `
+  id, full_name, date_of_birth, sex, cpf, rg, phone, email,
+  address, neighborhood, city, state, zip_code, indication,
+  school_name, school_phone, school_address, school_neighborhood,
+  school_city, school_state, school_zip, school_coordinator,
+  doctor_insurance, doctor_name, doctor_specialty, doctor_phone,
+  diagnosis, notes, deleted,
+  status_id, payment_method_id, primary_therapist_id, created_at, updated_at,
+  patient_specialties(specialty),
+  patient_conditions(diagnosis_id),
+  patient_external_therapists(id, name, specialty, phone, sort_order)
+`
+
 const GUARDIAN_SELECT = `
   id, full_name, relationship, phone, email, cpf, occupation, notes, neighborhood, active, created_at,
   patient_guardians(patient_id)
@@ -73,7 +87,14 @@ export function DataProvider({ children }) {
       patientsRes, guardiansRes, appointmentsRes, consultationsRes,
       therapistsRes, specialtiesRes, paymentRes, diagnosesRes, statusesRes, roomsRes, consultStatusRes, apptTypesRes,
     ] = await Promise.all([
-      supabase.from('patients').select(PATIENT_SELECT).eq('deleted', false),
+      supabase.from('patients').select(PATIENT_SELECT).eq('deleted', false).then(res => {
+        // Se a query falhar (ex: tabela patient_involved_therapists ainda não existe),
+        // tenta sem a relação para não quebrar o carregamento
+        if (res.error) {
+          return supabase.from('patients').select(PATIENT_SELECT_FALLBACK).eq('deleted', false)
+        }
+        return res
+      }),
       supabase.from('guardians').select(GUARDIAN_SELECT),
       supabase.from('appointments').select('*').order('date').order('time'),
       supabase.from('consultations').select(CONSULTATION_SELECT).order('date', { ascending: false }),
