@@ -39,11 +39,11 @@ export default function AgendaPage() {
     return appointments
       .filter(a => {
         if (a.date !== iso) return false
-        if (filterMode === 'mine') return a.therapistId === user?.id
+        if (filterMode === 'mine') return user?.role === 'admin' ? true : a.therapistId === user?.id
         if (filterMode === 'all') return true
         return a.specialty === filterMode
       })
-      .sort((a, b) => a.startTime.localeCompare(b.startTime))
+      .sort((a, b) => (a.startTime || '').localeCompare(b.startTime || ''))
   }
 
   const specColor = (key) => SPECIALTIES[key]?.calendarColor || '#6b7280'

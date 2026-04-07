@@ -93,7 +93,16 @@ export function mapTherapist(row) {
   }
 }
 
+function addMinutes(timeStr, minutes) {
+  if (!timeStr) return ''
+  const [h, m] = timeStr.split(':').map(Number)
+  const total = h * 60 + m + (minutes || 50)
+  return `${String(Math.floor(total / 60) % 24).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`
+}
+
 export function mapAppointment(row) {
+  const startTime = row.time || ''
+  const duration = row.duration || 50
   return {
     id: row.id,
     patientId: row.patient_id,
@@ -101,8 +110,10 @@ export function mapAppointment(row) {
     roomId: row.room_id,
     specialty: row.specialty,
     date: row.date,
-    time: row.time,
-    duration: row.duration,
+    time: startTime,
+    startTime,
+    endTime: addMinutes(startTime, duration),
+    duration,
     status: row.status,
     notes: row.notes || '',
     consultationId: row.consultation_id,

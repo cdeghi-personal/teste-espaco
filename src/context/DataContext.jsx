@@ -307,7 +307,7 @@ export function DataProvider({ children }) {
         room_id: data.roomId || null,
         specialty: data.specialty,
         date: data.date,
-        time: data.time,
+        time: data.startTime || data.time,
         duration: data.duration || 50,
         status: data.status || 'scheduled',
         notes: data.notes || null,
@@ -328,7 +328,8 @@ export function DataProvider({ children }) {
     if (data.roomId !== undefined) update.room_id = data.roomId || null
     if (data.specialty !== undefined) update.specialty = data.specialty
     if (data.date !== undefined) update.date = data.date
-    if (data.time !== undefined) update.time = data.time
+    if (data.startTime !== undefined) update.time = data.startTime
+    else if (data.time !== undefined) update.time = data.time
     if (data.duration !== undefined) update.duration = data.duration
     if (data.status !== undefined) update.status = data.status
     if (data.notes !== undefined) update.notes = data.notes || null

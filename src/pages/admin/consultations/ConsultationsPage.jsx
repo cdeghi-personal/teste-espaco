@@ -9,7 +9,7 @@ import ConsultationFormModal from './ConsultationFormModal'
 import { formatDateShort } from '../../../utils/dateUtils'
 
 export default function ConsultationsPage() {
-  const { consultations, patients, therapists, specialtiesData, consultationStatuses, appointmentTypes, deleteConsultation } = useData()
+  const { consultations, patients, therapists, rooms, specialtiesData, consultationStatuses, appointmentTypes, deleteConsultation } = useData()
   const { user } = useAuth()
   const [search, setSearch] = useState('')
   const [filterSpecialty, setFilterSpecialty] = useState('')
@@ -96,6 +96,7 @@ export default function ConsultationsPage() {
           const therapist = getTherapist(c.therapistId)
           const status = getStatus(c.consultationStatusId)
           const apptType = appointmentTypes.find(t => t.id === c.appointmentTypeId)
+          const room = rooms.find(r => r.id === c.roomId)
           const isExpanded = expanded === c.id
           return (
             <div key={c.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
@@ -111,10 +112,11 @@ export default function ConsultationsPage() {
                       <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">{apptType.name}</span>
                     )}
                   </div>
-                  <div className="flex items-center gap-3 text-xs text-gray-500">
-                    <span>{formatDateShort(c.date)}</span>
+                  <div className="flex items-center gap-3 text-xs text-gray-500 flex-wrap">
+                    <span>{formatDateShort(c.date)}{c.time && <span className="text-gray-400"> {c.time}</span>}</span>
                     <span>•</span>
                     <span>{therapist?.name || '—'}</span>
+                    {room && <><span>•</span><span>{room.name}</span></>}
                     <span>•</span>
                     <span>{c.activities?.length || 0} atividade(s)</span>
                   </div>

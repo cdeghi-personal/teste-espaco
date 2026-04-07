@@ -213,7 +213,7 @@ function Section({ title, count, children, defaultOpen = true }) {
 
 export default function MedicalRecordsPage() {
   const {
-    patients, therapists, specialtiesData, consultations, consultationStatuses, appointmentTypes,
+    patients, therapists, rooms, specialtiesData, consultations, consultationStatuses, appointmentTypes,
     getOrCreateMedicalRecord,
     getExams, addExam, updateExam, deleteExam,
     getMedications, addMedication, updateMedication, deleteMedication,
@@ -572,6 +572,7 @@ export default function MedicalRecordsPage() {
                       const therapist = therapists.find(t => t.id === c.therapistId)
                       const status = consultationStatuses.find(s => s.id === c.consultationStatusId)
                       const apptType = appointmentTypes.find(t => t.id === c.appointmentTypeId)
+                      const room = rooms.find(r => r.id === c.roomId)
                       return (
                         <div key={c.id} className="bg-gray-50 rounded-xl px-4 py-3 border border-gray-100">
                           <div className="flex items-center gap-2 flex-wrap">
@@ -580,6 +581,7 @@ export default function MedicalRecordsPage() {
                             {status && <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${status.color}`}>{status.name}</span>}
                             {apptType && <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-200 text-gray-600">{apptType.name}</span>}
                             <span className="text-xs text-gray-500">{therapist?.name || '—'}</span>
+                            {room && <span className="text-xs text-gray-400">{room.name}</span>}
                             <button
                               onClick={() => { setEditConsultation(c); setShowConsultationModal(true) }}
                               className="ml-auto p-1 rounded-lg text-gray-400 hover:text-brand-blue hover:bg-blue-50 transition-colors"
