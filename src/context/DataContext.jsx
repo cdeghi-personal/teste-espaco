@@ -8,7 +8,6 @@ import {
   syncTherapistSpecialties, syncExternalTherapists, syncInvolvedTherapists,
 } from '../lib/supabase'
 import { useToast } from '../components/ui/Toast'
-import { useAuth } from './AuthContext'
 
 function dbError(error, toast) {
   const msg = error?.message || 'Erro ao salvar. Tente novamente.'
@@ -66,7 +65,6 @@ const CONSULTATION_SELECT = `
 
 export function DataProvider({ children }) {
   const toast = useToast()
-  const { user } = useAuth()
   const [patients, setPatients] = useState([])
   const [guardians, setGuardians] = useState([])
   const [appointments, setAppointments] = useState([])
@@ -123,8 +121,19 @@ export function DataProvider({ children }) {
     setIsLoading(false)
   }, [])
 
-  // Só carrega dados quando o usuário está autenticado (evita fetch sem auth que retorna vazio por RLS)
-  useEffect(() => { if (user) fetchAll() }, [user?.authId, fetchAll])
+  // Carrega dados assim que há sessão ativa (evita fetch antes do auth restaurar a sessão)
+  useEffect(() => {
+    // Sessão já existe (reload de página)
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) fetchAll()
+      else setIsLoading(false)
+    })
+    // Login ocorre após a montagem
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_IN') fetchAll()
+    })
+    return () => subscription.unsubscribe()
+  }, [fetchAll])
 
   // ─── Patients ───────────────────────────────────────────────────────────────
 
