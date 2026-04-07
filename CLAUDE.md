@@ -77,6 +77,7 @@ supabase/
   08_appointment_types.sql       # Tabela appointment_types + coluna appointment_type_id em consultations
   09_consultation_status_automatic.sql  # Flag automatic em consultation_statuses
   10_guardian_neighborhood.sql   # Campo neighborhood em guardians
+  11_consultation_time_room.sql  # Campos time e room_id em consultations
   functions/
     invite-therapist/index.ts    # Edge Function — envia convite por e-mail ao criar terapeuta
 ```
@@ -104,8 +105,8 @@ Encontrar em: Supabase Dashboard → Project Settings → API.
 | `patient_conditions` | Relação N:N paciente ↔ diagnósticos (comorbidades) |
 | `guardians` | Responsáveis — soft delete com `active = false`; tem campo `neighborhood` |
 | `patient_guardians` | Relação N:N paciente ↔ responsável |
-| `appointments` | Agendamentos — hard delete |
-| `consultations` | Consultas/evolução — hard delete; tem `appointment_type_id` |
+| `appointments` | Agendamentos — hard delete; campos `time` (HH:MM), `room_id` |
+| `consultations` | Consultas/evolução — hard delete; tem `appointment_type_id`, `time` (HH:MM), `room_id` |
 | `consultation_activities` | Atividades dentro de uma consulta |
 | `specialties` | Tabela de config — toggle `active` |
 | `payment_methods` | Tabela de config — toggle `active` |
@@ -124,7 +125,7 @@ Encontrar em: Supabase Dashboard → Project Settings → API.
 ### Mappers (DB → App)
 
 Todos em `src/lib/supabase.js`. Convertem snake_case do banco para camelCase do app:
-- `mapPatient`, `mapGuardian` (inclui `neighborhood`), `mapTherapist`, `mapAppointment`, `mapConsultation`
+- `mapPatient`, `mapGuardian` (inclui `neighborhood`), `mapTherapist`, `mapAppointment` (inclui `startTime`, `endTime` calculado via duration), `mapConsultation` (inclui `time`, `roomId`)
 - `mapSpecialty`, `mapPaymentMethod`, `mapDiagnosis`, `mapPatientStatus`, `mapRoom`
 - `mapConsultationStatus` (inclui `automatic`), `mapAppointmentType`, `mapExam`, `mapMedication`, `mapConduct`
 - `syncPatientRelations(patientId, { specialties, conditionIds })`
@@ -294,11 +295,13 @@ Cada especialidade tem `label`, `color` (Tailwind), `bgColor`, `textColor`, `cal
 
 ## PatientDetailPage
 
-Tem 3 abas: **Resumo**, **Consultas**, **Responsáveis**.
+Tela sem abas — apenas **Resumo** em tela única.
 
-- **Resumo:** Dados Pessoais (inclui Terapeuta Principal), Informações Clínicas (Diagnóstico + Comorbidades), card de Responsáveis, Observações, Últimas 10 Consultas (com Status/Tipo/Objetivo)
-- **Consultas:** lista completa com paginação de 10 por página, mostra Status Atendimento e Tipo de Atendimento
-- **Responsáveis:** cards detalhados com Nome, Parentesco, Tel, E-mail
+- **Dados Pessoais:** Nome, Nasc, Idade, Sexo, CPF + Terapeuta Principal
+- **Informações Clínicas:** Diagnóstico Principal, Comorbidades, **Especialidades em Atendimento** (badges), Forma de Pagamento
+- **Responsáveis:** card inline com Nome, Parentesco, Tel, E-mail
+- **Observações Gerais:** notas do paciente
+- **Últimos Atendimentos:** 10 mais recentes, cada card mostra Data + Horário, Especialidade, Status, Tipo, Terapeuta, Sala
 
 ## Prontuário Clínico (MedicalRecordsPage — `/admin/prontuario`)
 
@@ -309,7 +312,7 @@ Página independente de prontuário. Fluxo: busca paciente → carrega/cria `med
 | Exames Complementares | `medical_record_exams` | **Fechada** | Descrição, data, link/anexo, observações |
 | Medicamentos | `medical_record_medications` | **Fechada** | Medicamento, data, status (ativa/interrompida), observações |
 | Conduta & Objetivo Terapêutico | `medical_record_conducts` | **Fechada** | Terapeuta, especialidade, conduta, objetivo, datas, status |
-| Histórico de Atendimentos | `consultations` | **Aberta** | Navegação por mês; card compacto com Data/Especialidade/Terapeuta/Status/Tipo/Objetivo; lápis abre `ConsultationFormModal`; link "Adicionar atendimento" no rodapé |
+| Histórico de Atendimentos | `consultations` | **Aberta** | Navegação por mês; card compacto com Data+Horário/Especialidade/Terapeuta/Status/Tipo/Sala/Objetivo; lápis abre `ConsultationFormModal`; link "Adicionar atendimento" no rodapé |
 
 **Padrão de edição inline:** cada linha tem lápis (abre draft local) e lixeira. Novo item usa formulário dashed expandido (link `+ Adicionar ...`).
 
@@ -337,7 +340,15 @@ Funções no DataContext: `addAppointmentType(data)` / `updateAppointmentType(id
 
 - Campo **Status Atendimento** filtra automáticos (só mostra os manuais)
 - Campo **Tipo de Atendimento** vinculado à tabela `appointment_types`
+- Campos **Horário** (type=time) e **Sala** no formulário de registro
 - Adicionar atividades usa link inline expandido (padrão prontuário): `+ Adicionar atividade`
+- Card na listagem exibe: Paciente, Especialidade, Status, Tipo / Data + Hora, Terapeuta, Sala
+
+## Agenda (`/admin/agenda`)
+
+- `mapAppointment` expõe `startTime` (= `time` do banco) e `endTime` (calculado: startTime + duration)
+- `DataContext.addAppointment` e `updateAppointment` aceitam `startTime` ou `time`
+- Filtro "Minha Agenda" mostra todos os agendamentos quando o usuário é `admin`
 
 ## Especialidades (tabela `specialties` no banco)
 
