@@ -66,7 +66,7 @@ export default function AppointmentFormModal({ onClose, initial = {} }) {
           error={errors.patientId}
         >
           <option value="">Selecione o paciente</option>
-          {patients.filter(p => p.status === 'active').map(p => (
+          {patients.filter(p => !p.deleted).map(p => (
             <option key={p.id} value={p.id}>{p.fullName}</option>
           ))}
         </Select>

@@ -308,7 +308,15 @@ export function DataProvider({ children }) {
         specialty: data.specialty,
         date: data.date,
         time: data.startTime || data.time,
-        duration: data.duration || 50,
+        duration: (() => {
+          if (data.startTime && data.endTime) {
+            const [sh, sm] = data.startTime.split(':').map(Number)
+            const [eh, em] = data.endTime.split(':').map(Number)
+            const d = (eh * 60 + em) - (sh * 60 + sm)
+            return d > 0 ? d : 50
+          }
+          return data.duration || 50
+        })(),
         status: data.status || 'scheduled',
         notes: data.notes || null,
       })
@@ -330,7 +338,12 @@ export function DataProvider({ children }) {
     if (data.date !== undefined) update.date = data.date
     if (data.startTime !== undefined) update.time = data.startTime
     else if (data.time !== undefined) update.time = data.time
-    if (data.duration !== undefined) update.duration = data.duration
+    if (data.startTime !== undefined && data.endTime !== undefined) {
+      const [sh, sm] = data.startTime.split(':').map(Number)
+      const [eh, em] = data.endTime.split(':').map(Number)
+      const d = (eh * 60 + em) - (sh * 60 + sm)
+      update.duration = d > 0 ? d : 50
+    } else if (data.duration !== undefined) update.duration = data.duration
     if (data.status !== undefined) update.status = data.status
     if (data.notes !== undefined) update.notes = data.notes || null
     if (data.consultationId !== undefined) update.consultation_id = data.consultationId
