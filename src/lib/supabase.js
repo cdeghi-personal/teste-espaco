@@ -40,7 +40,7 @@ export function mapPatient(row) {
     statusId: row.status_id,
     paymentMethodId: row.payment_method_id,
     therapistId: row.primary_therapist_id,
-    secondaryTherapistIds: [],
+    involvedTherapistIds: (row.patient_involved_therapists || []).map(r => r.therapist_id),
     conditionIds: (row.patient_conditions || []).map(r => r.diagnosis_id),
     specialties: (row.patient_specialties || []).map(r => r.specialty),
     externalTherapists: (row.patient_external_therapists || [])
@@ -269,6 +269,15 @@ export async function syncTherapistSpecialties(therapistId, specialties = []) {
   if (valid.length) {
     await supabase.from('therapist_specialties').insert(
       valid.map(s => ({ therapist_id: therapistId, specialty: s.specialty, credential: s.credential || null }))
+    )
+  }
+}
+
+export async function syncInvolvedTherapists(patientId, therapistIds = []) {
+  await supabase.from('patient_involved_therapists').delete().eq('patient_id', patientId)
+  if (therapistIds.length) {
+    await supabase.from('patient_involved_therapists').insert(
+      therapistIds.map(tid => ({ patient_id: patientId, therapist_id: tid }))
     )
   }
 }

@@ -78,6 +78,7 @@ supabase/
   09_consultation_status_automatic.sql  # Flag automatic em consultation_statuses
   10_guardian_neighborhood.sql   # Campo neighborhood em guardians
   11_consultation_time_room.sql  # Campos time e room_id em consultations
+  12_involved_therapists.sql     # Tabela patient_involved_therapists + RLS atualizado para Gerente de Conta + Envolvidos
   functions/
     invite-therapist/index.ts    # Edge Function — envia convite por e-mail ao criar terapeuta
 ```
@@ -121,6 +122,7 @@ Encontrar em: Supabase Dashboard → Project Settings → API.
 | `medical_record_exams` | Exames complementares do paciente — N por prontuário |
 | `medical_record_medications` | Medicamentos do paciente — N por prontuário |
 | `medical_record_conducts` | Conduta & objetivo terapêutico — N por prontuário, vinculado ao terapeuta/especialidade |
+| `patient_involved_therapists` | Terapeutas envolvidos no atendimento do paciente (N:N) — complementa o Gerente de Conta |
 
 ### Mappers (DB → App)
 
@@ -169,11 +171,13 @@ Admin cria terapeuta no TherapistFormModal
 ### Deploy da Edge Function
 
 ```
-npx supabase functions deploy invite-therapist --project-ref SEU_PROJECT_REF
+npx supabase functions deploy invite-therapist --project-ref ffkkgmikvsqhutftoajh
 ```
 
 O Project Ref está em: Supabase Dashboard → Project Settings → General → Reference ID.
 Também configurar a secret `SITE_URL` em: Edge Functions → invite-therapist → Secrets.
+
+> **IMPORTANTE — JWT Verification:** A Edge Function `invite-therapist` deve ter **JWT Verification DESATIVADO** (Supabase Dashboard → Edge Functions → invite-therapist → Settings → JWT Verification → off). A função faz sua própria verificação de admin via `getUser()` + perfil. Com JWT Verification ativado, o gateway do Supabase rejeita a requisição com 401 antes de qualquer código rodar, e nenhum log aparece.
 
 ### Fluxo de reset de senha / convite
 
@@ -280,6 +284,7 @@ Cada especialidade tem `label`, `color` (Tailwind), `bgColor`, `textColor`, `cal
 
 ## Campos do Paciente
 
+- **Terapeutas:** `primary_therapist_id` (Gerente de Conta) + tabela `patient_involved_therapists` (Terapeutas Envolvidos, N:N). No app: `therapistId` e `involvedTherapistIds[]`. Terapeuta vê pacientes onde é Gerente OU Envolvido (RLS).
 - **Dados pessoais extras:** `rg`, `phone`, `email`, `address`, `neighborhood`, `city`, `state`, `zip_code`, `indication`
 - **Dados escolares:** `school_name`, `school_phone`, `school_address`, `school_neighborhood`, `school_city`, `school_state`, `school_zip`, `school_coordinator`
 - **Médico responsável:** `doctor_insurance`, `doctor_name`, `doctor_specialty`, `doctor_phone`
@@ -368,9 +373,10 @@ Constantes de SELECT no DataContext: `PATIENT_SELECT`, `GUARDIAN_SELECT`, `CONSU
 - **Vercel** — conectado ao GitHub (branch `main`)
 - `vercel.json` com rewrite `/* → /index.html` para SPA routing
 - Variáveis de ambiente do Supabase configuradas em Vercel → Settings → Environment Variables
-- Edge Functions: `npx supabase functions deploy invite-therapist --project-ref SEU_PROJECT_REF`
-  - Project Ref: Supabase Dashboard → Project Settings → General → Reference ID
+- Edge Functions: `npx supabase functions deploy invite-therapist --project-ref ffkkgmikvsqhutftoajh`
+  - Project Ref: `ffkkgmikvsqhutftoajh`
   - Secret necessária: `SITE_URL` (URL do app)
+  - JWT Verification deve estar **desativado** na função (ver seção acima)
 
 ## Site público
 

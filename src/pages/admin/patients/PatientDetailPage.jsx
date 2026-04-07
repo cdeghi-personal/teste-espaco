@@ -27,6 +27,9 @@ export default function PatientDetailPage() {
   const linkedGuardians = getGuardiansForPatient(id)
   const patientStatus = patientStatuses.find(s => s.id === (patient.statusId || patient.status))
   const primaryTherapist = therapists.find(t => t.id === patient.therapistId)
+  const involvedTherapists = (patient.involvedTherapistIds || [])
+    .map(tid => therapists.find(t => t.id === tid))
+    .filter(Boolean)
   const paymentMethod = paymentMethods.find(pm => pm.id === patient.paymentMethodId)
   const patientConsultations = consultations
     .filter(c => c.patientId === id)
@@ -86,19 +89,6 @@ export default function PatientDetailPage() {
                 <span className="font-medium text-gray-900 text-right">{value}</span>
               </div>
             ))}
-            {/* Terapeuta Principal */}
-            <div className="flex justify-between items-center text-sm pt-1 border-t border-gray-50">
-              <span className="text-gray-500">Terapeuta Principal</span>
-              {primaryTherapist ? (
-                <div className="flex items-center gap-1.5">
-                  <div className="w-5 h-5 rounded-full bg-brand-blue text-white flex items-center justify-center text-xs font-bold">
-                    {primaryTherapist.name.charAt(0)}
-                  </div>
-                  <span className="font-medium text-gray-900">{primaryTherapist.name}</span>
-                  {primaryTherapist.specialty && <Badge specialty={primaryTherapist.specialty} />}
-                </div>
-              ) : <span className="text-gray-400">—</span>}
-            </div>
           </div>
 
           {/* Informações Clínicas */}
@@ -136,6 +126,44 @@ export default function PatientDetailPage() {
               <span className="font-medium text-gray-900">{paymentMethod?.name || '—'}</span>
             </div>
           </div>
+
+          {/* Terapeutas */}
+          {(primaryTherapist || involvedTherapists.length > 0) && (
+            <div className="bg-white rounded-2xl border border-gray-100 p-5 space-y-3">
+              <h3 className="font-semibold text-gray-900 text-sm">Terapeutas</h3>
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-gray-500">Gerente de Conta</span>
+                {primaryTherapist ? (
+                  <div className="flex items-center gap-1.5">
+                    <div
+                      className="w-5 h-5 rounded-full text-white flex items-center justify-center text-xs font-bold"
+                      style={{ backgroundColor: primaryTherapist.color || '#6b7280' }}
+                    >
+                      {primaryTherapist.name.charAt(0)}
+                    </div>
+                    <span className="font-medium text-gray-900">{primaryTherapist.name}</span>
+                    {primaryTherapist.specialty && <Badge specialty={primaryTherapist.specialty} />}
+                  </div>
+                ) : <span className="text-gray-400">—</span>}
+              </div>
+              {involvedTherapists.length > 0 && (
+                <div className="text-sm">
+                  <span className="text-gray-500 block mb-2">Terapeutas Envolvidos</span>
+                  <div className="flex flex-wrap gap-2">
+                    {involvedTherapists.map(t => (
+                      <span
+                        key={t.id}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium text-white"
+                        style={{ backgroundColor: t.color || '#6b7280' }}
+                      >
+                        {t.name}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Responsáveis */}
           {linkedGuardians.length > 0 && (

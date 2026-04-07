@@ -5,9 +5,10 @@ import {
   mapSpecialty, mapPaymentMethod, mapDiagnosis, mapPatientStatus, mapRoom,
   mapConsultationStatus, mapAppointmentType, mapExam, mapMedication, mapConduct,
   syncPatientRelations, syncGuardianPatients,
-  syncTherapistSpecialties, syncExternalTherapists,
+  syncTherapistSpecialties, syncExternalTherapists, syncInvolvedTherapists,
 } from '../lib/supabase'
 import { useToast } from '../components/ui/Toast'
+import { useAuth } from './AuthContext'
 
 function dbError(error, toast) {
   const msg = error?.message || 'Erro ao salvar. Tente novamente.'
@@ -30,7 +31,8 @@ const PATIENT_SELECT = `
   status_id, payment_method_id, primary_therapist_id, created_at, updated_at,
   patient_specialties(specialty),
   patient_conditions(diagnosis_id),
-  patient_external_therapists(id, name, specialty, phone, sort_order)
+  patient_external_therapists(id, name, specialty, phone, sort_order),
+  patient_involved_therapists(therapist_id)
 `
 
 const GUARDIAN_SELECT = `
@@ -50,6 +52,7 @@ const CONSULTATION_SELECT = `
 
 export function DataProvider({ children }) {
   const toast = useToast()
+  const { user } = useAuth()
   const [patients, setPatients] = useState([])
   const [guardians, setGuardians] = useState([])
   const [appointments, setAppointments] = useState([])
@@ -99,7 +102,8 @@ export function DataProvider({ children }) {
     setIsLoading(false)
   }, [])
 
-  useEffect(() => { fetchAll() }, [fetchAll])
+  // Só carrega dados quando o usuário está autenticado (evita fetch sem auth que retorna vazio por RLS)
+  useEffect(() => { if (user) fetchAll() }, [user?.authId, fetchAll])
 
   // ─── Patients ───────────────────────────────────────────────────────────────
 
@@ -148,12 +152,14 @@ export function DataProvider({ children }) {
       conditionIds: data.conditionIds || [],
     })
     await syncExternalTherapists(inserted.id, data.externalTherapists || [])
+    await syncInvolvedTherapists(inserted.id, data.involvedTherapistIds || [])
 
     const newPatient = mapPatient({
       ...inserted,
       patient_specialties: (data.specialties || []).map(s => ({ specialty: s })),
       patient_conditions: (data.conditionIds || []).map(id => ({ diagnosis_id: id })),
       patient_external_therapists: (data.externalTherapists || []).map((t, i) => ({ ...t, sort_order: i })),
+      patient_involved_therapists: (data.involvedTherapistIds || []).map(tid => ({ therapist_id: tid })),
     })
     setPatients(prev => [...prev, newPatient])
     return newPatient
@@ -203,6 +209,9 @@ export function DataProvider({ children }) {
     })
     if (data.externalTherapists !== undefined) {
       await syncExternalTherapists(id, data.externalTherapists)
+    }
+    if (data.involvedTherapistIds !== undefined) {
+      await syncInvolvedTherapists(id, data.involvedTherapistIds)
     }
 
     setPatients(prev => prev.map(p => p.id === id ? { ...p, ...data, updatedAt: new Date().toISOString() } : p))

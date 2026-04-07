@@ -17,6 +17,7 @@ const EMPTY = {
   schoolCity: '', schoolState: '', schoolZip: '', schoolCoordinator: '',
   doctorInsurance: '', doctorName: '', doctorSpecialty: '', doctorPhone: '',
   diagnosis: '', conditionIds: [], specialties: [], therapistId: '',
+  involvedTherapistIds: [],
   paymentMethodId: '', notes: '', statusId: '',
   externalTherapists: [],
 }
@@ -29,6 +30,7 @@ export default function PatientFormModal({ onClose, initial = {} }) {
     ...EMPTY,
     ...initial,
     conditionIds: initial.conditionIds || [],
+    involvedTherapistIds: initial.involvedTherapistIds || [],
     statusId: initial.statusId || initial.status || '',
     externalTherapists: initial.externalTherapists || [],
   })
@@ -146,13 +148,7 @@ export default function PatientFormModal({ onClose, initial = {} }) {
               <Input label="CEP" value={form.zipCode} onChange={e => set('zipCode', e.target.value)} placeholder="00000-000" />
               <Input label="Indicação" value={form.indication} onChange={e => set('indication', e.target.value)} placeholder="Como nos conheceu?" />
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <Select label="Gerente do Caso" value={form.therapistId} onChange={e => set('therapistId', e.target.value)}>
-                <option value="">Selecione</option>
-                {activeTherapists.map(t => (
-                  <option key={t.id} value={t.id}>{t.name}</option>
-                ))}
-              </Select>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Select label="Status" value={form.statusId} onChange={e => set('statusId', e.target.value)}>
                 <option value="">Selecione</option>
                 {activeStatuses.map(s => (
@@ -165,6 +161,50 @@ export default function PatientFormModal({ onClose, initial = {} }) {
                   <option key={pm.id} value={pm.id}>{pm.name}</option>
                 ))}
               </Select>
+            </div>
+          </div>
+        </section>
+
+        {/* Terapeutas */}
+        <section>
+          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3 pb-2 border-b border-gray-100">
+            Terapeutas
+          </h3>
+          <div className="space-y-3">
+            <Select label="Gerente de Conta" value={form.therapistId} onChange={e => set('therapistId', e.target.value)}>
+              <option value="">Selecione</option>
+              {activeTherapists.map(t => (
+                <option key={t.id} value={t.id}>{t.name}</option>
+              ))}
+            </Select>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Terapeutas Envolvidos
+                <span className="text-xs text-gray-400 font-normal ml-1">(múltipla seleção)</span>
+              </label>
+              {activeTherapists.length === 0 ? (
+                <p className="text-xs text-gray-400">Nenhum terapeuta cadastrado.</p>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {activeTherapists.map(t => {
+                    const isSelected = form.involvedTherapistIds?.includes(t.id)
+                    const color = t.color || '#6b7280'
+                    return (
+                      <button
+                        key={t.id}
+                        type="button"
+                        onClick={() => toggleList('involvedTherapistIds', t.id)}
+                        style={isSelected ? { backgroundColor: color, borderColor: color, color: 'white' } : {}}
+                        className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all border-2 ${
+                          isSelected ? '' : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border-transparent'
+                        }`}
+                      >
+                        {t.name}
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
             </div>
           </div>
         </section>
