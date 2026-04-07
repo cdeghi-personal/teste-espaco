@@ -5,7 +5,7 @@ import Input from '../../../components/ui/Input'
 import Select from '../../../components/ui/Select'
 import Textarea from '../../../components/ui/Textarea'
 import { useData } from '../../../context/DataContext'
-import { SPECIALTIES, SPECIALTY_LIST, APPOINTMENT_STATUS } from '../../../constants/specialties'
+import { APPOINTMENT_STATUS } from '../../../constants/specialties'
 
 const EMPTY = {
   patientId: '', therapistId: '', specialty: '', date: '', startTime: '08:00',
@@ -13,7 +13,7 @@ const EMPTY = {
 }
 
 export default function AppointmentFormModal({ onClose, initial = {} }) {
-  const { patients, rooms, therapists: allTherapists, addAppointment, updateAppointment } = useData()
+  const { patients, rooms, therapists: allTherapists, specialtiesData, addAppointment, updateAppointment } = useData()
   const isEdit = !!initial.id
   const [form, setForm] = useState({ ...EMPTY, ...initial })
   const [errors, setErrors] = useState({})
@@ -45,6 +45,7 @@ export default function AppointmentFormModal({ onClose, initial = {} }) {
 
   const therapists = allTherapists.filter(t => t.active !== false)
   const activeRooms = rooms.filter(r => r.active !== false)
+  const activeSpecialties = specialtiesData.filter(s => s.active !== false)
 
   return (
     <Modal
@@ -79,8 +80,8 @@ export default function AppointmentFormModal({ onClose, initial = {} }) {
             error={errors.specialty}
           >
             <option value="">Selecione</option>
-            {SPECIALTY_LIST.map(k => (
-              <option key={k} value={k}>{SPECIALTIES[k].label}</option>
+            {activeSpecialties.map(s => (
+              <option key={s.key} value={s.key}>{s.label}</option>
             ))}
           </Select>
 

@@ -5,11 +5,12 @@ import { useAuth } from '../../../context/AuthContext'
 import Badge from '../../../components/ui/Badge'
 import Button from '../../../components/ui/Button'
 import AppointmentFormModal from './AppointmentFormModal'
-import { SPECIALTIES, SPECIALTY_LIST } from '../../../constants/specialties'
+import { SPECIALTIES } from '../../../constants/specialties'
 import { getWeekDays, formatWeekDay, formatMonthYear, isoToday } from '../../../utils/dateUtils'
+import { format } from 'date-fns'
 
 export default function AgendaPage() {
-  const { appointments, patients, rooms, therapists, deleteAppointment } = useData()
+  const { appointments, patients, rooms, therapists, specialtiesData, deleteAppointment } = useData()
   const { user } = useAuth()
   const [weekRef, setWeekRef] = useState(new Date())
   const [filterMode, setFilterMode] = useState('mine') // 'mine' | specialty key
@@ -17,7 +18,7 @@ export default function AgendaPage() {
   const [editAppt, setEditAppt] = useState(null)
 
   const days = getWeekDays(weekRef)
-  const today = isoToday()
+  const today = format(new Date(), 'yyyy-MM-dd')
   const [selectedDayIdx, setSelectedDayIdx] = useState(() => {
     const d = new Date().getDay()
     // getDay: 0=sun,1=mon...5=fri,6=sat. Clamp to 0-4 (Mon-Fri)
@@ -34,8 +35,14 @@ export default function AgendaPage() {
   function getTherapist(id) { return therapists.find(t => t.id === id) }
   function getRoom(id) { return rooms.find(r => r.id === id) }
 
+  const activeSpecialties = specialtiesData.filter(s => s.active !== false)
+
+  function dayIso(date) {
+    return format(date, 'yyyy-MM-dd')
+  }
+
   function getApptsByDay(date) {
-    const iso = date.toISOString().split('T')[0]
+    const iso = dayIso(date)
     return appointments
       .filter(a => {
         if (a.date !== iso) return false
@@ -87,14 +94,14 @@ export default function AgendaPage() {
           >
             Todas
           </button>
-          {SPECIALTY_LIST.map(k => (
+          {activeSpecialties.map(s => (
             <button
-              key={k}
-              onClick={() => setFilterMode(k)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${filterMode === k ? 'text-white' : 'text-gray-600 hover:bg-gray-50'}`}
-              style={filterMode === k ? { backgroundColor: SPECIALTIES[k].calendarColor } : {}}
+              key={s.key}
+              onClick={() => setFilterMode(s.key)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${filterMode === s.key ? 'text-white' : 'text-gray-600 hover:bg-gray-50'}`}
+              style={filterMode === s.key ? { backgroundColor: specColor(s.key) } : {}}
             >
-              {SPECIALTIES[k].label}
+              {s.label}
             </button>
           ))}
         </div>
@@ -104,7 +111,7 @@ export default function AgendaPage() {
       <div className="hidden md:block bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         <div className="grid grid-cols-5 border-b border-gray-100">
           {days.map((day) => {
-            const iso = day.toISOString().split('T')[0]
+            const iso = dayIso(day)
             const isToday = iso === today
             return (
               <div
@@ -122,7 +129,7 @@ export default function AgendaPage() {
 
         <div className="grid grid-cols-5 min-h-[400px]">
           {days.map((day) => {
-            const iso = day.toISOString().split('T')[0]
+            const iso = dayIso(day)
             const dayAppts = getApptsByDay(day)
             return (
               <div key={iso} className={`border-r border-gray-100 last:border-r-0 p-2 space-y-2 ${iso === today ? 'bg-brand-blue/5' : ''}`}>
@@ -176,7 +183,7 @@ export default function AgendaPage() {
           </button>
           <div className="flex-1 flex gap-1 overflow-x-auto">
             {days.map((day, idx) => {
-              const iso = day.toISOString().split('T')[0]
+              const iso = dayIso(day)
               const isToday = iso === today
               const isSelected = idx === selectedDayIdx
               return (
@@ -256,10 +263,10 @@ export default function AgendaPage() {
 
       {/* Legendas */}
       <div className="flex flex-wrap gap-3">
-        {SPECIALTY_LIST.map(k => (
-          <div key={k} className="flex items-center gap-1.5 text-xs text-gray-600">
-            <span className="w-3 h-3 rounded-full" style={{ backgroundColor: SPECIALTIES[k].calendarColor }} />
-            {SPECIALTIES[k].label}
+        {activeSpecialties.map(s => (
+          <div key={s.key} className="flex items-center gap-1.5 text-xs text-gray-600">
+            <span className="w-3 h-3 rounded-full" style={{ backgroundColor: specColor(s.key) }} />
+            {s.label}
           </div>
         ))}
       </div>
