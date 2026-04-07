@@ -120,6 +120,8 @@ export function mapConsultation(row) {
     sessionNumber: row.session_number,
     consultationStatusId: row.consultation_status_id,
     appointmentTypeId: row.appointment_type_id,
+    time: row.time || '',
+    roomId: row.room_id || null,
     mainObjective: row.main_objective || '',
     evolutionNotes: row.evolution_notes || '',
     nextObjectives: row.next_objectives || '',

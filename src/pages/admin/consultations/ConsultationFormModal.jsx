@@ -14,15 +14,15 @@ import { isoToday } from '../../../utils/dateUtils'
 const EMPTY_ACTIVITY = { id: '', name: '', description: '', outcome: 'achieved' }
 
 const EMPTY = {
-  patientId: '', therapistId: '', specialty: '', date: isoToday(),
-  consultationStatusId: '', appointmentTypeId: '',
+  patientId: '', therapistId: '', specialty: '', date: isoToday(), time: '',
+  consultationStatusId: '', appointmentTypeId: '', roomId: '',
   mainObjective: '', activities: [],
   evolutionNotes: '', nextObjectives: '',
   sessionQuality: 'good', guardianFeedback: '', appointmentId: '',
 }
 
 export default function ConsultationFormModal({ onClose, initial = {} }) {
-  const { patients, therapists, specialtiesData, consultationStatuses, appointmentTypes, appointments, addConsultation, updateConsultation } = useData()
+  const { patients, therapists, specialtiesData, rooms, consultationStatuses, appointmentTypes, appointments, addConsultation, updateConsultation } = useData()
   const { user } = useAuth()
   const isEdit = !!initial.id
 
@@ -76,6 +76,7 @@ export default function ConsultationFormModal({ onClose, initial = {} }) {
   const activeSpecialties = specialtiesData.filter(s => s.active !== false)
   const activeStatuses = consultationStatuses.filter(s => s.active !== false && !s.automatic)
   const activeAppointmentTypes = appointmentTypes.filter(t => t.active !== false)
+  const activeRooms = rooms.filter(r => r.active !== false)
   const patientAppointments = form.patientId
     ? appointments.filter(a => a.patientId === form.patientId && !a.consultationId)
     : []
@@ -106,7 +107,7 @@ export default function ConsultationFormModal({ onClose, initial = {} }) {
               ))}
             </Select>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <Select label="Terapeuta" value={form.therapistId} onChange={e => set('therapistId', e.target.value)}>
                 <option value="">Selecione</option>
                 {activeTherapists.map(t => (
@@ -114,6 +115,15 @@ export default function ConsultationFormModal({ onClose, initial = {} }) {
                 ))}
               </Select>
               <Input label="Data *" type="date" value={form.date} onChange={e => set('date', e.target.value)} />
+              <Input label="Horário" type="time" value={form.time} onChange={e => set('time', e.target.value)} />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Select label="Sala" value={form.roomId} onChange={e => set('roomId', e.target.value)}>
+                <option value="">Nenhuma / Avulso</option>
+                {activeRooms.map(r => (
+                  <option key={r.id} value={r.id}>{r.name}</option>
+                ))}
+              </Select>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">

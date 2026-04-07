@@ -358,6 +358,8 @@ export function DataProvider({ children }) {
         session_number: rest.sessionNumber || null,
         consultation_status_id: rest.consultationStatusId || null,
         appointment_type_id: rest.appointmentTypeId || null,
+        time: rest.time || null,
+        room_id: rest.roomId || null,
         main_objective: rest.mainObjective || null,
         evolution_notes: rest.evolutionNotes || null,
         next_objectives: rest.nextObjectives || null,
@@ -404,6 +406,8 @@ export function DataProvider({ children }) {
     if (rest.therapistId !== undefined) update.therapist_id = rest.therapistId
     if (rest.specialty !== undefined) update.specialty = rest.specialty
     if (rest.date !== undefined) update.date = rest.date
+    if (rest.time !== undefined) update.time = rest.time || null
+    if (rest.roomId !== undefined) update.room_id = rest.roomId || null
     if (rest.sessionNumber !== undefined) update.session_number = rest.sessionNumber
     if (rest.consultationStatusId !== undefined) update.consultation_status_id = rest.consultationStatusId || null
     if (rest.appointmentTypeId !== undefined) update.appointment_type_id = rest.appointmentTypeId || null

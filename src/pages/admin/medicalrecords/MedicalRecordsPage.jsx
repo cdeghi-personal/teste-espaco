@@ -575,7 +575,7 @@ export default function MedicalRecordsPage() {
                       return (
                         <div key={c.id} className="bg-gray-50 rounded-xl px-4 py-3 border border-gray-100">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-medium text-sm text-gray-900">{formatDateShort(c.date)}</span>
+                            <span className="font-medium text-sm text-gray-900">{formatDateShort(c.date)}{c.time && <span className="font-normal text-gray-500"> {c.time}</span>}</span>
                             <Badge specialty={c.specialty} />
                             {status && <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${status.color}`}>{status.name}</span>}
                             {apptType && <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-200 text-gray-600">{apptType.name}</span>}
