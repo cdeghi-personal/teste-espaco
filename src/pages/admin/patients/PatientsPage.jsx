@@ -8,10 +8,8 @@ import Button from '../../../components/ui/Button'
 import EmptyState from '../../../components/ui/EmptyState'
 import PatientFormModal from './PatientFormModal'
 import { calculateAge, formatDateShort } from '../../../utils/dateUtils'
-import { SPECIALTY_LIST, SPECIALTIES } from '../../../constants/specialties'
-
 export default function PatientsPage() {
-  const { patients, deletePatient, restorePatient, patientStatuses } = useData()
+  const { patients, deletePatient, restorePatient, patientStatuses, specialtiesData } = useData()
   const { user } = useAuth()
   const navigate = useNavigate()
   const [search, setSearch] = useState('')
@@ -99,7 +97,7 @@ export default function PatientsPage() {
               className="flex-1 sm:flex-none px-3 py-2 text-sm border border-gray-200 rounded-xl bg-white focus:ring-2 focus:ring-brand-blue outline-none"
             >
               <option value="">Especialidade</option>
-              {SPECIALTY_LIST.map(k => <option key={k} value={k}>{SPECIALTIES[k].label}</option>)}
+              {specialtiesData.filter(s => s.active !== false).map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
             </select>
           </div>
         )}

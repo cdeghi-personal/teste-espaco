@@ -7,7 +7,6 @@ import Input from '../../../components/ui/Input'
 import Select from '../../../components/ui/Select'
 import { useData } from '../../../context/DataContext'
 import { useToast } from '../../../components/ui/Toast'
-import { SPECIALTY_LIST, SPECIALTIES } from '../../../constants/specialties'
 
 const EMPTY_SPEC = { specialty: '', credential: '' }
 
@@ -19,7 +18,8 @@ const EMPTY = {
 }
 
 export default function TherapistFormModal({ onClose, initial = {} }) {
-  const { addTherapist, updateTherapist } = useData()
+  const { addTherapist, updateTherapist, specialtiesData } = useData()
+  const activeSpecialties = specialtiesData.filter(s => s.active !== false)
   const toast = useToast()
   const isEdit = !!initial.id
 
@@ -204,8 +204,8 @@ export default function TherapistFormModal({ onClose, initial = {} }) {
                   onChange={e => setSpecRow(i, 'specialty', e.target.value)}
                 >
                   <option value="">Selecione</option>
-                  {SPECIALTY_LIST.map(k => (
-                    <option key={k} value={k}>{SPECIALTIES[k].label}</option>
+                  {activeSpecialties.map(s => (
+                    <option key={s.key} value={s.key}>{s.label}</option>
                   ))}
                 </Select>
                 <Input
