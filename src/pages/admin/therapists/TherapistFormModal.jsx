@@ -106,7 +106,12 @@ export default function TherapistFormModal({ onClose, initial = {} }) {
             body: { email: form.email, therapistId: therapist.id, therapistName: form.name },
           })
           if (result.error) {
-            toast.show(`Terapeuta cadastrado, mas o e-mail de convite falhou: ${result.error.message || 'erro desconhecido'}. Você pode reenviar depois.`, 'error')
+            let detail = result.error.message || 'erro desconhecido'
+            try {
+              const body = await result.error.context?.json()
+              if (body?.error) detail = body.error
+            } catch {}
+            toast.show(`Convite falhou: ${detail}`, 'error')
           }
         } catch (emailErr) {
           toast.show('Terapeuta cadastrado, mas o e-mail de convite não pôde ser enviado. Verifique a Edge Function.', 'error')
