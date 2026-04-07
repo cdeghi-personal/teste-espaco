@@ -121,19 +121,7 @@ export function DataProvider({ children }) {
     setIsLoading(false)
   }, [])
 
-  // Carrega dados assim que há sessão ativa (evita fetch antes do auth restaurar a sessão)
-  useEffect(() => {
-    // Sessão já existe (reload de página)
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) fetchAll()
-      else setIsLoading(false)
-    })
-    // Login ocorre após a montagem
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === 'SIGNED_IN') fetchAll()
-    })
-    return () => subscription.unsubscribe()
-  }, [fetchAll])
+  useEffect(() => { fetchAll() }, [fetchAll])
 
   // ─── Patients ───────────────────────────────────────────────────────────────
 
