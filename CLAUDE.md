@@ -350,6 +350,12 @@ Funções no DataContext: `addAppointmentType(data)` / `updateAppointmentType(id
 - `DataContext.addAppointment` e `updateAppointment` aceitam `startTime` ou `time`
 - Filtro "Minha Agenda" mostra todos os agendamentos quando o usuário é `admin`
 
+## Atenção — SELECTs explícitos no DataContext
+
+`CONSULTATION_SELECT` lista colunas explicitamente. Ao adicionar novas colunas ao banco, **sempre incluir no SELECT** correspondente, caso contrário o campo só aparece após edição (o insert/update retorna tudo, mas a carga inicial não).
+
+Constantes de SELECT no DataContext: `PATIENT_SELECT`, `GUARDIAN_SELECT`, `CONSULTATION_SELECT`.
+
 ## Especialidades (tabela `specialties` no banco)
 
 - Campos no banco: `key` (identificador único, ex: `MUSICOTERAPIA`) e `label` (nome exibido)
