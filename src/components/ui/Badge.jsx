@@ -1,6 +1,14 @@
 import { SPECIALTIES, APPOINTMENT_STATUS, PATIENT_STATUS, SESSION_QUALITY } from '../../constants/specialties'
 import { useData } from '../../context/DataContext'
 
+function hexTextColor(hex) {
+  if (!hex || hex.length < 7) return '#111827'
+  const r = parseInt(hex.slice(1, 3), 16)
+  const g = parseInt(hex.slice(3, 5), 16)
+  const b = parseInt(hex.slice(5, 7), 16)
+  return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.55 ? '#111827' : '#ffffff'
+}
+
 export default function Badge({ specialty, status, patientStatus, quality, children, className = '' }) {
   const { specialtiesData } = useData()
 
@@ -9,7 +17,7 @@ export default function Badge({ specialty, status, patientStatus, quality, child
     if (dynamic?.color) {
       return (
         <span
-          style={{ backgroundColor: dynamic.color + '20', color: dynamic.color }}
+          style={{ backgroundColor: dynamic.color, color: hexTextColor(dynamic.color) }}
           className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${className}`}
         >
           {dynamic.label || specialty}

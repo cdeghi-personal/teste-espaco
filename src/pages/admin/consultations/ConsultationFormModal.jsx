@@ -73,7 +73,7 @@ export default function ConsultationFormModal({ onClose, initial = {} }) {
 
   const activeTherapists = therapists.filter(t => t.active !== false)
   const activeSpecialties = specialtiesData.filter(s => s.active !== false)
-  const activeStatuses = consultationStatuses.filter(s => s.active !== false && !s.automatic)
+  const activeStatuses = consultationStatuses.filter(s => s.active !== false && (user?.role === 'admin' || !s.automatic))
   const currentStatus = isEdit ? consultationStatuses.find(s => s.id === initial.consultationStatusId) : null
   const isBlocked = isEdit && currentStatus?.automatic && user?.role !== 'admin'
   const activeAppointmentTypes = appointmentTypes.filter(t => t.active !== false)
