@@ -19,9 +19,12 @@ export default function PatientsPage() {
   const [showModal, setShowModal] = useState(false)
   const [editPatient, setEditPatient] = useState(null)
 
-  const accessiblePatients = user?.role === 'admin'
+  const accessiblePatients = user?.role === 'admin' || user?.belongsToTeam
     ? patients
-    : patients.filter(p => p.therapistId === user?.id)
+    : patients.filter(p =>
+        p.therapistId === user?.id ||
+        (p.involvedTherapistIds || []).includes(user?.id)
+      )
 
   const filtered = accessiblePatients.filter(p => {
     const matchDeleted = showDeleted ? p.deleted === true : !p.deleted
