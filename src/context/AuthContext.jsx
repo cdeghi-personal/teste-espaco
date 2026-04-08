@@ -55,7 +55,7 @@ export function AuthProvider({ children }) {
       if (role === 'therapist') {
         const { data } = await supabase
           .from('therapists')
-          .select('id, name, specialty')
+          .select('id, name, specialty, belongs_to_team')
           .eq('user_id', authUser.id)
           .maybeSingle()
         therapist = data
@@ -69,6 +69,7 @@ export function AuthProvider({ children }) {
         role,
         name: therapist?.name || authUser.email,
         specialty: therapist?.specialty || null,
+        belongsToTeam: therapist?.belongs_to_team || false,
       })
     } catch (err) {
       console.error('Erro ao carregar usuário:', err)

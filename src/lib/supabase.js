@@ -89,6 +89,7 @@ export function mapTherapist(row) {
       specialty: s.specialty,
       credential: s.credential || '',
     })),
+    belongsToTeam: row.belongs_to_team || false,
     active: row.active,
     createdAt: row.created_at,
   }

@@ -514,6 +514,7 @@ export function DataProvider({ children }) {
         account_number: data.accountNumber || null,
         pix_key: data.pixKey || null,
         color: data.color || null,
+        belongs_to_team: data.belongsToTeam || false,
         active: true,
       })
       .select()
@@ -542,6 +543,7 @@ export function DataProvider({ children }) {
     if (data.pixKey !== undefined) update.pix_key = data.pixKey || null
     if (data.color !== undefined) update.color = data.color || null
     if (data.active !== undefined) update.active = data.active
+    if (data.belongsToTeam !== undefined) update.belongs_to_team = data.belongsToTeam
 
     // Update primary specialty from first in list
     if (data.therapistSpecialties !== undefined) {

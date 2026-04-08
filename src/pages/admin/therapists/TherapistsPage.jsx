@@ -88,7 +88,10 @@ export default function TherapistsPage() {
                       {t.name?.charAt(0)}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="font-medium text-sm text-gray-900 truncate">{t.name}</div>
+                      <div className="flex items-center gap-2">
+                        <div className="font-medium text-sm text-gray-900 truncate">{t.name}</div>
+                        {t.belongsToTeam && <span className="px-1.5 py-0.5 rounded-full text-xs font-medium bg-brand-yellow/30 text-yellow-800">Equipe</span>}
+                      </div>
                       <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                         {(t.therapistSpecialties?.length ? t.therapistSpecialties : t.specialty ? [{ specialty: t.specialty }] : []).map((s, i) => (
                           <Badge key={i} specialty={s.specialty} />
@@ -137,7 +140,10 @@ export default function TherapistsPage() {
                               {t.name?.charAt(0)}
                             </div>
                             <div>
-                              <div className="font-medium text-gray-900 text-sm">{t.name}</div>
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium text-gray-900 text-sm">{t.name}</span>
+                                {t.belongsToTeam && <span className="px-1.5 py-0.5 rounded-full text-xs font-medium bg-brand-yellow/30 text-yellow-800">Equipe</span>}
+                              </div>
                               {isInactive && <div className="text-xs text-red-500">Inativo</div>}
                             </div>
                           </div>

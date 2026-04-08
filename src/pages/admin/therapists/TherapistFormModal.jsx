@@ -14,7 +14,7 @@ const EMPTY = {
   name: '', email: '', phone: '', cpf: '',
   therapistSpecialties: [{ ...EMPTY_SPEC }],
   bank: '', agency: '', accountNumber: '', pixKey: '',
-  color: '#6b7280', active: true,
+  color: '#6b7280', active: true, belongsToTeam: false,
 }
 
 function ColorPicker({ value, onChange }) {
@@ -297,18 +297,33 @@ export default function TherapistFormModal({ onClose, initial = {} }) {
           </div>
         )}
 
-        {isEdit && (
+        <div className="space-y-2">
           <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
             <input
-              id="active"
+              id="belongsToTeam"
               type="checkbox"
-              checked={form.active}
-              onChange={e => set('active', e.target.checked)}
+              checked={form.belongsToTeam}
+              onChange={e => set('belongsToTeam', e.target.checked)}
               className="w-4 h-4 rounded accent-brand-blue"
             />
-            <label htmlFor="active" className="text-sm font-medium text-gray-700">Terapeuta ativo</label>
+            <div>
+              <label htmlFor="belongsToTeam" className="text-sm font-medium text-gray-700">Pertence à Equipe</label>
+              <p className="text-xs text-gray-400">Acessa todos os pacientes e prontuários da clínica</p>
+            </div>
           </div>
-        )}
+          {isEdit && (
+            <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
+              <input
+                id="active"
+                type="checkbox"
+                checked={form.active}
+                onChange={e => set('active', e.target.checked)}
+                className="w-4 h-4 rounded accent-brand-blue"
+              />
+              <label htmlFor="active" className="text-sm font-medium text-gray-700">Terapeuta ativo</label>
+            </div>
+          )}
+        </div>
 
         {errors.submit && (
           <p className="text-sm text-red-600 bg-red-50 rounded-xl px-3 py-2">{errors.submit}</p>

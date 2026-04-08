@@ -251,8 +251,13 @@ export default function MedicalRecordsPage() {
   const activeSpecialties = specialtiesData.filter(s => s.active !== false)
 
   // Consultations for current patient
+  // Therapist without "belongs_to_team" sees only their own consultations
   const patientConsultations = consultations
-    .filter(c => c.patientId === selectedPatientId)
+    .filter(c => {
+      if (c.patientId !== selectedPatientId) return false
+      if (user?.role === 'therapist' && !user?.belongsToTeam) return c.therapistId === user?.id
+      return true
+    })
     .sort((a, b) => b.date.localeCompare(a.date))
 
   const monthConsultations = patientConsultations.filter(c => c.date.startsWith(consultMonth))
