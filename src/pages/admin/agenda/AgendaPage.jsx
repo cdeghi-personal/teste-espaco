@@ -3,8 +3,8 @@ import { FiPlus, FiChevronLeft, FiChevronRight, FiSearch, FiCalendar, FiEdit2, F
 import { useData } from '../../../context/DataContext'
 import { useAuth } from '../../../context/AuthContext'
 import Button from '../../../components/ui/Button'
-import AppointmentFormModal from './AppointmentFormModal'
-import { getWeekDays, formatWeekDay, formatMonthYear, isoToday } from '../../../utils/dateUtils'
+import ConsultationFormModal from '../consultations/ConsultationFormModal'
+import { getWeekDays, formatWeekDay, formatMonthYear } from '../../../utils/dateUtils'
 import { format } from 'date-fns'
 
 function textColorForBg(hex) {
@@ -17,14 +17,14 @@ function textColorForBg(hex) {
 }
 
 export default function AgendaPage() {
-  const { appointments, patients, rooms, therapists, deleteAppointment } = useData()
+  const { consultations, patients, rooms, therapists, deleteConsultation } = useData()
   const { user } = useAuth()
   const [weekRef, setWeekRef] = useState(new Date())
   const [search, setSearch] = useState('')
   const [filterRoom, setFilterRoom] = useState('')
   const [filterTherapist, setFilterTherapist] = useState('')
   const [showModal, setShowModal] = useState(false)
-  const [editAppt, setEditAppt] = useState(null)
+  const [editItem, setEditItem] = useState(null)
   const [selectedDayIdx, setSelectedDayIdx] = useState(() => {
     const d = new Date().getDay()
     return d === 0 || d === 6 ? 0 : d - 1
@@ -32,9 +32,6 @@ export default function AgendaPage() {
 
   const days = getWeekDays(weekRef)
   const today = format(new Date(), 'yyyy-MM-dd')
-
-  // DEBUG TEMPORÁRIO — remover após diagnóstico
-  const debugDates = appointments.slice(0, 5).map(a => a.date).join(', ')
 
   const isAdminOrTeam = user?.role === 'admin' || user?.belongsToTeam
 
@@ -48,28 +45,26 @@ export default function AgendaPage() {
   const activeRooms = rooms.filter(r => r.active !== false)
   const activeTherapists = therapists.filter(t => t.active !== false)
 
-  function getApptsByDay(date) {
+  function getByDay(date) {
     if (!user) return []
     const iso = format(date, 'yyyy-MM-dd')
-    return appointments
-      .filter(a => {
-        if (a.date !== iso) return false
-        // Visibilidade base: não-equipe só vê os seus
-        if (user.role !== 'admin' && !user.belongsToTeam && a.therapistId !== user.id) return false
-        // Filtros adicionais
+    return consultations
+      .filter(c => {
+        if (c.date !== iso) return false
+        if (user.role !== 'admin' && !user.belongsToTeam && c.therapistId !== user.id) return false
         if (search) {
-          const patient = getPatient(a.patientId)
+          const patient = getPatient(c.patientId)
           if (!patient?.fullName.toLowerCase().includes(search.toLowerCase())) return false
         }
-        if (filterRoom && a.roomId !== filterRoom) return false
-        if (filterTherapist && a.therapistId !== filterTherapist) return false
+        if (filterRoom && c.roomId !== filterRoom) return false
+        if (filterTherapist && c.therapistId !== filterTherapist) return false
         return true
       })
-      .sort((a, b) => (a.startTime || '').localeCompare(b.startTime || ''))
+      .sort((a, b) => (a.time || '').localeCompare(b.time || ''))
   }
 
-  function cardStyle(appt) {
-    const therapist = getTherapist(appt.therapistId)
+  function cardStyle(item) {
+    const therapist = getTherapist(item.therapistId)
     const bg = therapist?.color || '#1e6a9e'
     return { backgroundColor: bg, color: textColorForBg(bg) }
   }
@@ -82,18 +77,11 @@ export default function AgendaPage() {
           <h1 className="text-xl md:text-2xl font-bold text-gray-900">Agenda</h1>
           <p className="text-sm text-gray-500 mt-0.5 capitalize">{formatMonthYear(weekRef)}</p>
         </div>
-        <Button variant="primary" onClick={() => { setEditAppt(null); setShowModal(true) }}>
+        <Button variant="primary" onClick={() => { setEditItem(null); setShowModal(true) }}>
           <FiPlus size={16} />
           <span className="hidden sm:inline">Novo Agendamento</span>
           <span className="sm:hidden">Novo</span>
         </Button>
-      </div>
-
-      {/* DEBUG — remover após diagnóstico */}
-      <div className="bg-yellow-100 border border-yellow-300 rounded-xl px-4 py-2 text-xs text-yellow-800">
-        <strong>DEBUG:</strong> {appointments.length} agendamento(s) carregado(s).
-        {appointments.length > 0 && <> Datas: {debugDates}</>}
-        {appointments.length === 0 && <> — tabela appointments está vazia ou sem permissão de leitura.</>}
       </div>
 
       {/* Filters */}
@@ -170,34 +158,34 @@ export default function AgendaPage() {
         <div className="grid grid-cols-5 min-h-[440px]">
           {days.map(day => {
             const iso = format(day, 'yyyy-MM-dd')
-            const dayAppts = getApptsByDay(day)
+            const dayItems = getByDay(day)
             return (
               <div key={iso} className={`border-r border-gray-100 last:border-r-0 p-2 space-y-1.5 ${iso === today ? 'bg-brand-blue/5' : ''}`}>
-                {dayAppts.length === 0 ? (
+                {dayItems.length === 0 ? (
                   <div className="h-full flex items-center justify-center text-xs text-gray-300 py-10">Livre</div>
-                ) : dayAppts.map(appt => {
-                  const patient = getPatient(appt.patientId)
-                  const room = getRoom(appt.roomId)
-                  const style = cardStyle(appt)
+                ) : dayItems.map(item => {
+                  const patient = getPatient(item.patientId)
+                  const room = getRoom(item.roomId)
+                  const style = cardStyle(item)
                   return (
                     <div
-                      key={appt.id}
+                      key={item.id}
                       className="rounded-xl px-2.5 py-2 text-xs cursor-pointer group relative transition-opacity hover:opacity-90"
                       style={style}
                     >
-                      <div className="font-bold">{appt.startTime}</div>
+                      <div className="font-bold">{item.time || '—'}</div>
                       <div className="font-medium truncate mt-0.5">{patient?.fullName || '—'}</div>
                       {room && <div className="truncate opacity-80 text-xs mt-0.5">{room.name}</div>}
                       {/* Actions on hover */}
                       <div className="absolute top-1 right-1 hidden group-hover:flex gap-0.5">
                         <button
-                          onClick={() => { setEditAppt(appt); setShowModal(true) }}
+                          onClick={() => { setEditItem(item); setShowModal(true) }}
                           className="w-5 h-5 rounded flex items-center justify-center bg-black/20 hover:bg-black/40 transition-colors"
                         >
                           <FiEdit2 size={10} />
                         </button>
                         <button
-                          onClick={() => { if (confirm('Excluir este agendamento?')) deleteAppointment(appt.id) }}
+                          onClick={() => { if (confirm('Excluir este agendamento?')) deleteConsultation(item.id) }}
                           className="w-5 h-5 rounded flex items-center justify-center bg-black/20 hover:bg-red-500 transition-colors"
                         >
                           <FiTrash2 size={10} />
@@ -254,8 +242,8 @@ export default function AgendaPage() {
 
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
           {(() => {
-            const dayAppts = getApptsByDay(days[selectedDayIdx])
-            if (dayAppts.length === 0) return (
+            const dayItems = getByDay(days[selectedDayIdx])
+            if (dayItems.length === 0) return (
               <div className="py-12 text-center text-gray-400 text-sm">
                 <FiCalendar size={28} className="mx-auto mb-2 opacity-40" />
                 Nenhum agendamento neste dia
@@ -263,26 +251,26 @@ export default function AgendaPage() {
             )
             return (
               <div className="divide-y divide-gray-50">
-                {dayAppts.map(appt => {
-                  const patient = getPatient(appt.patientId)
-                  const therapist = getTherapist(appt.therapistId)
-                  const room = getRoom(appt.roomId)
-                  const style = cardStyle(appt)
+                {dayItems.map(item => {
+                  const patient = getPatient(item.patientId)
+                  const therapist = getTherapist(item.therapistId)
+                  const room = getRoom(item.roomId)
+                  const style = cardStyle(item)
                   return (
-                    <div key={appt.id} className="flex items-center gap-3 p-4">
+                    <div key={item.id} className="flex items-center gap-3 p-4">
                       <div className="w-1 self-stretch rounded-full shrink-0" style={{ backgroundColor: style.backgroundColor }} />
                       <div className="flex-1 min-w-0">
-                        <div className="font-semibold text-sm text-gray-900">{appt.startTime}{appt.endTime ? ` – ${appt.endTime}` : ''}</div>
+                        <div className="font-semibold text-sm text-gray-900">{item.time || '—'}</div>
                         <div className="text-sm text-gray-700 truncate">{patient?.fullName}</div>
                         <div className="text-xs text-gray-500 truncate">
                           {therapist?.name}{room ? ` • ${room.name}` : ''}
                         </div>
                       </div>
                       <div className="flex gap-1 shrink-0">
-                        <button onClick={() => { setEditAppt(appt); setShowModal(true) }} className="p-2 rounded-lg text-gray-400 hover:text-brand-blue hover:bg-blue-50">
+                        <button onClick={() => { setEditItem(item); setShowModal(true) }} className="p-2 rounded-lg text-gray-400 hover:text-brand-blue hover:bg-blue-50">
                           <FiEdit2 size={15} />
                         </button>
-                        <button onClick={() => { if (confirm('Excluir?')) deleteAppointment(appt.id) }} className="p-2 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50">
+                        <button onClick={() => { if (confirm('Excluir?')) deleteConsultation(item.id) }} className="p-2 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50">
                           <FiTrash2 size={15} />
                         </button>
                       </div>
@@ -308,9 +296,9 @@ export default function AgendaPage() {
       )}
 
       {showModal && (
-        <AppointmentFormModal
+        <ConsultationFormModal
           onClose={() => setShowModal(false)}
-          initial={editAppt || {}}
+          initial={editItem || {}}
         />
       )}
     </div>
