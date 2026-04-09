@@ -19,7 +19,9 @@ export default function PatientsPage() {
   const [showModal, setShowModal] = useState(false)
   const [editPatient, setEditPatient] = useState(null)
 
-  const accessiblePatients = user?.role === 'admin'
+  // admin e terapeuta da equipe: RLS já retorna o conjunto correto
+  // terapeuta fora da equipe: filtra no frontend também (garante que não vê extras)
+  const accessiblePatients = user?.role === 'admin' || user?.belongsToTeam
     ? patients
     : patients.filter(p =>
         p.therapistId === user?.id ||
