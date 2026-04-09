@@ -46,13 +46,14 @@ export default function AgendaPage() {
   const activeTherapists = therapists.filter(t => t.active !== false)
 
   function getApptsByDay(date) {
+    if (!user) return []
     const iso = format(date, 'yyyy-MM-dd')
     return appointments
       .filter(a => {
         if (a.date !== iso) return false
-        // Visibilidade base
-        if (!isAdminOrTeam && a.therapistId !== user?.id) return false
-        // Filtros
+        // Visibilidade base: não-equipe só vê os seus
+        if (user.role !== 'admin' && !user.belongsToTeam && a.therapistId !== user.id) return false
+        // Filtros adicionais
         if (search) {
           const patient = getPatient(a.patientId)
           if (!patient?.fullName.toLowerCase().includes(search.toLowerCase())) return false
@@ -69,9 +70,6 @@ export default function AgendaPage() {
     const bg = therapist?.color || '#1e6a9e'
     return { backgroundColor: bg, color: textColorForBg(bg) }
   }
-
-  // DEBUG — remover após diagnóstico
-  console.log('[Agenda] total:', appointments.length, 'role:', user?.role, 'isAdminOrTeam:', isAdminOrTeam, 'sample.date:', appointments[0]?.date, 'week[0]:', format(days[0], 'yyyy-MM-dd'))
 
   return (
     <div className="p-3 md:p-6 space-y-4">
