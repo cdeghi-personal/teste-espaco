@@ -22,16 +22,31 @@ const EMPTY = {
   externalTherapists: [],
 }
 
+// Retorna 'white' ou 'black' dependendo da luminância da cor hex
+function textColorForBg(hex) {
+  if (!hex) return 'black'
+  const c = hex.replace('#', '')
+  const r = parseInt(c.substring(0, 2), 16)
+  const g = parseInt(c.substring(2, 4), 16)
+  const b = parseInt(c.substring(4, 6), 16)
+  return (0.299 * r + 0.587 * g + 0.114 * b) > 140 ? 'black' : 'white'
+}
+
 export default function PatientFormModal({ onClose, initial = {} }) {
   const { paymentMethods, therapists, diagnoses, patientStatuses, specialtiesData, addPatient, updatePatient } = useData()
   const isEdit = !!initial.id
+
+  const activeStatuses = patientStatuses.filter(s => s.active !== false)
+  const defaultStatusId = !isEdit
+    ? (activeStatuses.find(s => s.name.toLowerCase().includes('ativo'))?.id || activeStatuses[0]?.id || '')
+    : ''
 
   const [form, setForm] = useState({
     ...EMPTY,
     ...initial,
     conditionIds: initial.conditionIds || [],
     involvedTherapistIds: initial.involvedTherapistIds || [],
-    statusId: initial.statusId || initial.status || '',
+    statusId: initial.statusId || initial.status || defaultStatusId,
     externalTherapists: initial.externalTherapists || [],
   })
   const [errors, setErrors] = useState({})
@@ -67,7 +82,11 @@ export default function PatientFormModal({ onClose, initial = {} }) {
     if (!form.fullName.trim()) e.fullName = 'Nome obrigatório'
     if (!form.dateOfBirth) e.dateOfBirth = 'Data de nascimento obrigatória'
     if (!form.sex) e.sex = 'Selecione'
-    if (form.cpf && form.cpf.replace(/\D/g, '').length === 11 && !validateCPF(form.cpf)) e.cpf = 'CPF inválido'
+    if (!form.cpf?.replace(/\D/g, '')) e.cpf = 'CPF obrigatório'
+    else if (form.cpf.replace(/\D/g, '').length === 11 && !validateCPF(form.cpf)) e.cpf = 'CPF inválido'
+    if (!form.statusId) e.statusId = 'Selecione'
+    if (!form.paymentMethodId) e.paymentMethodId = 'Selecione'
+    if (!form.therapistId) e.therapistId = 'Selecione'
     return e
   }
 
@@ -85,8 +104,9 @@ export default function PatientFormModal({ onClose, initial = {} }) {
   const activeTherapists = therapists.filter(t => t.active !== false)
   const activePaymentMethods = paymentMethods.filter(pm => pm.active !== false)
   const activeDiagnoses = diagnoses.filter(d => d.active !== false)
-  const activeStatuses = patientStatuses.filter(s => s.active !== false)
   const activeSpecialties = specialtiesData.filter(s => s.active !== false)
+  // Terapeutas disponíveis para "Envolvidos": exclui o Gerente de Conta selecionado
+  const involvedTherapistOptions = activeTherapists.filter(t => t.id !== form.therapistId)
 
   return (
     <Modal
@@ -129,7 +149,7 @@ export default function PatientFormModal({ onClose, initial = {} }) {
                 <option value="F">Feminino</option>
                 <option value="O">Outro</option>
               </Select>
-              <Input label="CPF" value={form.cpf} onChange={e => set('cpf', formatCPF(e.target.value))} error={errors.cpf} placeholder="000.000.000-00" />
+              <Input label="CPF *" value={form.cpf} onChange={e => set('cpf', formatCPF(e.target.value))} error={errors.cpf} placeholder="000.000.000-00" />
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <Input label="RG" value={form.rg} onChange={e => set('rg', e.target.value)} placeholder="00.000.000-0" />
@@ -149,13 +169,13 @@ export default function PatientFormModal({ onClose, initial = {} }) {
               <Input label="Indicação" value={form.indication} onChange={e => set('indication', e.target.value)} placeholder="Como nos conheceu?" />
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <Select label="Status" value={form.statusId} onChange={e => set('statusId', e.target.value)}>
+              <Select label="Status *" value={form.statusId} onChange={e => set('statusId', e.target.value)} error={errors.statusId}>
                 <option value="">Selecione</option>
                 {activeStatuses.map(s => (
                   <option key={s.id} value={s.id}>{s.name}</option>
                 ))}
               </Select>
-              <Select label="Forma de Pagamento" value={form.paymentMethodId} onChange={e => set('paymentMethodId', e.target.value)}>
+              <Select label="Forma de Pagamento *" value={form.paymentMethodId} onChange={e => set('paymentMethodId', e.target.value)} error={errors.paymentMethodId}>
                 <option value="">Selecione</option>
                 {activePaymentMethods.map(pm => (
                   <option key={pm.id} value={pm.id}>{pm.name}</option>
@@ -171,7 +191,7 @@ export default function PatientFormModal({ onClose, initial = {} }) {
             Terapeutas
           </h3>
           <div className="space-y-3">
-            <Select label="Gerente de Conta" value={form.therapistId} onChange={e => set('therapistId', e.target.value)}>
+            <Select label="Gerente de Conta *" value={form.therapistId} onChange={e => set('therapistId', e.target.value)} error={errors.therapistId}>
               <option value="">Selecione</option>
               {activeTherapists.map(t => (
                 <option key={t.id} value={t.id}>{t.name}</option>
@@ -182,19 +202,20 @@ export default function PatientFormModal({ onClose, initial = {} }) {
                 Terapeutas Envolvidos
                 <span className="text-xs text-gray-400 font-normal ml-1">(múltipla seleção)</span>
               </label>
-              {activeTherapists.length === 0 ? (
-                <p className="text-xs text-gray-400">Nenhum terapeuta cadastrado.</p>
+              {involvedTherapistOptions.length === 0 ? (
+                <p className="text-xs text-gray-400">Nenhum terapeuta disponível.</p>
               ) : (
                 <div className="flex flex-wrap gap-2">
-                  {activeTherapists.map(t => {
+                  {involvedTherapistOptions.map(t => {
                     const isSelected = form.involvedTherapistIds?.includes(t.id)
                     const color = t.color || '#6b7280'
+                    const fontColor = isSelected ? textColorForBg(color) : undefined
                     return (
                       <button
                         key={t.id}
                         type="button"
                         onClick={() => toggleList('involvedTherapistIds', t.id)}
-                        style={isSelected ? { backgroundColor: color, borderColor: color, color: 'white' } : {}}
+                        style={isSelected ? { backgroundColor: color, borderColor: color, color: fontColor } : {}}
                         className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all border-2 ${
                           isSelected ? '' : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border-transparent'
                         }`}
@@ -352,12 +373,13 @@ export default function PatientFormModal({ onClose, initial = {} }) {
                   {activeSpecialties.map(s => {
                     const isSelected = form.specialties?.includes(s.key)
                     const color = s.color || '#6b7280'
+                    const fontColor = isSelected ? textColorForBg(color) : undefined
                     return (
                       <button
                         key={s.key}
                         type="button"
                         onClick={() => toggleList('specialties', s.key)}
-                        style={isSelected ? { backgroundColor: color, borderColor: color, color: 'white' } : {}}
+                        style={isSelected ? { backgroundColor: color, borderColor: color, color: fontColor } : {}}
                         className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all border-2 ${
                           isSelected ? '' : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border-transparent'
                         }`}
