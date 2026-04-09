@@ -138,6 +138,7 @@ export default function ConsultationsPage() {
                   >
                     <FiEye size={15} />
                   </button>
+                  {(user?.role === 'admin' || user?.id === c.therapistId) && (<>
                   <button
                     onClick={() => { setEditConsultation(c); setShowModal(true) }}
                     className="p-1.5 rounded-lg text-gray-400 hover:text-brand-blue hover:bg-blue-50 transition-colors"
@@ -150,6 +151,7 @@ export default function ConsultationsPage() {
                   >
                     <FiTrash2 size={15} />
                   </button>
+                  </>)}
                   <button
                     onClick={() => setExpanded(isExpanded ? null : c.id)}
                     className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-50 transition-colors"

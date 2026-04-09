@@ -654,12 +654,14 @@ export default function MedicalRecordsPage() {
                                 {room.name}
                               </span>
                             )}
+                            {(user?.role === 'admin' || user?.id === c.therapistId) && (
                             <button
                               onClick={() => { setEditConsultation(c); setShowConsultationModal(true) }}
                               className="ml-auto p-1 rounded-lg text-gray-400 hover:text-brand-blue hover:bg-blue-50 transition-colors"
                             >
                               <FiEdit2 size={13} />
                             </button>
+                            )}
                           </div>
                           {c.mainObjective && (
                             <p className="text-xs text-gray-600 mt-1.5 line-clamp-2">{c.mainObjective}</p>

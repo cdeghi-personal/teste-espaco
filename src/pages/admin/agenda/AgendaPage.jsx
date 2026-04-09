@@ -177,6 +177,7 @@ export default function AgendaPage() {
                       <div className="font-medium truncate mt-0.5">{patient?.fullName || '—'}</div>
                       {room && <div className="truncate opacity-80 text-xs mt-0.5">{room.name}</div>}
                       {/* Actions on hover */}
+                      {(user?.role === 'admin' || user?.id === item.therapistId) && (
                       <div className="absolute top-1 right-1 hidden group-hover:flex gap-0.5">
                         <button
                           onClick={() => { setEditItem(item); setShowModal(true) }}
@@ -191,6 +192,7 @@ export default function AgendaPage() {
                           <FiTrash2 size={10} />
                         </button>
                       </div>
+                      )}
                     </div>
                   )
                 })}
@@ -266,6 +268,7 @@ export default function AgendaPage() {
                           {therapist?.name}{room ? ` • ${room.name}` : ''}
                         </div>
                       </div>
+                      {(user?.role === 'admin' || user?.id === item.therapistId) && (
                       <div className="flex gap-1 shrink-0">
                         <button onClick={() => { setEditItem(item); setShowModal(true) }} className="p-2 rounded-lg text-gray-400 hover:text-brand-blue hover:bg-blue-50">
                           <FiEdit2 size={15} />
@@ -274,6 +277,7 @@ export default function AgendaPage() {
                           <FiTrash2 size={15} />
                         </button>
                       </div>
+                      )}
                     </div>
                   )
                 })}
