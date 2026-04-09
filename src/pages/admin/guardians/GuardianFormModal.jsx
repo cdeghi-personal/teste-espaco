@@ -16,7 +16,7 @@ const EMPTY = {
 
 const BR_STATES = ['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO']
 
-export default function GuardianFormModal({ onClose, initial = {} }) {
+export default function GuardianFormModal({ onClose, initial = {}, readOnly = false }) {
   const { addGuardian, updateGuardian, patients } = useData()
   const isEdit = !!initial.id
   const [form, setForm] = useState({ ...EMPTY, ...initial, patientIds: initial.patientIds || [] })
@@ -64,16 +64,20 @@ export default function GuardianFormModal({ onClose, initial = {} }) {
     onClose()
   }
 
+  const title = readOnly ? 'Visualizar Responsável' : isEdit ? 'Editar Responsável' : 'Novo Responsável'
+
   return (
     <Modal
-      title={isEdit ? 'Editar Responsável' : 'Novo Responsável'}
+      title={title}
       onClose={onClose}
       size="xl"
       footer={
-        <>
-          <Button variant="ghost" onClick={onClose}>Cancelar</Button>
-          <Button variant="primary" onClick={handleSave}>{isEdit ? 'Salvar' : 'Cadastrar'}</Button>
-        </>
+        readOnly
+          ? <Button variant="ghost" onClick={onClose}>Fechar</Button>
+          : <>
+              <Button variant="ghost" onClick={onClose}>Cancelar</Button>
+              <Button variant="primary" onClick={handleSave}>{isEdit ? 'Salvar' : 'Cadastrar'}</Button>
+            </>
       }
     >
       <div className="space-y-6">
@@ -84,18 +88,18 @@ export default function GuardianFormModal({ onClose, initial = {} }) {
           <div className="space-y-3">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div className="sm:col-span-2">
-                <Input label="Nome Completo *" value={form.fullName} onChange={e => set('fullName', e.target.value)} error={errors.fullName} />
+                <Input label="Nome Completo *" value={form.fullName} onChange={e => set('fullName', e.target.value)} error={errors.fullName} disabled={readOnly} />
               </div>
-              <Select label="Parentesco *" value={form.relationship} onChange={e => set('relationship', e.target.value)} error={errors.relationship}>
+              <Select label="Parentesco *" value={form.relationship} onChange={e => set('relationship', e.target.value)} error={errors.relationship} disabled={readOnly}>
                 <option value="">Selecione</option>
                 {['Mãe','Pai','Avó','Avô','Tia','Tio','Outro'].map(r => <option key={r}>{r}</option>)}
               </Select>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <Input label="CPF *" value={form.cpf} onChange={e => set('cpf', formatCPF(e.target.value))} error={errors.cpf} placeholder="000.000.000-00" />
-              <Input label="RG" value={form.rg} onChange={e => set('rg', e.target.value)} />
+              <Input label="CPF *" value={form.cpf} onChange={e => set('cpf', formatCPF(e.target.value))} error={errors.cpf} placeholder="000.000.000-00" disabled={readOnly} />
+              <Input label="RG" value={form.rg} onChange={e => set('rg', e.target.value)} disabled={readOnly} />
             </div>
-            <Input label="Profissão" value={form.occupation} onChange={e => set('occupation', e.target.value)} />
+            <Input label="Profissão" value={form.occupation} onChange={e => set('occupation', e.target.value)} disabled={readOnly} />
           </div>
         </section>
 
@@ -105,10 +109,10 @@ export default function GuardianFormModal({ onClose, initial = {} }) {
           </h3>
           <div className="space-y-3">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <Input label="Telefone / WhatsApp *" value={form.phone} onChange={e => set('phone', e.target.value)} error={errors.phone} placeholder="(11) 9 9999-9999" />
-              <Input label="Telefone 2" value={form.phone2} onChange={e => set('phone2', e.target.value)} placeholder="(11) 3333-4444" />
+              <Input label="Telefone / WhatsApp *" value={form.phone} onChange={e => set('phone', e.target.value)} error={errors.phone} placeholder="(11) 9 9999-9999" disabled={readOnly} />
+              <Input label="Telefone 2" value={form.phone2} onChange={e => set('phone2', e.target.value)} placeholder="(11) 3333-4444" disabled={readOnly} />
             </div>
-            <Input label="E-mail *" type="email" value={form.email} onChange={e => set('email', e.target.value)} error={errors.email} />
+            <Input label="E-mail *" type="email" value={form.email} onChange={e => set('email', e.target.value)} error={errors.email} disabled={readOnly} />
           </div>
         </section>
 
@@ -117,16 +121,16 @@ export default function GuardianFormModal({ onClose, initial = {} }) {
             Endereço
           </h3>
           <div className="space-y-3">
-            <Input label="Endereço *" value={form.address} onChange={e => set('address', e.target.value)} placeholder="Rua, número, complemento" error={errors.address} />
+            <Input label="Endereço *" value={form.address} onChange={e => set('address', e.target.value)} placeholder="Rua, número, complemento" error={errors.address} disabled={readOnly} />
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <Input label="Bairro *" value={form.neighborhood} onChange={e => set('neighborhood', e.target.value)} placeholder="Bairro" error={errors.neighborhood} />
-              <Input label="CEP *" value={form.cep} onChange={e => set('cep', e.target.value)} placeholder="00000-000" error={errors.cep} />
+              <Input label="Bairro *" value={form.neighborhood} onChange={e => set('neighborhood', e.target.value)} placeholder="Bairro" error={errors.neighborhood} disabled={readOnly} />
+              <Input label="CEP *" value={form.cep} onChange={e => set('cep', e.target.value)} placeholder="00000-000" error={errors.cep} disabled={readOnly} />
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               <div className="col-span-2 sm:col-span-2">
-                <Input label="Cidade *" value={form.city} onChange={e => set('city', e.target.value)} error={errors.city} />
+                <Input label="Cidade *" value={form.city} onChange={e => set('city', e.target.value)} error={errors.city} disabled={readOnly} />
               </div>
-              <Select label="Estado" value={form.state} onChange={e => set('state', e.target.value)}>
+              <Select label="Estado" value={form.state} onChange={e => set('state', e.target.value)} disabled={readOnly}>
                 {BR_STATES.map(s => <option key={s}>{s}</option>)}
               </Select>
             </div>
@@ -142,9 +146,17 @@ export default function GuardianFormModal({ onClose, initial = {} }) {
               </span>
             )}
           </h3>
-          {errors.patientIds && <p className="text-xs text-red-600 mb-2">{errors.patientIds}</p>}
+          {!readOnly && errors.patientIds && <p className="text-xs text-red-600 mb-2">{errors.patientIds}</p>}
           {activePatients.length === 0 ? (
             <p className="text-xs text-gray-400">Nenhum paciente cadastrado.</p>
+          ) : readOnly ? (
+            <div className="flex flex-wrap gap-2">
+              {activePatients.filter(p => form.patientIds?.includes(p.id)).map(p => (
+                <span key={p.id} className="px-3 py-1.5 rounded-full text-xs font-medium bg-brand-yellow/20 text-brand-blue">
+                  {p.fullName}
+                </span>
+              ))}
+            </div>
           ) : (
             <div className="space-y-2">
               <div className="relative">
@@ -182,7 +194,7 @@ export default function GuardianFormModal({ onClose, initial = {} }) {
         </section>
 
         <section>
-          <Textarea label="Observações" value={form.notes} onChange={e => set('notes', e.target.value)} placeholder="Preferências de contato, informações relevantes..." rows={3} />
+          <Textarea label="Observações" value={form.notes} onChange={e => set('notes', e.target.value)} placeholder="Preferências de contato, informações relevantes..." rows={3} disabled={readOnly} />
         </section>
       </div>
     </Modal>

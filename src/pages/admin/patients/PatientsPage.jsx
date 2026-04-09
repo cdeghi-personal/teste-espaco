@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { FiPlus, FiSearch, FiEdit2, FiTrash2, FiUser, FiRotateCcw, FiEyeOff, FiChevronRight } from 'react-icons/fi'
+import { FiPlus, FiSearch, FiEdit2, FiTrash2, FiUser, FiRotateCcw, FiEyeOff, FiEye, FiChevronRight } from 'react-icons/fi'
 import { useData } from '../../../context/DataContext'
 import { useAuth } from '../../../context/AuthContext'
 import Badge from '../../../components/ui/Badge'
@@ -18,6 +18,7 @@ export default function PatientsPage() {
   const [showDeleted, setShowDeleted] = useState(false)
   const [showModal, setShowModal] = useState(false)
   const [editPatient, setEditPatient] = useState(null)
+  const [viewPatient, setViewPatient] = useState(null)
 
   // admin e terapeuta da equipe: RLS já retorna o conjunto correto
   // terapeuta fora da equipe: filtra no frontend também (garante que não vê extras)
@@ -157,6 +158,9 @@ export default function PatientsPage() {
                         </button>
                       ) : (
                         <>
+                          <button onClick={() => setViewPatient(p)} className="p-2 rounded-lg text-gray-400">
+                            <FiEye size={15} />
+                          </button>
                           <button onClick={() => { setEditPatient(p); setShowModal(true) }} className="p-2 rounded-lg text-gray-400">
                             <FiEdit2 size={15} />
                           </button>
@@ -234,6 +238,9 @@ export default function PatientsPage() {
                             </button>
                           ) : (
                             <>
+                              <button onClick={() => setViewPatient(p)} className="p-1.5 rounded-lg text-gray-400 hover:text-brand-blue hover:bg-blue-50 transition-colors">
+                                <FiEye size={15} />
+                              </button>
                               <button onClick={() => { setEditPatient(p); setShowModal(true) }} className="p-1.5 rounded-lg text-gray-400 hover:text-brand-blue hover:bg-blue-50 transition-colors">
                                 <FiEdit2 size={15} />
                               </button>
@@ -255,6 +262,9 @@ export default function PatientsPage() {
 
       {showModal && (
         <PatientFormModal onClose={() => setShowModal(false)} initial={editPatient || {}} />
+      )}
+      {viewPatient && (
+        <PatientFormModal onClose={() => setViewPatient(null)} initial={viewPatient} readOnly />
       )}
     </div>
   )

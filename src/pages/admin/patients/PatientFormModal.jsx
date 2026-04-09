@@ -33,7 +33,7 @@ function textColorForBg(hex) {
   return (0.299 * r + 0.587 * g + 0.114 * b) > 140 ? 'black' : 'white'
 }
 
-export default function PatientFormModal({ onClose, initial = {} }) {
+export default function PatientFormModal({ onClose, initial = {}, readOnly = false }) {
   const { paymentMethods, therapists, diagnoses, patientStatuses, specialtiesData, addPatient, updatePatient } = useData()
   const { user } = useAuth()
   const isEdit = !!initial.id
@@ -114,16 +114,20 @@ export default function PatientFormModal({ onClose, initial = {} }) {
   // Terapeutas disponíveis para "Envolvidos": exclui o Gerente de Conta selecionado
   const involvedTherapistOptions = activeTherapists.filter(t => t.id !== form.therapistId)
 
+  const title = readOnly ? 'Visualizar Paciente' : isEdit ? 'Editar Paciente' : 'Novo Paciente'
+
   return (
     <Modal
-      title={isEdit ? 'Editar Paciente' : 'Novo Paciente'}
+      title={title}
       onClose={onClose}
       size="xl"
       footer={
-        <>
-          <Button variant="ghost" onClick={onClose}>Cancelar</Button>
-          <Button variant="primary" onClick={handleSave}>{isEdit ? 'Salvar Alterações' : 'Cadastrar Paciente'}</Button>
-        </>
+        readOnly
+          ? <Button variant="ghost" onClick={onClose}>Fechar</Button>
+          : <>
+              <Button variant="ghost" onClick={onClose}>Cancelar</Button>
+              <Button variant="primary" onClick={handleSave}>{isEdit ? 'Salvar Alterações' : 'Cadastrar Paciente'}</Button>
+            </>
       }
     >
       <div className="space-y-6">
@@ -140,6 +144,7 @@ export default function PatientFormModal({ onClose, initial = {} }) {
               onChange={e => set('fullName', e.target.value)}
               error={errors.fullName}
               placeholder="Nome da criança"
+              disabled={readOnly}
             />
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <Input
@@ -148,40 +153,41 @@ export default function PatientFormModal({ onClose, initial = {} }) {
                 value={form.dateOfBirth}
                 onChange={e => set('dateOfBirth', e.target.value)}
                 error={errors.dateOfBirth}
+                disabled={readOnly}
               />
-              <Select label="Sexo *" value={form.sex} onChange={e => set('sex', e.target.value)} error={errors.sex}>
+              <Select label="Sexo *" value={form.sex} onChange={e => set('sex', e.target.value)} error={errors.sex} disabled={readOnly}>
                 <option value="">Selecione</option>
                 <option value="M">Masculino</option>
                 <option value="F">Feminino</option>
                 <option value="O">Outro</option>
               </Select>
-              <Input label="CPF *" value={form.cpf} onChange={e => set('cpf', formatCPF(e.target.value))} error={errors.cpf} placeholder="000.000.000-00" />
+              <Input label="CPF *" value={form.cpf} onChange={e => set('cpf', formatCPF(e.target.value))} error={errors.cpf} placeholder="000.000.000-00" disabled={readOnly} />
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <Input label="RG" value={form.rg} onChange={e => set('rg', e.target.value)} placeholder="00.000.000-0" />
-              <Input label="Telefone" value={form.phone} onChange={e => set('phone', e.target.value)} placeholder="(11) 9 9999-9999" />
-              <Input label="E-mail" type="email" value={form.email} onChange={e => set('email', e.target.value)} placeholder="email@exemplo.com" />
+              <Input label="RG" value={form.rg} onChange={e => set('rg', e.target.value)} placeholder="00.000.000-0" disabled={readOnly} />
+              <Input label="Telefone" value={form.phone} onChange={e => set('phone', e.target.value)} placeholder="(11) 9 9999-9999" disabled={readOnly} />
+              <Input label="E-mail" type="email" value={form.email} onChange={e => set('email', e.target.value)} placeholder="email@exemplo.com" disabled={readOnly} />
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <Input label="Endereço" value={form.address} onChange={e => set('address', e.target.value)} placeholder="Rua, número, complemento" />
-              <Input label="Bairro" value={form.neighborhood} onChange={e => set('neighborhood', e.target.value)} placeholder="Bairro" />
+              <Input label="Endereço" value={form.address} onChange={e => set('address', e.target.value)} placeholder="Rua, número, complemento" disabled={readOnly} />
+              <Input label="Bairro" value={form.neighborhood} onChange={e => set('neighborhood', e.target.value)} placeholder="Bairro" disabled={readOnly} />
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <div className="col-span-2 sm:col-span-1">
-                <Input label="Cidade" value={form.city} onChange={e => set('city', e.target.value)} placeholder="Cidade" />
+                <Input label="Cidade" value={form.city} onChange={e => set('city', e.target.value)} placeholder="Cidade" disabled={readOnly} />
               </div>
-              <Input label="Estado" value={form.state} onChange={e => set('state', e.target.value)} placeholder="SP" />
-              <Input label="CEP" value={form.zipCode} onChange={e => set('zipCode', e.target.value)} placeholder="00000-000" />
-              <Input label="Indicação" value={form.indication} onChange={e => set('indication', e.target.value)} placeholder="Como nos conheceu?" />
+              <Input label="Estado" value={form.state} onChange={e => set('state', e.target.value)} placeholder="SP" disabled={readOnly} />
+              <Input label="CEP" value={form.zipCode} onChange={e => set('zipCode', e.target.value)} placeholder="00000-000" disabled={readOnly} />
+              <Input label="Indicação" value={form.indication} onChange={e => set('indication', e.target.value)} placeholder="Como nos conheceu?" disabled={readOnly} />
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <Select label="Status *" value={form.statusId} onChange={e => set('statusId', e.target.value)} error={errors.statusId}>
+              <Select label="Status *" value={form.statusId} onChange={e => set('statusId', e.target.value)} error={errors.statusId} disabled={readOnly}>
                 <option value="">Selecione</option>
                 {activeStatuses.map(s => (
                   <option key={s.id} value={s.id}>{s.name}</option>
                 ))}
               </Select>
-              <Select label="Forma de Pagamento *" value={form.paymentMethodId} onChange={e => set('paymentMethodId', e.target.value)} error={errors.paymentMethodId}>
+              <Select label="Forma de Pagamento *" value={form.paymentMethodId} onChange={e => set('paymentMethodId', e.target.value)} error={errors.paymentMethodId} disabled={readOnly}>
                 <option value="">Selecione</option>
                 {activePaymentMethods.map(pm => (
                   <option key={pm.id} value={pm.id}>{pm.name}</option>
@@ -197,7 +203,7 @@ export default function PatientFormModal({ onClose, initial = {} }) {
             Terapeutas
           </h3>
           <div className="space-y-3">
-            <Select label="Gerente de Conta *" value={form.therapistId} onChange={e => set('therapistId', e.target.value)} error={errors.therapistId}>
+            <Select label="Gerente de Conta *" value={form.therapistId} onChange={e => set('therapistId', e.target.value)} error={errors.therapistId} disabled={readOnly}>
               <option value="">Selecione</option>
               {activeTherapists.map(t => (
                 <option key={t.id} value={t.id}>{t.name}</option>
@@ -206,7 +212,7 @@ export default function PatientFormModal({ onClose, initial = {} }) {
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Terapeutas Envolvidos
-                <span className="text-xs text-gray-400 font-normal ml-1">(múltipla seleção)</span>
+                {!readOnly && <span className="text-xs text-gray-400 font-normal ml-1">(múltipla seleção)</span>}
               </label>
               {involvedTherapistOptions.length === 0 ? (
                 <p className="text-xs text-gray-400">Nenhum terapeuta disponível.</p>
@@ -214,17 +220,18 @@ export default function PatientFormModal({ onClose, initial = {} }) {
                 <div className="flex flex-wrap gap-2">
                   {involvedTherapistOptions.map(t => {
                     const isSelected = form.involvedTherapistIds?.includes(t.id)
+                    if (readOnly && !isSelected) return null
                     const color = t.color || '#6b7280'
                     const fontColor = isSelected ? textColorForBg(color) : undefined
                     return (
                       <button
                         key={t.id}
                         type="button"
-                        onClick={() => toggleList('involvedTherapistIds', t.id)}
+                        onClick={() => !readOnly && toggleList('involvedTherapistIds', t.id)}
                         style={isSelected ? { backgroundColor: color, borderColor: color, color: fontColor } : {}}
-                        className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all border-2 ${
-                          isSelected ? '' : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border-transparent'
-                        }`}
+                        className={`px-3 py-1.5 rounded-full text-xs font-medium border-2 ${
+                          readOnly ? 'cursor-default' : 'transition-all'
+                        } ${isSelected ? '' : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border-transparent'}`}
                       >
                         {t.name}
                       </button>
@@ -243,20 +250,20 @@ export default function PatientFormModal({ onClose, initial = {} }) {
           </h3>
           <div className="space-y-3">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <Input label="Nome da Escola" value={form.schoolName} onChange={e => set('schoolName', e.target.value)} placeholder="Nome da instituição" />
-              <Input label="Telefone" value={form.schoolPhone} onChange={e => set('schoolPhone', e.target.value)} placeholder="(11) 3333-3333" />
+              <Input label="Nome da Escola" value={form.schoolName} onChange={e => set('schoolName', e.target.value)} placeholder="Nome da instituição" disabled={readOnly} />
+              <Input label="Telefone" value={form.schoolPhone} onChange={e => set('schoolPhone', e.target.value)} placeholder="(11) 3333-3333" disabled={readOnly} />
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <Input label="Endereço" value={form.schoolAddress} onChange={e => set('schoolAddress', e.target.value)} placeholder="Rua, número" />
-              <Input label="Bairro" value={form.schoolNeighborhood} onChange={e => set('schoolNeighborhood', e.target.value)} placeholder="Bairro" />
+              <Input label="Endereço" value={form.schoolAddress} onChange={e => set('schoolAddress', e.target.value)} placeholder="Rua, número" disabled={readOnly} />
+              <Input label="Bairro" value={form.schoolNeighborhood} onChange={e => set('schoolNeighborhood', e.target.value)} placeholder="Bairro" disabled={readOnly} />
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <div className="col-span-2 sm:col-span-1">
-                <Input label="Cidade" value={form.schoolCity} onChange={e => set('schoolCity', e.target.value)} placeholder="Cidade" />
+                <Input label="Cidade" value={form.schoolCity} onChange={e => set('schoolCity', e.target.value)} placeholder="Cidade" disabled={readOnly} />
               </div>
-              <Input label="Estado" value={form.schoolState} onChange={e => set('schoolState', e.target.value)} placeholder="SP" />
-              <Input label="CEP" value={form.schoolZip} onChange={e => set('schoolZip', e.target.value)} placeholder="00000-000" />
-              <Input label="Coordenador(a)" value={form.schoolCoordinator} onChange={e => set('schoolCoordinator', e.target.value)} placeholder="Nome" />
+              <Input label="Estado" value={form.schoolState} onChange={e => set('schoolState', e.target.value)} placeholder="SP" disabled={readOnly} />
+              <Input label="CEP" value={form.schoolZip} onChange={e => set('schoolZip', e.target.value)} placeholder="00000-000" disabled={readOnly} />
+              <Input label="Coordenador(a)" value={form.schoolCoordinator} onChange={e => set('schoolCoordinator', e.target.value)} placeholder="Nome" disabled={readOnly} />
             </div>
           </div>
         </section>
@@ -268,11 +275,11 @@ export default function PatientFormModal({ onClose, initial = {} }) {
           </h3>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div className="col-span-2 sm:col-span-1">
-              <Input label="Convênio" value={form.doctorInsurance} onChange={e => set('doctorInsurance', e.target.value)} placeholder="Plano de saúde" />
+              <Input label="Convênio" value={form.doctorInsurance} onChange={e => set('doctorInsurance', e.target.value)} placeholder="Plano de saúde" disabled={readOnly} />
             </div>
-            <Input label="Nome do Médico" value={form.doctorName} onChange={e => set('doctorName', e.target.value)} placeholder="Dr(a). Nome" />
-            <Input label="Especialidade" value={form.doctorSpecialty} onChange={e => set('doctorSpecialty', e.target.value)} placeholder="Neuropediatra..." />
-            <Input label="Telefone" value={form.doctorPhone} onChange={e => set('doctorPhone', e.target.value)} placeholder="(11) 9 9999-9999" />
+            <Input label="Nome do Médico" value={form.doctorName} onChange={e => set('doctorName', e.target.value)} placeholder="Dr(a). Nome" disabled={readOnly} />
+            <Input label="Especialidade" value={form.doctorSpecialty} onChange={e => set('doctorSpecialty', e.target.value)} placeholder="Neuropediatra..." disabled={readOnly} />
+            <Input label="Telefone" value={form.doctorPhone} onChange={e => set('doctorPhone', e.target.value)} placeholder="(11) 9 9999-9999" disabled={readOnly} />
           </div>
         </section>
 
@@ -283,46 +290,30 @@ export default function PatientFormModal({ onClose, initial = {} }) {
           </h3>
           <div className="space-y-2">
             {form.externalTherapists.length > 0 && (
-              <div className="hidden sm:grid grid-cols-[1fr_1fr_1fr_32px] gap-2 px-1">
+              <div className={`hidden sm:grid gap-2 px-1 ${readOnly ? 'grid-cols-3' : 'grid-cols-[1fr_1fr_1fr_32px]'}`}>
                 <span className="text-xs text-gray-400 font-medium">Nome</span>
                 <span className="text-xs text-gray-400 font-medium">Especialidade</span>
                 <span className="text-xs text-gray-400 font-medium">Telefone</span>
-                <span />
+                {!readOnly && <span />}
               </div>
             )}
             {form.externalTherapists.map((row, i) => (
-              <div key={i} className="grid grid-cols-[1fr_1fr_1fr_32px] gap-2 items-start">
-                <Input
-                  value={row.name}
-                  onChange={e => setExtRow(i, 'name', e.target.value)}
-                  placeholder="Nome"
-                />
-                <Input
-                  value={row.specialty}
-                  onChange={e => setExtRow(i, 'specialty', e.target.value)}
-                  placeholder="Especialidade"
-                />
-                <Input
-                  value={row.phone}
-                  onChange={e => setExtRow(i, 'phone', e.target.value)}
-                  placeholder="(11) 9 9999-9999"
-                />
-                <button
-                  type="button"
-                  onClick={() => removeExtRow(i)}
-                  className="mt-1 p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
-                >
-                  <FiTrash2 size={14} />
-                </button>
+              <div key={i} className={`grid gap-2 items-start ${readOnly ? 'grid-cols-3' : 'grid-cols-[1fr_1fr_1fr_32px]'}`}>
+                <Input value={row.name} onChange={e => setExtRow(i, 'name', e.target.value)} placeholder="Nome" disabled={readOnly} />
+                <Input value={row.specialty} onChange={e => setExtRow(i, 'specialty', e.target.value)} placeholder="Especialidade" disabled={readOnly} />
+                <Input value={row.phone} onChange={e => setExtRow(i, 'phone', e.target.value)} placeholder="(11) 9 9999-9999" disabled={readOnly} />
+                {!readOnly && (
+                  <button type="button" onClick={() => removeExtRow(i)} className="mt-1 p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors">
+                    <FiTrash2 size={14} />
+                  </button>
+                )}
               </div>
             ))}
-            <button
-              type="button"
-              onClick={addExtRow}
-              className="flex items-center gap-1.5 text-sm text-brand-blue hover:underline"
-            >
-              <FiPlus size={14} /> Adicionar terapeuta externo
-            </button>
+            {!readOnly && (
+              <button type="button" onClick={addExtRow} className="flex items-center gap-1.5 text-sm text-brand-blue hover:underline">
+                <FiPlus size={14} /> Adicionar terapeuta externo
+              </button>
+            )}
           </div>
         </section>
 
@@ -336,6 +327,7 @@ export default function PatientFormModal({ onClose, initial = {} }) {
               label="Diagnóstico Principal"
               value={form.diagnosis}
               onChange={e => set('diagnosis', e.target.value)}
+              disabled={readOnly}
             >
               <option value="">Selecione</option>
               {activeDiagnoses.map(d => (
@@ -349,20 +341,22 @@ export default function PatientFormModal({ onClose, initial = {} }) {
                 <p className="text-xs text-gray-400">Cadastre diagnósticos em Administração → Diagnósticos.</p>
               ) : (
                 <div className="flex flex-wrap gap-2">
-                  {activeDiagnoses.filter(d => d.name !== form.diagnosis).map(d => (
-                    <button
-                      key={d.id}
-                      type="button"
-                      onClick={() => toggleList('conditionIds', d.id)}
-                      className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-                        form.conditionIds?.includes(d.id)
-                          ? 'bg-brand-blue text-white'
-                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                      }`}
-                    >
-                      {d.name}
-                    </button>
-                  ))}
+                  {activeDiagnoses.filter(d => d.name !== form.diagnosis).map(d => {
+                    const isSelected = form.conditionIds?.includes(d.id)
+                    if (readOnly && !isSelected) return null
+                    return (
+                      <button
+                        key={d.id}
+                        type="button"
+                        onClick={() => !readOnly && toggleList('conditionIds', d.id)}
+                        className={`px-3 py-1.5 rounded-full text-xs font-medium ${readOnly ? 'cursor-default' : 'transition-all'} ${
+                          isSelected ? 'bg-brand-blue text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        }`}
+                      >
+                        {d.name}
+                      </button>
+                    )
+                  })}
                 </div>
               )}
             </div>
@@ -370,7 +364,7 @@ export default function PatientFormModal({ onClose, initial = {} }) {
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Especialidades em Atendimento
-                <span className="text-xs text-gray-400 font-normal ml-1">(múltipla seleção)</span>
+                {!readOnly && <span className="text-xs text-gray-400 font-normal ml-1">(múltipla seleção)</span>}
               </label>
               {activeSpecialties.length === 0 ? (
                 <p className="text-xs text-gray-400">Cadastre especialidades em Administração → Especialidades.</p>
@@ -378,15 +372,16 @@ export default function PatientFormModal({ onClose, initial = {} }) {
                 <div className="flex flex-wrap gap-2">
                   {activeSpecialties.map(s => {
                     const isSelected = form.specialties?.includes(s.key)
+                    if (readOnly && !isSelected) return null
                     const color = s.color || '#6b7280'
                     const fontColor = isSelected ? textColorForBg(color) : undefined
                     return (
                       <button
                         key={s.key}
                         type="button"
-                        onClick={() => toggleList('specialties', s.key)}
+                        onClick={() => !readOnly && toggleList('specialties', s.key)}
                         style={isSelected ? { backgroundColor: color, borderColor: color, color: fontColor } : {}}
-                        className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all border-2 ${
+                        className={`px-3 py-1.5 rounded-full text-xs font-medium border-2 ${readOnly ? 'cursor-default' : 'transition-all'} ${
                           isSelected ? '' : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border-transparent'
                         }`}
                       >
@@ -411,6 +406,7 @@ export default function PatientFormModal({ onClose, initial = {} }) {
             onChange={e => set('notes', e.target.value)}
             placeholder="Preferências, restrições, informações importantes para os terapeutas..."
             rows={4}
+            disabled={readOnly}
           />
         </section>
       </div>
