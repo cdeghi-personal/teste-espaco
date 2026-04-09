@@ -251,12 +251,17 @@ export default function MedicalRecordsPage() {
   const activeSpecialties = specialtiesData.filter(s => s.active !== false)
 
   // Consultations for current patient
-  // Therapist without "belongs_to_team" sees only their own consultations
   const patientConsultations = consultations
     .filter(c => {
       if (c.patientId !== selectedPatientId) return false
-      if (user?.role === 'therapist' && !user?.belongsToTeam) return c.therapistId === user?.id
-      return true
+      if (user?.role === 'admin') return true
+      if (user?.belongsToTeam) {
+        // terapeuta da equipe vê apenas consultas de terapeutas da equipe
+        const t = therapists.find(t => t.id === c.therapistId)
+        return t?.belongsToTeam === true
+      }
+      // terapeuta fora da equipe vê apenas as suas
+      return c.therapistId === user?.id
     })
     .sort((a, b) => b.date.localeCompare(a.date))
 
