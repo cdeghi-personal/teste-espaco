@@ -34,7 +34,7 @@ export default function AgendaPage() {
   const today = format(new Date(), 'yyyy-MM-dd')
 
   // DEBUG TEMPORÁRIO — remover após diagnóstico
-  console.log('[Agenda] appointments total:', appointments.length, appointments.slice(0, 3))
+  const debugDates = appointments.slice(0, 5).map(a => a.date).join(', ')
 
   const isAdminOrTeam = user?.role === 'admin' || user?.belongsToTeam
 
@@ -87,6 +87,13 @@ export default function AgendaPage() {
           <span className="hidden sm:inline">Novo Agendamento</span>
           <span className="sm:hidden">Novo</span>
         </Button>
+      </div>
+
+      {/* DEBUG — remover após diagnóstico */}
+      <div className="bg-yellow-100 border border-yellow-300 rounded-xl px-4 py-2 text-xs text-yellow-800">
+        <strong>DEBUG:</strong> {appointments.length} agendamento(s) carregado(s).
+        {appointments.length > 0 && <> Datas: {debugDates}</>}
+        {appointments.length === 0 && <> — tabela appointments está vazia ou sem permissão de leitura.</>}
       </div>
 
       {/* Filters */}
