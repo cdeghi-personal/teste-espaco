@@ -1,23 +1,38 @@
 import { useState } from 'react'
 import { FiPlus, FiSearch, FiEdit2, FiTrash2, FiUserCheck, FiPhone, FiMail, FiEyeOff, FiRotateCcw } from 'react-icons/fi'
 import { useData } from '../../../context/DataContext'
+import { useAuth } from '../../../context/AuthContext'
 import Button from '../../../components/ui/Button'
 import EmptyState from '../../../components/ui/EmptyState'
 import GuardianFormModal from './GuardianFormModal'
 
 export default function GuardiansPage() {
   const { guardians, patients, deleteGuardian, restoreGuardian } = useData()
+  const { user } = useAuth()
   const [search, setSearch] = useState('')
   const [showInactive, setShowInactive] = useState(false)
   const [showModal, setShowModal] = useState(false)
   const [editGuardian, setEditGuardian] = useState(null)
+
+  // Determina quais IDs de pacientes este usuário tem acesso
+  // Admin: todos | Equipe: todos retornados pelo RLS (já filtrado no DataContext) | Fora da equipe: apenas os seus
+  const accessiblePatientIds = user?.role === 'admin' || user?.belongsToTeam
+    ? patients.map(p => p.id)
+    : patients
+        .filter(p => p.therapistId === user?.id || (p.involvedTherapistIds || []).includes(user?.id))
+        .map(p => p.id)
+
+  // Responsáveis visíveis: admin vê todos; demais veem apenas os vinculados a pacientes acessíveis
+  const accessibleGuardians = user?.role === 'admin'
+    ? guardians
+    : guardians.filter(g => (g.patientIds || []).some(pid => accessiblePatientIds.includes(pid)))
 
   function getLinkedPatients(guardian) {
     const ids = guardian.patientIds || []
     return patients.filter(p => !p.deleted && ids.includes(p.id))
   }
 
-  const filtered = guardians.filter(g => {
+  const filtered = accessibleGuardians.filter(g => {
     const matchActive = showInactive ? g.active === false : g.active !== false
     const linkedPatients = getLinkedPatients(g)
     const matchSearch = !search ||

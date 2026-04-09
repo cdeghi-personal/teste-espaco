@@ -41,8 +41,18 @@ export default function GuardianFormModal({ onClose, initial = {} }) {
   function validate() {
     const e = {}
     if (!form.fullName.trim()) e.fullName = 'Nome obrigatório'
+    if (!form.relationship) e.relationship = 'Parentesco obrigatório'
     if (!form.phone.trim()) e.phone = 'Telefone obrigatório'
-    if (form.cpf && form.cpf.replace(/\D/g, '').length === 11 && !validateCPF(form.cpf)) e.cpf = 'CPF inválido'
+    const cpfDigits = form.cpf?.replace(/\D/g, '') || ''
+    if (!cpfDigits) e.cpf = 'CPF obrigatório'
+    else if (cpfDigits.length !== 11) e.cpf = 'CPF inválido'
+    else if (!validateCPF(form.cpf)) e.cpf = 'CPF inválido'
+    if (!form.email?.trim()) e.email = 'E-mail obrigatório'
+    if (!form.address?.trim()) e.address = 'Endereço obrigatório'
+    if (!form.neighborhood?.trim()) e.neighborhood = 'Bairro obrigatório'
+    if (!form.cep?.trim()) e.cep = 'CEP obrigatório'
+    if (!form.city?.trim()) e.city = 'Cidade obrigatória'
+    if (!form.patientIds?.length) e.patientIds = 'Vincule ao menos um paciente'
     return e
   }
 
@@ -76,13 +86,13 @@ export default function GuardianFormModal({ onClose, initial = {} }) {
               <div className="sm:col-span-2">
                 <Input label="Nome Completo *" value={form.fullName} onChange={e => set('fullName', e.target.value)} error={errors.fullName} />
               </div>
-              <Select label="Parentesco" value={form.relationship} onChange={e => set('relationship', e.target.value)}>
+              <Select label="Parentesco *" value={form.relationship} onChange={e => set('relationship', e.target.value)} error={errors.relationship}>
                 <option value="">Selecione</option>
                 {['Mãe','Pai','Avó','Avô','Tia','Tio','Outro'].map(r => <option key={r}>{r}</option>)}
               </Select>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <Input label="CPF" value={form.cpf} onChange={e => set('cpf', formatCPF(e.target.value))} error={errors.cpf} placeholder="000.000.000-00" />
+              <Input label="CPF *" value={form.cpf} onChange={e => set('cpf', formatCPF(e.target.value))} error={errors.cpf} placeholder="000.000.000-00" />
               <Input label="RG" value={form.rg} onChange={e => set('rg', e.target.value)} />
             </div>
             <Input label="Profissão" value={form.occupation} onChange={e => set('occupation', e.target.value)} />
@@ -98,7 +108,7 @@ export default function GuardianFormModal({ onClose, initial = {} }) {
               <Input label="Telefone / WhatsApp *" value={form.phone} onChange={e => set('phone', e.target.value)} error={errors.phone} placeholder="(11) 9 9999-9999" />
               <Input label="Telefone 2" value={form.phone2} onChange={e => set('phone2', e.target.value)} placeholder="(11) 3333-4444" />
             </div>
-            <Input label="E-mail" type="email" value={form.email} onChange={e => set('email', e.target.value)} />
+            <Input label="E-mail *" type="email" value={form.email} onChange={e => set('email', e.target.value)} error={errors.email} />
           </div>
         </section>
 
@@ -107,14 +117,14 @@ export default function GuardianFormModal({ onClose, initial = {} }) {
             Endereço
           </h3>
           <div className="space-y-3">
-            <Input label="Endereço" value={form.address} onChange={e => set('address', e.target.value)} placeholder="Rua, número, complemento" />
+            <Input label="Endereço *" value={form.address} onChange={e => set('address', e.target.value)} placeholder="Rua, número, complemento" error={errors.address} />
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <Input label="Bairro" value={form.neighborhood} onChange={e => set('neighborhood', e.target.value)} placeholder="Bairro" />
-              <Input label="CEP" value={form.cep} onChange={e => set('cep', e.target.value)} placeholder="00000-000" />
+              <Input label="Bairro *" value={form.neighborhood} onChange={e => set('neighborhood', e.target.value)} placeholder="Bairro" error={errors.neighborhood} />
+              <Input label="CEP *" value={form.cep} onChange={e => set('cep', e.target.value)} placeholder="00000-000" error={errors.cep} />
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               <div className="col-span-2 sm:col-span-2">
-                <Input label="Cidade" value={form.city} onChange={e => set('city', e.target.value)} />
+                <Input label="Cidade *" value={form.city} onChange={e => set('city', e.target.value)} error={errors.city} />
               </div>
               <Select label="Estado" value={form.state} onChange={e => set('state', e.target.value)}>
                 {BR_STATES.map(s => <option key={s}>{s}</option>)}
@@ -125,13 +135,14 @@ export default function GuardianFormModal({ onClose, initial = {} }) {
 
         <section>
           <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-3 pb-2 border-b border-gray-100">
-            Pacientes Vinculados
+            Pacientes Vinculados *
             {form.patientIds?.length > 0 && (
               <span className="ml-2 text-xs font-normal text-brand-blue normal-case">
                 {form.patientIds.length} selecionado(s)
               </span>
             )}
           </h3>
+          {errors.patientIds && <p className="text-xs text-red-600 mb-2">{errors.patientIds}</p>}
           {activePatients.length === 0 ? (
             <p className="text-xs text-gray-400">Nenhum paciente cadastrado.</p>
           ) : (
