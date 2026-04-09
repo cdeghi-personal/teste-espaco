@@ -49,7 +49,8 @@ const PATIENT_SELECT_FALLBACK = `
 `
 
 const GUARDIAN_SELECT = `
-  id, full_name, relationship, phone, email, cpf, occupation, notes, neighborhood, active, created_at,
+  id, full_name, relationship, phone, phone2, email, cpf, rg, occupation, notes,
+  address, neighborhood, city, state, cep, active, created_at,
   patient_guardians(patient_id)
 `
 
@@ -270,11 +271,17 @@ export function DataProvider({ children }) {
         full_name: data.fullName,
         relationship: data.relationship,
         phone: data.phone || null,
+        phone2: data.phone2 || null,
         email: data.email || null,
         cpf: data.cpf || null,
+        rg: data.rg || null,
         occupation: data.occupation || null,
         notes: data.notes || null,
+        address: data.address || null,
         neighborhood: data.neighborhood || null,
+        city: data.city || null,
+        state: data.state || null,
+        cep: data.cep || null,
         active: true,
       })
       .select()
@@ -297,11 +304,17 @@ export function DataProvider({ children }) {
     if (data.fullName !== undefined) update.full_name = data.fullName
     if (data.relationship !== undefined) update.relationship = data.relationship
     if (data.phone !== undefined) update.phone = data.phone || null
+    if (data.phone2 !== undefined) update.phone2 = data.phone2 || null
     if (data.email !== undefined) update.email = data.email || null
     if (data.cpf !== undefined) update.cpf = data.cpf || null
+    if (data.rg !== undefined) update.rg = data.rg || null
     if (data.occupation !== undefined) update.occupation = data.occupation || null
     if (data.notes !== undefined) update.notes = data.notes || null
+    if (data.address !== undefined) update.address = data.address || null
     if (data.neighborhood !== undefined) update.neighborhood = data.neighborhood || null
+    if (data.city !== undefined) update.city = data.city || null
+    if (data.state !== undefined) update.state = data.state || null
+    if (data.cep !== undefined) update.cep = data.cep || null
     if (data.active !== undefined) update.active = data.active
 
     if (Object.keys(update).length) {
