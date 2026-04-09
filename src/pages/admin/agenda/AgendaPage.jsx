@@ -70,6 +70,9 @@ export default function AgendaPage() {
     return { backgroundColor: bg, color: textColorForBg(bg) }
   }
 
+  // DEBUG — remover após diagnóstico
+  console.log('[Agenda] total:', appointments.length, 'role:', user?.role, 'isAdminOrTeam:', isAdminOrTeam, 'sample.date:', appointments[0]?.date, 'week[0]:', format(days[0], 'yyyy-MM-dd'))
+
   return (
     <div className="p-3 md:p-6 space-y-4">
       {/* Header */}
