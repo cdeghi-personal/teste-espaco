@@ -33,6 +33,9 @@ export default function AgendaPage() {
   const days = getWeekDays(weekRef)
   const today = format(new Date(), 'yyyy-MM-dd')
 
+  // DEBUG TEMPORÁRIO — remover após diagnóstico
+  console.log('[Agenda] appointments total:', appointments.length, appointments.slice(0, 3))
+
   const isAdminOrTeam = user?.role === 'admin' || user?.belongsToTeam
 
   function prevWeek() { const d = new Date(weekRef); d.setDate(d.getDate() - 7); setWeekRef(d) }
