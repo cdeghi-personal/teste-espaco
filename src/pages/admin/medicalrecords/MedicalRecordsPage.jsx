@@ -512,7 +512,7 @@ export default function MedicalRecordsPage() {
               </Section>
 
               {/* ── Conduta & Objetivo Terapêutico ── */}
-              <Section title="Conduta & Objetivo Terapêutico" count={conducts.length} defaultOpen={false}>
+              {(user?.role === 'admin' || user?.belongsToTeam) && <Section title="Conduta & Objetivo Terapêutico" count={conducts.length} defaultOpen={false}>
                 <div className="space-y-2">
                   {conducts.map(cd => (
                     <ConductRow
@@ -564,7 +564,7 @@ export default function MedicalRecordsPage() {
                     </button>
                   )}
                 </div>
-              </Section>
+              </Section>}
 
               {/* ── Histórico de Atendimentos ── */}
               <Section title="Histórico de Atendimentos" count={patientConsultations.length}>
