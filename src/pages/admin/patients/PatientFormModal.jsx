@@ -7,6 +7,7 @@ import Input from '../../../components/ui/Input'
 import Select from '../../../components/ui/Select'
 import Textarea from '../../../components/ui/Textarea'
 import { useData } from '../../../context/DataContext'
+import { useAuth } from '../../../context/AuthContext'
 
 const EMPTY_EXT = { name: '', specialty: '', phone: '' }
 
@@ -34,6 +35,7 @@ function textColorForBg(hex) {
 
 export default function PatientFormModal({ onClose, initial = {} }) {
   const { paymentMethods, therapists, diagnoses, patientStatuses, specialtiesData, addPatient, updatePatient } = useData()
+  const { user } = useAuth()
   const isEdit = !!initial.id
 
   const activeStatuses = patientStatuses.filter(s => s.active !== false)
@@ -41,12 +43,16 @@ export default function PatientFormModal({ onClose, initial = {} }) {
     ? (activeStatuses.find(s => s.name.toLowerCase().includes('ativo'))?.id || activeStatuses[0]?.id || '')
     : ''
 
+  // Para novo paciente criado por terapeuta: pré-seleciona o próprio terapeuta como Gerente de Conta
+  const defaultTherapistId = !isEdit && user?.role === 'therapist' ? (user?.id || '') : ''
+
   const [form, setForm] = useState({
     ...EMPTY,
     ...initial,
     conditionIds: initial.conditionIds || [],
     involvedTherapistIds: initial.involvedTherapistIds || [],
     statusId: initial.statusId || initial.status || defaultStatusId,
+    therapistId: initial.therapistId || defaultTherapistId,
     externalTherapists: initial.externalTherapists || [],
   })
   const [errors, setErrors] = useState({})
