@@ -265,9 +265,13 @@ export function DataProvider({ children }) {
   // ─── Guardians ──────────────────────────────────────────────────────────────
 
   async function addGuardian(data) {
-    const { data: inserted, error } = await supabase
+    // Gera UUID no frontend para evitar RETURNING * que falha na RLS de SELECT
+    // (guardian recém criado não tem pacientes ainda, SELECT policy não passa)
+    const newId = crypto.randomUUID()
+    const { error } = await supabase
       .from('guardians')
       .insert({
+        id: newId,
         full_name: data.fullName,
         relationship: data.relationship,
         phone: data.phone || null,
@@ -284,17 +288,19 @@ export function DataProvider({ children }) {
         cep: data.cep || null,
         active: true,
       })
-      .select()
-      .single()
 
     if (error) return dbError(error, toast)
 
-    await syncGuardianPatients(inserted.id, data.patientIds || [])
+    // Vincula pacientes; agora a SELECT policy já passa pois o guardian tem pacientes
+    await syncGuardianPatients(newId, data.patientIds || [])
 
-    const newGuardian = mapGuardian({
-      ...inserted,
-      patient_guardians: (data.patientIds || []).map(pid => ({ patient_id: pid })),
-    })
+    const { data: fetched } = await supabase
+      .from('guardians')
+      .select(GUARDIAN_SELECT)
+      .eq('id', newId)
+      .single()
+
+    const newGuardian = mapGuardian(fetched || { id: newId, ...data, patient_guardians: (data.patientIds || []).map(pid => ({ patient_id: pid })) })
     setGuardians(prev => [...prev, newGuardian])
     return newGuardian
   }
