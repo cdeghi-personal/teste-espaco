@@ -20,16 +20,21 @@ const EMPTY = {
   sessionQuality: 'good', guardianFeedback: '', appointmentId: '',
 }
 
-export default function ConsultationFormModal({ onClose, initial = {} }) {
+export default function ConsultationFormModal({ onClose, initial = {}, readOnly = false }) {
   const { patients, therapists, specialtiesData, rooms, consultationStatuses, appointmentTypes, appointments, addConsultation, updateConsultation } = useData()
   const { user } = useAuth()
   const isEdit = !!initial.id
+
+  const defaultStatusId = !isEdit
+    ? (consultationStatuses.find(s => s.active !== false && s.name.toLowerCase().includes('agendada'))?.id || '')
+    : ''
 
   const [newActivityDraft, setNewActivityDraft] = useState(null)
   const [form, setForm] = useState({
     ...EMPTY,
     therapistId: user?.id || '',
     ...initial,
+    consultationStatusId: initial.consultationStatusId || defaultStatusId,
     activities: initial.activities ? [...initial.activities.map(a => ({ ...a }))] : [],
   })
   const [errors, setErrors] = useState({})
@@ -58,8 +63,16 @@ export default function ConsultationFormModal({ onClose, initial = {} }) {
   function validate() {
     const e = {}
     if (!form.patientId) e.patientId = 'Selecione o paciente'
+    if (!form.therapistId) e.therapistId = 'Selecione o terapeuta'
     if (!form.specialty) e.specialty = 'Selecione a especialidade'
-    if (!form.mainObjective.trim()) e.mainObjective = 'Informe o objetivo da sessão'
+    if (!form.time) e.time = 'Informe o horário'
+    if (!form.roomId) e.roomId = 'Selecione a sala'
+    if (!form.consultationStatusId) e.consultationStatusId = 'Selecione o status'
+    if (!form.appointmentTypeId) e.appointmentTypeId = 'Selecione o tipo'
+    const selectedStatus = consultationStatuses.find(s => s.id === form.consultationStatusId)
+    if (selectedStatus?.name?.toLowerCase().includes('realizada') && !form.mainObjective.trim()) {
+      e.mainObjective = 'Informe o objetivo da sessão'
+    }
     return e
   }
 
@@ -82,16 +95,22 @@ export default function ConsultationFormModal({ onClose, initial = {} }) {
     ? appointments.filter(a => a.patientId === form.patientId && !a.consultationId)
     : []
 
+  const title = readOnly ? 'Visualizar Atendimento' : isEdit ? 'Editar Registro de Atendimento' : 'Novo Registro de Atendimento'
+  const selectedStatus = consultationStatuses.find(s => s.id === form.consultationStatusId)
+  const mainObjectiveRequired = selectedStatus?.name?.toLowerCase().includes('realizada')
+
   return (
     <Modal
-      title={isEdit ? 'Editar Registro de Atendimento' : 'Novo Registro de Atendimento'}
+      title={title}
       onClose={onClose}
       size="xl"
       footer={
-        <>
-          <Button variant="ghost" onClick={onClose}>Cancelar</Button>
-          {!isBlocked && <Button variant="primary" onClick={handleSave}>{isEdit ? 'Salvar' : 'Registrar Atendimento'}</Button>}
-        </>
+        readOnly
+          ? <Button variant="ghost" onClick={onClose}>Fechar</Button>
+          : <>
+              <Button variant="ghost" onClick={onClose}>Cancelar</Button>
+              {!isBlocked && <Button variant="primary" onClick={handleSave}>{isEdit ? 'Salvar' : 'Registrar Atendimento'}</Button>}
+            </>
       }
     >
       <div className="space-y-6">
@@ -107,7 +126,7 @@ export default function ConsultationFormModal({ onClose, initial = {} }) {
             Dados do Atendimento
           </h3>
           <div className="space-y-3">
-            <Select label="Paciente *" value={form.patientId} onChange={e => set('patientId', e.target.value)} error={errors.patientId}>
+            <Select label="Paciente *" value={form.patientId} onChange={e => set('patientId', e.target.value)} error={errors.patientId} disabled={readOnly}>
               <option value="">Selecione o paciente</option>
               {patients.filter(p => !p.deleted).map(p => (
                 <option key={p.id} value={p.id}>{p.fullName}</option>
@@ -115,18 +134,18 @@ export default function ConsultationFormModal({ onClose, initial = {} }) {
             </Select>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <Select label="Terapeuta" value={form.therapistId} onChange={e => set('therapistId', e.target.value)}>
+              <Select label="Terapeuta *" value={form.therapistId} onChange={e => set('therapistId', e.target.value)} error={errors.therapistId} disabled={readOnly}>
                 <option value="">Selecione</option>
                 {activeTherapists.map(t => (
                   <option key={t.id} value={t.id}>{t.name}</option>
                 ))}
               </Select>
-              <Input label="Data *" type="date" value={form.date} onChange={e => set('date', e.target.value)} />
-              <Input label="Horário" type="time" value={form.time} onChange={e => set('time', e.target.value)} />
+              <Input label="Data *" type="date" value={form.date} onChange={e => set('date', e.target.value)} disabled={readOnly} />
+              <Input label="Horário *" type="time" value={form.time} onChange={e => set('time', e.target.value)} error={errors.time} disabled={readOnly} />
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <Select label="Sala" value={form.roomId} onChange={e => set('roomId', e.target.value)}>
-                <option value="">Nenhuma / Avulso</option>
+              <Select label="Sala *" value={form.roomId} onChange={e => set('roomId', e.target.value)} error={errors.roomId} disabled={readOnly}>
+                <option value="">Selecione</option>
                 {activeRooms.map(r => (
                   <option key={r.id} value={r.id}>{r.name}</option>
                 ))}
@@ -134,19 +153,19 @@ export default function ConsultationFormModal({ onClose, initial = {} }) {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <Select label="Especialidade *" value={form.specialty} onChange={e => set('specialty', e.target.value)} error={errors.specialty}>
+              <Select label="Especialidade *" value={form.specialty} onChange={e => set('specialty', e.target.value)} error={errors.specialty} disabled={readOnly}>
                 <option value="">Selecione</option>
                 {activeSpecialties.map(s => (
                   <option key={s.key} value={s.key}>{s.label}</option>
                 ))}
               </Select>
-              <Select label="Status Atendimento" value={form.consultationStatusId} onChange={e => set('consultationStatusId', e.target.value)}>
+              <Select label="Status Atendimento *" value={form.consultationStatusId} onChange={e => set('consultationStatusId', e.target.value)} error={errors.consultationStatusId} disabled={readOnly}>
                 <option value="">Selecione</option>
                 {activeStatuses.map(s => (
                   <option key={s.id} value={s.id}>{s.name}</option>
                 ))}
               </Select>
-              <Select label="Tipo de Atendimento" value={form.appointmentTypeId} onChange={e => set('appointmentTypeId', e.target.value)}>
+              <Select label="Tipo de Atendimento *" value={form.appointmentTypeId} onChange={e => set('appointmentTypeId', e.target.value)} error={errors.appointmentTypeId} disabled={readOnly}>
                 <option value="">Selecione</option>
                 {activeAppointmentTypes.map(t => (
                   <option key={t.id} value={t.id}>{t.name}</option>
@@ -154,7 +173,7 @@ export default function ConsultationFormModal({ onClose, initial = {} }) {
               </Select>
             </div>
 
-            {patientAppointments.length > 0 && (
+            {!readOnly && patientAppointments.length > 0 && (
               <Select label="Vincular ao Agendamento" value={form.appointmentId} onChange={e => set('appointmentId', e.target.value)}>
                 <option value="">Nenhum / Avulso</option>
                 {patientAppointments.map(a => (
@@ -168,12 +187,13 @@ export default function ConsultationFormModal({ onClose, initial = {} }) {
         {/* Objetivo principal */}
         <section>
           <Textarea
-            label="Objetivo Principal da Sessão *"
+            label={mainObjectiveRequired ? 'Objetivo Principal da Sessão *' : 'Objetivo Principal da Sessão'}
             value={form.mainObjective}
             onChange={e => set('mainObjective', e.target.value)}
             error={errors.mainObjective}
             placeholder="Descreva o objetivo terapêutico desta sessão..."
             rows={2}
+            disabled={readOnly}
           />
         </section>
 
@@ -186,82 +206,47 @@ export default function ConsultationFormModal({ onClose, initial = {} }) {
           <div className="space-y-3">
             {form.activities.map((act, idx) => (
               <div key={act.id} className="bg-gray-50 rounded-xl p-4 relative">
-                <button
-                  onClick={() => removeActivity(idx)}
-                  className="absolute top-3 right-3 p-1 text-gray-400 hover:text-red-500 transition-colors"
-                >
-                  <FiTrash2 size={14} />
-                </button>
+                {!readOnly && (
+                  <button onClick={() => removeActivity(idx)} className="absolute top-3 right-3 p-1 text-gray-400 hover:text-red-500 transition-colors">
+                    <FiTrash2 size={14} />
+                  </button>
+                )}
                 <div className="text-xs font-semibold text-gray-500 mb-3">Atividade {idx + 1}</div>
                 <div className="space-y-3">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <Input
-                      label="Nome da Atividade"
-                      value={act.name}
-                      onChange={e => updateActivity(idx, 'name', e.target.value)}
-                      placeholder="Ex: Jogo de encaixe, treino de marcha..."
-                    />
-                    <Select
-                      label="Resultado"
-                      value={act.outcome}
-                      onChange={e => updateActivity(idx, 'outcome', e.target.value)}
-                    >
+                    <Input label="Nome da Atividade" value={act.name} onChange={e => updateActivity(idx, 'name', e.target.value)} placeholder="Ex: Jogo de encaixe, treino de marcha..." disabled={readOnly} />
+                    <Select label="Resultado" value={act.outcome} onChange={e => updateActivity(idx, 'outcome', e.target.value)} disabled={readOnly}>
                       <option value="achieved">Objetivo Alcançado</option>
                       <option value="partial">Parcialmente Alcançado</option>
                       <option value="not_achieved">Não Alcançado</option>
                     </Select>
                   </div>
-                  <Textarea
-                    label="Descrição"
-                    value={act.description}
-                    onChange={e => updateActivity(idx, 'description', e.target.value)}
-                    placeholder="Como a atividade foi realizada..."
-                    rows={2}
-                  />
+                  <Textarea label="Descrição" value={act.description} onChange={e => updateActivity(idx, 'description', e.target.value)} placeholder="Como a atividade foi realizada..." rows={2} disabled={readOnly} />
                 </div>
               </div>
             ))}
 
-            {newActivityDraft ? (
+            {!readOnly && (newActivityDraft ? (
               <div className="rounded-xl border-2 border-brand-blue border-dashed p-4 space-y-3">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <Input
-                    label="Nome da Atividade *"
-                    value={newActivityDraft.name}
-                    onChange={e => setNewActivityDraft(d => ({ ...d, name: e.target.value }))}
-                    placeholder="Ex: Jogo de encaixe, treino de marcha..."
-                    autoFocus
-                  />
-                  <Select
-                    label="Resultado"
-                    value={newActivityDraft.outcome}
-                    onChange={e => setNewActivityDraft(d => ({ ...d, outcome: e.target.value }))}
-                  >
+                  <Input label="Nome da Atividade *" value={newActivityDraft.name} onChange={e => setNewActivityDraft(d => ({ ...d, name: e.target.value }))} placeholder="Ex: Jogo de encaixe, treino de marcha..." autoFocus />
+                  <Select label="Resultado" value={newActivityDraft.outcome} onChange={e => setNewActivityDraft(d => ({ ...d, outcome: e.target.value }))}>
                     <option value="achieved">Objetivo Alcançado</option>
                     <option value="partial">Parcialmente Alcançado</option>
                     <option value="not_achieved">Não Alcançado</option>
                   </Select>
                 </div>
-                <Textarea
-                  label="Descrição"
-                  value={newActivityDraft.description}
-                  onChange={e => setNewActivityDraft(d => ({ ...d, description: e.target.value }))}
-                  placeholder="Como a atividade foi realizada..."
-                  rows={2}
-                />
+                <Textarea label="Descrição" value={newActivityDraft.description} onChange={e => setNewActivityDraft(d => ({ ...d, description: e.target.value }))} placeholder="Como a atividade foi realizada..." rows={2} />
                 <div className="flex gap-2 justify-end">
                   <Button variant="ghost" onClick={() => setNewActivityDraft(null)}>Cancelar</Button>
                   <Button variant="primary" onClick={confirmNewActivity}>Adicionar</Button>
                 </div>
               </div>
             ) : (
-              <button
-                onClick={() => setNewActivityDraft({ name: '', description: '', outcome: 'achieved' })}
-                className="flex items-center gap-1.5 text-sm text-brand-blue hover:underline mt-1"
-              >
+              <button onClick={() => setNewActivityDraft({ name: '', description: '', outcome: 'achieved' })} className="flex items-center gap-1.5 text-sm text-brand-blue hover:underline mt-1">
                 <FiPlus size={14} /> Adicionar atividade
               </button>
-            )}
+            ))}
           </div>
         </section>
 
@@ -271,27 +256,9 @@ export default function ConsultationFormModal({ onClose, initial = {} }) {
             Evolução e Observações
           </h3>
           <div className="space-y-3">
-            <Textarea
-              label="Notas de Evolução"
-              value={form.evolutionNotes}
-              onChange={e => set('evolutionNotes', e.target.value)}
-              placeholder="Evolução clínica, comparação com sessões anteriores..."
-              rows={3}
-            />
-            <Textarea
-              label="Objetivos para a Próxima Sessão"
-              value={form.nextObjectives}
-              onChange={e => set('nextObjectives', e.target.value)}
-              placeholder="Metas e foco para a próxima sessão..."
-              rows={2}
-            />
-            <Textarea
-              label="Orientações Passadas ao Responsável"
-              value={form.guardianFeedback}
-              onChange={e => set('guardianFeedback', e.target.value)}
-              placeholder="O que foi comunicado ao responsável ao final da sessão..."
-              rows={2}
-            />
+            <Textarea label="Notas de Evolução" value={form.evolutionNotes} onChange={e => set('evolutionNotes', e.target.value)} placeholder="Evolução clínica, comparação com sessões anteriores..." rows={3} disabled={readOnly} />
+            <Textarea label="Objetivos para a Próxima Sessão" value={form.nextObjectives} onChange={e => set('nextObjectives', e.target.value)} placeholder="Metas e foco para a próxima sessão..." rows={2} disabled={readOnly} />
+            <Textarea label="Orientações Passadas ao Responsável" value={form.guardianFeedback} onChange={e => set('guardianFeedback', e.target.value)} placeholder="O que foi comunicado ao responsável ao final da sessão..." rows={2} disabled={readOnly} />
           </div>
         </section>
       </div>

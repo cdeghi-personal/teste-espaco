@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { FiPlus, FiSearch, FiClipboard, FiChevronDown, FiChevronUp, FiEdit2, FiTrash2 } from 'react-icons/fi'
+import { FiPlus, FiSearch, FiClipboard, FiChevronDown, FiChevronUp, FiEdit2, FiTrash2, FiEye } from 'react-icons/fi'
 import { useData } from '../../../context/DataContext'
 import { useAuth } from '../../../context/AuthContext'
 import Badge from '../../../components/ui/Badge'
@@ -15,6 +15,7 @@ export default function ConsultationsPage() {
   const [filterSpecialty, setFilterSpecialty] = useState('')
   const [showModal, setShowModal] = useState(false)
   const [editConsultation, setEditConsultation] = useState(null)
+  const [viewConsultation, setViewConsultation] = useState(null)
   const [expanded, setExpanded] = useState(null)
 
   function getPatient(id) { return patients.find(p => p.id === id) }
@@ -132,6 +133,12 @@ export default function ConsultationsPage() {
                 </div>
                 <div className="flex items-center gap-2">
                   <button
+                    onClick={() => setViewConsultation(c)}
+                    className="p-1.5 rounded-lg text-gray-400 hover:text-brand-blue hover:bg-blue-50 transition-colors"
+                  >
+                    <FiEye size={15} />
+                  </button>
+                  <button
                     onClick={() => { setEditConsultation(c); setShowModal(true) }}
                     className="p-1.5 rounded-lg text-gray-400 hover:text-brand-blue hover:bg-blue-50 transition-colors"
                   >
@@ -204,6 +211,13 @@ export default function ConsultationsPage() {
         <ConsultationFormModal
           onClose={() => setShowModal(false)}
           initial={editConsultation || {}}
+        />
+      )}
+      {viewConsultation && (
+        <ConsultationFormModal
+          onClose={() => setViewConsultation(null)}
+          initial={viewConsultation}
+          readOnly
         />
       )}
     </div>
