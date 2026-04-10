@@ -117,7 +117,6 @@ export default function DashboardPage() {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <tbody>
               <tbody className="divide-y divide-gray-50">
                 {upcomingConsultations.map(c => {
                   const patient = getPatient(c.patientId)
