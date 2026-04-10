@@ -17,6 +17,11 @@ function textColorForBg(hex) {
   return (0.299 * r + 0.587 * g + 0.114 * b) > 140 ? '#1f2937' : '#ffffff'
 }
 
+function fmtTime(t) {
+  if (!t) return '—'
+  return t.slice(0, 5)
+}
+
 function shortName(fullName) {
   if (!fullName) return '—'
   const parts = fullName.trim().split(/\s+/).filter(Boolean)
@@ -211,7 +216,8 @@ export default function AgendaPage() {
                       style={style}
                     >
                       <div className="flex items-baseline gap-1 min-w-0">
-                        <span className="font-bold shrink-0">{item.time || '—'}</span>
+                        <span className="font-bold shrink-0">{fmtTime(item.time)}</span>
+                        <span className="opacity-60">-</span>
                         <span className="font-medium truncate">{shortName(patient?.fullName)}</span>
                       </div>
                       {room && <div className="truncate opacity-75 mt-0.5" style={{ fontSize: '10px' }}>{room.name}</div>}
@@ -257,7 +263,8 @@ export default function AgendaPage() {
                       style={style}
                     >
                       <div className="flex items-baseline gap-1 min-w-0">
-                        <span className="font-bold shrink-0">{item.time || '—'}</span>
+                        <span className="font-bold shrink-0">{fmtTime(item.time)}</span>
+                        <span className="opacity-60">-</span>
                         <span className="font-medium truncate">{shortName(patient?.fullName)}</span>
                       </div>
                       {room && <div className="truncate opacity-75 mt-0.5" style={{ fontSize: '10px' }}>{room.name}</div>}
@@ -359,7 +366,7 @@ export default function AgendaPage() {
                     <div key={item.id} className="flex items-center gap-3 p-4">
                       <div className="w-1 self-stretch rounded-full shrink-0" style={{ backgroundColor: style.backgroundColor }} />
                       <div className="flex-1 min-w-0">
-                        <div className="font-semibold text-sm text-gray-900">{item.time || '—'}</div>
+                        <div className="font-semibold text-sm text-gray-900">{fmtTime(item.time)}</div>
                         <div className="text-sm text-gray-700 truncate">{patient?.fullName}</div>
                         <div className="text-xs text-gray-500 truncate">
                           {therapist?.name}{room ? ` • ${room.name}` : ''}

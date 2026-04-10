@@ -108,21 +108,16 @@ export default function DashboardPage() {
 
       {/* Próximos Atendimentos — formato tabela */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+        <div className="px-4 md:px-6 py-3 md:py-4 border-b border-gray-100 flex items-center justify-between">
+          <h2 className="font-semibold text-gray-900 text-sm md:text-base">Próximos Atendimentos</h2>
+          <span className="text-xs text-gray-400">{upcomingConsultations.length}</span>
+        </div>
         {upcomingConsultations.length === 0 ? (
           <div className="px-4 py-8 text-center text-gray-400 text-sm">Nenhum atendimento agendado</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-100 text-xs text-gray-500 uppercase tracking-wide">
-                  <th className="px-4 md:px-6 py-2 text-left font-medium">Data</th>
-                  <th className="px-3 py-2 text-left font-medium">Hora</th>
-                  <th className="px-3 py-2 text-left font-medium">Paciente</th>
-                  <th className="px-3 py-2 text-left font-medium hidden sm:table-cell">Terapeuta</th>
-                  <th className="px-3 py-2 text-left font-medium hidden md:table-cell">Especialidade</th>
-                  <th className="px-3 md:px-6 py-2 text-left font-medium hidden lg:table-cell">Sala</th>
-                </tr>
-              </thead>
+              <tbody>
               <tbody className="divide-y divide-gray-50">
                 {upcomingConsultations.map(c => {
                   const patient = getPatient(c.patientId)
