@@ -116,7 +116,7 @@ export default function AgendaPage() {
         </div>
         <Button variant="primary" onClick={() => { setEditItem(null); setShowModal(true) }}>
           <FiPlus size={16} />
-          <span className="hidden sm:inline">Novo Agendamento</span>
+          <span className="hidden sm:inline">Novo Atendimento</span>
           <span className="sm:hidden">Novo</span>
         </Button>
       </div>
@@ -397,7 +397,7 @@ export default function AgendaPage() {
           {activeTherapists.filter(t => t.color).map(t => (
             <div key={t.id} className="flex items-center gap-1.5 text-xs text-gray-600">
               <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: t.color }} />
-              {t.name.split(' ')[0]}
+              {t.name}
             </div>
           ))}
         </div>
