@@ -17,15 +17,14 @@ function textColorForBg(hex) {
 
 export default function DashboardPage() {
   const { user } = useAuth()
-  const { patients, consultations, therapists, patientStatuses, specialtiesData } = useData()
+  const { patients, consultations, therapists, rooms, patientStatuses, specialtiesData } = useData()
 
   const now = new Date()
-  // Usa horário local (não UTC) para evitar erro de fuso horário
   const today = format(now, 'yyyy-MM-dd')
+  const nowTime = format(now, 'HH:mm')
   const thisMonth = format(now, 'yyyy-MM')
 
-  // Início e fim da semana (seg–dom) em horário local
-  const dayOfWeek = now.getDay() // 0=dom
+  const dayOfWeek = now.getDay()
   const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek
   const weekStart = new Date(now)
   weekStart.setDate(now.getDate() + diffToMonday)
@@ -54,19 +53,25 @@ export default function DashboardPage() {
   const monthConsultations = visibleConsultations.filter(c => c.date?.startsWith(thisMonth))
 
   const stats = [
-    { icon: FiUsers,     label: 'Pacientes Ativos',   value: activePatients.length,        color: 'text-brand-blue',  bg: 'bg-blue-50'   },
-    { icon: FiCalendar,  label: 'Atendimentos Hoje',   value: todayConsultations.length,     color: 'text-green-600',   bg: 'bg-green-50'  },
-    { icon: FiTrendingUp,label: 'Esta Semana',         value: thisWeekConsultations.length,  color: 'text-purple-600',  bg: 'bg-purple-50' },
-    { icon: FiClipboard, label: 'Registros no Mês',    value: monthConsultations.length,     color: 'text-orange-600',  bg: 'bg-orange-50' },
+    { icon: FiUsers,      label: 'Pacientes Ativos',  value: activePatients.length,       color: 'text-brand-blue',  bg: 'bg-blue-50'   },
+    { icon: FiCalendar,   label: 'Atendimentos Hoje', value: todayConsultations.length,    color: 'text-green-600',   bg: 'bg-green-50'  },
+    { icon: FiTrendingUp, label: 'Esta Semana',        value: thisWeekConsultations.length, color: 'text-purple-600',  bg: 'bg-purple-50' },
+    { icon: FiClipboard,  label: 'Registros no Mês',  value: monthConsultations.length,    color: 'text-orange-600',  bg: 'bg-orange-50' },
   ]
 
+  // Próximos atendimentos: data futura OU hoje com horário >= agora
   const upcomingConsultations = visibleConsultations
-    .filter(c => c.date >= today)
+    .filter(c => {
+      if (c.date > today) return true
+      if (c.date === today) return !c.time || c.time >= nowTime
+      return false
+    })
     .sort((a, b) => a.date.localeCompare(b.date) || (a.time || '').localeCompare(b.time || ''))
-    .slice(0, 8)
+    .slice(0, 5)
 
   function getPatient(id) { return patients.find(p => p.id === id) }
   function getTherapist(id) { return therapists.find(t => t.id === id) }
+  function getRoom(id) { return rooms.find(r => r.id === id) }
 
   const hour = now.getHours()
   const greeting = hour < 12 ? 'Bom dia' : hour < 18 ? 'Boa tarde' : 'Boa noite'
@@ -101,54 +106,61 @@ export default function DashboardPage() {
         ))}
       </div>
 
-      {/* Próximos Atendimentos */}
+      {/* Próximos Atendimentos — formato tabela */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-        <div className="px-3 md:px-6 py-3 md:py-4 border-b border-gray-100 flex items-center justify-between">
+        <div className="px-4 md:px-6 py-3 md:py-4 border-b border-gray-100 flex items-center justify-between">
           <h2 className="font-semibold text-gray-900 text-sm md:text-base">Próximos Atendimentos</h2>
-          <span className="text-xs text-gray-500">{upcomingConsultations.length}</span>
+          <span className="text-xs text-gray-400">{upcomingConsultations.length} de 5</span>
         </div>
         {upcomingConsultations.length === 0 ? (
           <div className="px-4 py-8 text-center text-gray-400 text-sm">Nenhum atendimento agendado</div>
         ) : (
-          <div className="divide-y divide-gray-50">
-            {upcomingConsultations.map((c) => {
-              const patient = getPatient(c.patientId)
-              const therapist = getTherapist(c.therapistId)
-              return (
-                <div key={c.id} className="px-3 md:px-6 py-3 md:py-4 flex items-center gap-2 md:gap-4 hover:bg-gray-50/50 transition-colors">
-                  <div className="min-w-[60px] md:min-w-[80px] text-center shrink-0">
-                    <div className="text-xs text-gray-500">{formatDateShort(c.date)}</div>
-                    <div className="font-semibold text-gray-900 text-sm">{c.time || '—'}</div>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="font-medium text-gray-900 text-sm truncate">{patient?.fullName || '—'}</div>
-                    <div className="text-xs text-gray-500 truncate">{therapist?.name}</div>
-                  </div>
-                  <div className="shrink-0">
-                    <Badge specialty={c.specialty} />
-                  </div>
-                </div>
-              )
-            })}
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-100 text-xs text-gray-500 uppercase tracking-wide">
+                  <th className="px-4 md:px-6 py-2 text-left font-medium">Data</th>
+                  <th className="px-3 py-2 text-left font-medium">Hora</th>
+                  <th className="px-3 py-2 text-left font-medium">Paciente</th>
+                  <th className="px-3 py-2 text-left font-medium hidden sm:table-cell">Terapeuta</th>
+                  <th className="px-3 py-2 text-left font-medium hidden md:table-cell">Especialidade</th>
+                  <th className="px-3 md:px-6 py-2 text-left font-medium hidden lg:table-cell">Sala</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {upcomingConsultations.map(c => {
+                  const patient = getPatient(c.patientId)
+                  const therapist = getTherapist(c.therapistId)
+                  const room = getRoom(c.roomId)
+                  return (
+                    <tr key={c.id} className="hover:bg-gray-50/50 transition-colors">
+                      <td className="px-4 md:px-6 py-3 text-gray-700 whitespace-nowrap">{formatDateShort(c.date)}</td>
+                      <td className="px-3 py-3 text-gray-700 whitespace-nowrap font-medium">{c.time || '—'}</td>
+                      <td className="px-3 py-3 text-gray-900 font-medium max-w-[140px] truncate">{patient?.fullName || '—'}</td>
+                      <td className="px-3 py-3 text-gray-600 hidden sm:table-cell max-w-[120px] truncate">{therapist?.name || '—'}</td>
+                      <td className="px-3 py-3 hidden md:table-cell"><Badge specialty={c.specialty} /></td>
+                      <td className="px-3 md:px-6 py-3 text-gray-500 hidden lg:table-cell">{room?.name || '—'}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
           </div>
         )}
       </div>
 
-      {/* Perfil dos Pacientes por Especialidade */}
+      {/* Perfil dos Pacientes */}
       <div>
-        <h2 className="font-semibold text-gray-900 text-sm md:text-base mb-3">Perfil dos Pacientes</h2>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 md:gap-4">
+        <h2 className="font-semibold text-gray-900 text-sm md:text-base mb-2">Perfil dos Pacientes</h2>
+        <div className="grid grid-cols-4 md:grid-cols-8 gap-2">
           {activeSpecialties.map(spec => {
             const count = visiblePatients.filter(p => p.specialties?.includes(spec.key)).length
             const bg = spec.color || '#e5e7eb'
             const textColor = textColorForBg(bg)
             return (
-              <div key={spec.key} className="rounded-2xl p-3 md:p-5 border border-gray-100 shadow-sm" style={{ backgroundColor: bg }}>
-                <div className="text-xs font-semibold mb-2 md:mb-3 opacity-80" style={{ color: textColor }}>
-                  {spec.label}
-                </div>
-                <div className="text-xl font-bold" style={{ color: textColor }}>{count}</div>
-                <div className="text-xs mt-0.5 opacity-70" style={{ color: textColor }}>paciente(s)</div>
+              <div key={spec.key} className="rounded-xl px-2 py-2.5 text-center border border-gray-100 shadow-sm" style={{ backgroundColor: bg }}>
+                <div className="text-lg font-bold" style={{ color: textColor }}>{count}</div>
+                <div className="text-xs font-medium leading-tight mt-0.5" style={{ color: textColor, opacity: 0.85 }}>{spec.label}</div>
               </div>
             )
           })}
