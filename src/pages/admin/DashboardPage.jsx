@@ -108,10 +108,6 @@ export default function DashboardPage() {
 
       {/* Próximos Atendimentos — formato tabela */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-        <div className="px-4 md:px-6 py-3 md:py-4 border-b border-gray-100 flex items-center justify-between">
-          <h2 className="font-semibold text-gray-900 text-sm md:text-base">Próximos Atendimentos</h2>
-          <span className="text-xs text-gray-400">{upcomingConsultations.length} de 5</span>
-        </div>
         {upcomingConsultations.length === 0 ? (
           <div className="px-4 py-8 text-center text-gray-400 text-sm">Nenhum atendimento agendado</div>
         ) : (
