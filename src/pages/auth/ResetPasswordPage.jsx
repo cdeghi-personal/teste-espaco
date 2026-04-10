@@ -1,8 +1,16 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { FiLock, FiEye, FiEyeOff, FiCheck } from 'react-icons/fi'
+import { FiLock, FiEye, FiEyeOff, FiCheck, FiX } from 'react-icons/fi'
 import { useAuth } from '../../context/AuthContext'
 import { ROUTES } from '../../constants/routes'
+
+const RULES = [
+  { id: 'len',     label: 'Mínimo 8 caracteres',           test: p => p.length >= 8 },
+  { id: 'upper',   label: 'Pelo menos 1 letra maiúscula',  test: p => /[A-Z]/.test(p) },
+  { id: 'lower',   label: 'Pelo menos 1 letra minúscula',  test: p => /[a-z]/.test(p) },
+  { id: 'number',  label: 'Pelo menos 1 número',           test: p => /[0-9]/.test(p) },
+  { id: 'special', label: 'Pelo menos 1 caractere especial (!@#$...)', test: p => /[^A-Za-z0-9]/.test(p) },
+]
 
 export default function ResetPasswordPage() {
   const [password, setPassword] = useState('')
@@ -13,12 +21,15 @@ export default function ResetPasswordPage() {
   const { updatePassword } = useAuth()
   const navigate = useNavigate()
 
+  const ruleResults = RULES.map(r => ({ ...r, ok: r.test(password) }))
+  const allRulesOk = ruleResults.every(r => r.ok)
+
   async function handleSubmit(e) {
     e.preventDefault()
     setError('')
 
-    if (password.length < 8) {
-      setError('A senha deve ter pelo menos 8 caracteres.')
+    if (!allRulesOk) {
+      setError('A senha não atende todos os requisitos de segurança.')
       return
     }
     if (password !== confirm) {
@@ -57,7 +68,7 @@ export default function ResetPasswordPage() {
           </div>
 
           <h1 className="text-2xl font-bold text-gray-900 mb-1 text-center">Crie sua senha</h1>
-          <p className="text-sm text-gray-500 text-center mb-8">
+          <p className="text-sm text-gray-500 text-center mb-6">
             Defina uma senha segura para acessar o sistema.
           </p>
 
@@ -71,7 +82,7 @@ export default function ResetPasswordPage() {
                   value={password}
                   onChange={e => setPassword(e.target.value)}
                   required
-                  placeholder="Mínimo 8 caracteres"
+                  placeholder="Digite sua senha"
                   className="w-full pl-10 pr-10 py-3 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none transition"
                 />
                 <button
@@ -84,6 +95,21 @@ export default function ResetPasswordPage() {
               </div>
             </div>
 
+            {/* Indicador de força da senha */}
+            {password.length > 0 && (
+              <div className="bg-gray-50 rounded-xl px-3 py-2.5 space-y-1.5">
+                {ruleResults.map(r => (
+                  <div key={r.id} className="flex items-center gap-2 text-xs">
+                    {r.ok
+                      ? <FiCheck size={13} className="text-green-500 shrink-0" />
+                      : <FiX size={13} className="text-gray-300 shrink-0" />
+                    }
+                    <span className={r.ok ? 'text-green-700' : 'text-gray-400'}>{r.label}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">Confirmar Senha</label>
               <div className="relative">
@@ -94,10 +120,12 @@ export default function ResetPasswordPage() {
                   onChange={e => setConfirm(e.target.value)}
                   required
                   placeholder="Repita a senha"
-                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none transition"
+                  className="w-full pl-10 pr-10 py-3 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none transition"
                 />
-                {confirm && password === confirm && (
-                  <FiCheck size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-green-500" />
+                {confirm && (
+                  password === confirm
+                    ? <FiCheck size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-green-500" />
+                    : <FiX size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-red-400" />
                 )}
               </div>
             </div>
@@ -110,7 +138,7 @@ export default function ResetPasswordPage() {
 
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || !allRulesOk}
               className="w-full bg-brand-blue text-white font-semibold py-3.5 rounded-xl hover:bg-brand-blue-dark transition-all disabled:opacity-60 text-sm mt-2"
             >
               {loading ? 'Salvando...' : 'Definir Senha e Entrar'}

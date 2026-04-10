@@ -218,6 +218,7 @@ export default function MedicalRecordsPage() {
     getExams, addExam, updateExam, deleteExam,
     getMedications, addMedication, updateMedication, deleteMedication,
     getConducts, addConduct, updateConduct, deleteConduct,
+    logAudit,
   } = useData()
   const { user } = useAuth()
 
@@ -280,7 +281,10 @@ export default function MedicalRecordsPage() {
     setMedications(m || [])
     setConducts(c || [])
     setLoading(false)
-  }, [])
+    // Log de visualização do prontuário
+    const pat = patients.find(p => p.id === patientId)
+    logAudit('VIEW', 'medical_records', mrId, pat?.fullName || patientId)
+  }, [patients])
 
   async function handleSelectPatient(id) {
     setSelectedPatientId(id)

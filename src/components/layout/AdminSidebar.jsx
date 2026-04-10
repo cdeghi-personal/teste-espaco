@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
-import { FiGrid, FiCalendar, FiUsers, FiUserCheck, FiClipboard, FiLogOut, FiUserPlus, FiLayers, FiCreditCard, FiActivity, FiFlag, FiHome, FiChevronDown, FiChevronUp, FiBookOpen, FiTag } from 'react-icons/fi'
+import { FiGrid, FiCalendar, FiUsers, FiUserCheck, FiClipboard, FiLogOut, FiUserPlus, FiLayers, FiCreditCard, FiActivity, FiFlag, FiHome, FiChevronDown, FiChevronUp, FiBookOpen, FiTag, FiShield } from 'react-icons/fi'
 import { ROUTES } from '../../constants/routes'
 import { useAuth } from '../../context/AuthContext'
 import { SPECIALTIES } from '../../constants/specialties'
@@ -23,6 +23,7 @@ const adminNavItems = [
   { to: ROUTES.CONSULTATION_STATUS, icon: FiFlag, label: 'Status Atendimento' },
   { to: ROUTES.APPOINTMENT_TYPES, icon: FiTag, label: 'Tipos de Atendimento' },
   { to: ROUTES.ROOMS, icon: FiHome, label: 'Salas' },
+  { to: ROUTES.AUDIT, icon: FiShield, label: 'Log de Auditoria' },
 ]
 
 function NavItem({ to, icon: Icon, label, end, onClick }) {

@@ -24,4 +24,5 @@ export const ROUTES = {
   CONSULTATION_STATUS:  '/admin/statusconsulta',
   APPOINTMENT_TYPES:    '/admin/tipoatendimento',
   ROOMS:                '/admin/salas',
+  AUDIT:                '/admin/auditoria',
 }

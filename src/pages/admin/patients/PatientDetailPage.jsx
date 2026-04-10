@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { FiArrowLeft, FiEdit2, FiUser, FiPhone, FiMail } from 'react-icons/fi'
 import { useData } from '../../../context/DataContext'
@@ -11,10 +11,15 @@ import { calculateAge, formatDateBR, formatDateShort } from '../../../utils/date
 export default function PatientDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { getPatientById, getGuardiansForPatient, consultations, therapists, paymentMethods, patientStatuses, diagnoses, consultationStatuses, appointmentTypes, rooms } = useData()
+  const { getPatientById, getGuardiansForPatient, consultations, therapists, paymentMethods, patientStatuses, diagnoses, consultationStatuses, appointmentTypes, rooms, logAudit } = useData()
   const [showEdit, setShowEdit] = useState(false)
 
   const patient = getPatientById(id)
+
+  useEffect(() => {
+    if (patient) logAudit('VIEW', 'patients', patient.id, patient.fullName)
+  }, [patient?.id])
+
   if (!patient) {
     return (
       <div className="p-6 text-center text-gray-500">

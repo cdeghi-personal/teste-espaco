@@ -884,6 +884,24 @@ export function DataProvider({ children }) {
     await supabase.from('medical_record_conducts').delete().eq('id', id)
   }
 
+  // ─── Audit Log ───────────────────────────────────────────────────────────────
+
+  async function logAudit(action, resourceType, resourceId, resourceName = '') {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      await supabase.from('audit_logs').insert({
+        user_id: session?.user?.id || null,
+        user_email: session?.user?.email || '',
+        action,
+        resource_type: resourceType,
+        resource_id: resourceId || null,
+        resource_name: resourceName || '',
+      })
+    } catch {
+      // silently fail — erros de auditoria não devem quebrar a UI
+    }
+  }
+
   // ─── Value ───────────────────────────────────────────────────────────────────
 
   const value = {
@@ -905,6 +923,7 @@ export function DataProvider({ children }) {
     getExams, addExam, updateExam, deleteExam,
     getMedications, addMedication, updateMedication, deleteMedication,
     getConducts, addConduct, updateConduct, deleteConduct,
+    logAudit,
   }
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>

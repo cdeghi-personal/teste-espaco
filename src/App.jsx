@@ -37,6 +37,7 @@ import PatientStatusPage from './pages/admin/patientstatus/PatientStatusPage'
 import ConsultationStatusPage from './pages/admin/consultationstatus/ConsultationStatusPage'
 import AppointmentTypesPage from './pages/admin/appointmenttypes/AppointmentTypesPage'
 import RoomsPage from './pages/admin/rooms/RoomsPage'
+import AuditPage from './pages/admin/audit/AuditPage'
 
 // Common
 import ScrollToTop from './components/common/ScrollToTop'
@@ -90,6 +91,7 @@ export default function App() {
                 <Route path={ROUTES.CONSULTATION_STATUS} element={<ConsultationStatusPage />} />
                 <Route path={ROUTES.APPOINTMENT_TYPES} element={<AppointmentTypesPage />} />
                 <Route path={ROUTES.ROOMS} element={<RoomsPage />} />
+                <Route path={ROUTES.AUDIT} element={<AuditPage />} />
               </Route>
             </Route>
 
