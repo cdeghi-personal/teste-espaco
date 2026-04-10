@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { FiPlus, FiChevronLeft, FiChevronRight, FiSearch, FiCalendar, FiEdit2, FiTrash2 } from 'react-icons/fi'
+import { FiPlus, FiChevronLeft, FiChevronRight, FiSearch, FiCalendar, FiEdit2 } from 'react-icons/fi'
 import { addDays, startOfWeek, format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { useData } from '../../../context/DataContext'
@@ -34,7 +34,7 @@ function formatDay(date) {
 }
 
 export default function AgendaPage() {
-  const { consultations, patients, rooms, therapists, deleteConsultation } = useData()
+  const { consultations, patients, rooms, therapists } = useData()
   const { user } = useAuth()
   const [weekRef, setWeekRef] = useState(new Date())
   const [search, setSearch] = useState('')
@@ -229,12 +229,6 @@ export default function AgendaPage() {
                           >
                             <FiEdit2 size={10} />
                           </button>
-                          <button
-                            onClick={() => { if (confirm('Excluir este agendamento?')) deleteConsultation(item.id) }}
-                            className="w-5 h-5 rounded flex items-center justify-center bg-black/20 hover:bg-red-500 transition-colors"
-                          >
-                            <FiTrash2 size={10} />
-                          </button>
                         </div>
                       )}
                     </div>
@@ -276,12 +270,6 @@ export default function AgendaPage() {
                             className="w-5 h-5 rounded flex items-center justify-center bg-black/20 hover:bg-black/40 transition-colors"
                           >
                             <FiEdit2 size={10} />
-                          </button>
-                          <button
-                            onClick={() => { if (confirm('Excluir este agendamento?')) deleteConsultation(item.id) }}
-                            className="w-5 h-5 rounded flex items-center justify-center bg-black/20 hover:bg-red-500 transition-colors"
-                          >
-                            <FiTrash2 size={10} />
                           </button>
                         </div>
                       )}
@@ -377,9 +365,7 @@ export default function AgendaPage() {
                           <button onClick={() => { setEditItem(item); setShowModal(true) }} className="p-2 rounded-lg text-gray-400 hover:text-brand-blue hover:bg-blue-50">
                             <FiEdit2 size={15} />
                           </button>
-                          <button onClick={() => { if (confirm('Excluir?')) deleteConsultation(item.id) }} className="p-2 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50">
-                            <FiTrash2 size={15} />
-                          </button>
+
                         </div>
                       )}
                     </div>
