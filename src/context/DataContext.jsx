@@ -887,14 +887,15 @@ export function DataProvider({ children }) {
   // ─── Audit Log ───────────────────────────────────────────────────────────────
 
   async function logAudit(action, resourceType, resourceId, resourceName = '') {
-    console.log('[audit] logAudit chamado', { action, resourceType, resourceId, resourceName })
-    const { error } = await supabase.rpc('log_view_audit', {
-      p_resource_type: resourceType,
-      p_resource_id:   resourceId || null,
-      p_resource_name: resourceName || '',
-    })
-    if (error) console.error('[audit] erro no RPC', error)
-    else console.log('[audit] log registrado com sucesso')
+    try {
+      await supabase.rpc('log_view_audit', {
+        p_resource_type: resourceType,
+        p_resource_id:   resourceId || null,
+        p_resource_name: resourceName || '',
+      })
+    } catch {
+      // silently fail — erros de auditoria não devem quebrar a UI
+    }
   }
 
   // ─── Value ───────────────────────────────────────────────────────────────────
