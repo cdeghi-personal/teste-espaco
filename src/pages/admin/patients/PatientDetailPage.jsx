@@ -17,7 +17,6 @@ export default function PatientDetailPage() {
   const patient = getPatientById(id)
 
   useEffect(() => {
-    console.log('[audit] effect', id, !!patient)
     if (patient) logAudit('VIEW', 'patients', patient.id, patient.fullName)
   }, [id, patient?.id])
 
