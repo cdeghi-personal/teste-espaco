@@ -7,7 +7,7 @@ import EmptyState from '../../../components/ui/EmptyState'
 import GuardianFormModal from './GuardianFormModal'
 
 export default function GuardiansPage() {
-  const { guardians, patients, deleteGuardian, restoreGuardian } = useData()
+  const { guardians, patients, deleteGuardian, restoreGuardian, logAudit } = useData()
   const { user } = useAuth()
   const [search, setSearch] = useState('')
   const [showInactive, setShowInactive] = useState(false)
@@ -123,7 +123,7 @@ export default function GuardiansPage() {
                         <button onClick={() => restoreGuardian(g.id)} className="p-2 rounded-lg text-gray-400"><FiRotateCcw size={15} /></button>
                       ) : (
                         <>
-                          <button onClick={() => setViewGuardian(g)} className="p-2 rounded-lg text-gray-400"><FiEye size={15} /></button>
+                          <button onClick={() => { setViewGuardian(g); logAudit('VIEW', 'guardians', g.id, g.fullName) }} className="p-2 rounded-lg text-gray-400"><FiEye size={15} /></button>
                           <button onClick={() => { setEditGuardian(g); setShowModal(true) }} className="p-2 rounded-lg text-gray-400"><FiEdit2 size={15} /></button>
                           <button onClick={() => handleDelete(g.id, g.fullName)} className="p-2 rounded-lg text-gray-400"><FiTrash2 size={15} /></button>
                         </>
@@ -188,7 +188,7 @@ export default function GuardiansPage() {
                               <button onClick={() => restoreGuardian(g.id)} className="p-1.5 rounded-lg text-gray-400 hover:text-green-600 hover:bg-green-50 transition-colors"><FiRotateCcw size={15} /></button>
                             ) : (
                               <>
-                                <button onClick={() => setViewGuardian(g)} className="p-1.5 rounded-lg text-gray-400 hover:text-brand-blue hover:bg-blue-50 transition-colors"><FiEye size={15} /></button>
+                                <button onClick={() => { setViewGuardian(g); logAudit('VIEW', 'guardians', g.id, g.fullName) }} className="p-1.5 rounded-lg text-gray-400 hover:text-brand-blue hover:bg-blue-50 transition-colors"><FiEye size={15} /></button>
                                 <button onClick={() => { setEditGuardian(g); setShowModal(true) }} className="p-1.5 rounded-lg text-gray-400 hover:text-brand-blue hover:bg-blue-50 transition-colors"><FiEdit2 size={15} /></button>
                                 <button onClick={() => handleDelete(g.id, g.fullName)} className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"><FiTrash2 size={15} /></button>
                               </>

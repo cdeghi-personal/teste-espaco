@@ -888,14 +888,10 @@ export function DataProvider({ children }) {
 
   async function logAudit(action, resourceType, resourceId, resourceName = '') {
     try {
-      const { data: { session } } = await supabase.auth.getSession()
-      await supabase.from('audit_logs').insert({
-        user_id: session?.user?.id || null,
-        user_email: session?.user?.email || '',
-        action,
-        resource_type: resourceType,
-        resource_id: resourceId || null,
-        resource_name: resourceName || '',
+      await supabase.rpc('log_view_audit', {
+        p_resource_type: resourceType,
+        p_resource_id:   resourceId || null,
+        p_resource_name: resourceName || '',
       })
     } catch {
       // silently fail — erros de auditoria não devem quebrar a UI
