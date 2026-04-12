@@ -30,8 +30,24 @@ export default function AuditPage() {
   const [filterAction, setFilterAction] = useState('')
   const [filterResource, setFilterResource] = useState('')
   const [filterDate, setFilterDate] = useState('')
+  const [filterUser, setFilterUser] = useState('')
+  const [users, setUsers] = useState([])
   const [page, setPage] = useState(0)
   const [total, setTotal] = useState(0)
+
+  // Carrega lista de usuários distintos para o filtro
+  useEffect(() => {
+    supabase
+      .from('audit_logs')
+      .select('user_email')
+      .neq('user_email', '')
+      .then(({ data }) => {
+        if (data) {
+          const unique = [...new Set(data.map(r => r.user_email))].sort()
+          setUsers(unique)
+        }
+      })
+  }, [])
 
   const fetchLogs = useCallback(async () => {
     setLoading(true)
@@ -43,12 +59,13 @@ export default function AuditPage() {
 
     if (filterAction) query = query.eq('action', filterAction)
     if (filterResource) query = query.eq('resource_type', filterResource)
+    if (filterUser) query = query.eq('user_email', filterUser)
     if (filterDate) {
       query = query.gte('created_at', `${filterDate}T00:00:00`)
                    .lte('created_at', `${filterDate}T23:59:59`)
     }
     if (search) {
-      query = query.or(`user_email.ilike.%${search}%,resource_name.ilike.%${search}%`)
+      query = query.ilike('resource_name', `%${search}%`)
     }
 
     const { data, count, error } = await query
@@ -57,12 +74,12 @@ export default function AuditPage() {
       setTotal(count || 0)
     }
     setLoading(false)
-  }, [page, filterAction, filterResource, filterDate, search])
+  }, [page, filterAction, filterResource, filterDate, filterUser, search])
 
   useEffect(() => { fetchLogs() }, [fetchLogs])
 
   // Reset page when filters change
-  useEffect(() => { setPage(0) }, [filterAction, filterResource, filterDate, search])
+  useEffect(() => { setPage(0) }, [filterAction, filterResource, filterDate, filterUser, search])
 
   function formatDate(iso) {
     try { return format(parseISO(iso), "dd/MM/yyyy 'às' HH:mm:ss", { locale: ptBR }) }
@@ -99,10 +116,20 @@ export default function AuditPage() {
           <input
             value={search}
             onChange={e => setSearch(e.target.value)}
-            placeholder="Buscar por usuário ou registro..."
+            placeholder="Buscar por registro..."
             className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-brand-blue outline-none bg-white"
           />
         </div>
+        <select
+          value={filterUser}
+          onChange={e => setFilterUser(e.target.value)}
+          className="px-3 py-2 text-sm border border-gray-200 rounded-xl bg-white focus:ring-2 focus:ring-brand-blue outline-none"
+        >
+          <option value="">Todos os Usuários</option>
+          {users.map(email => (
+            <option key={email} value={email}>{email}</option>
+          ))}
+        </select>
         <select
           value={filterAction}
           onChange={e => setFilterAction(e.target.value)}
