@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate, useLocation, Link } from 'react-router-dom'
 import { FiMail, FiLock, FiEye, FiEyeOff, FiArrowLeft, FiCheck } from 'react-icons/fi'
 import { useAuth } from '../../context/AuthContext'
@@ -14,22 +14,26 @@ export default function LoginPage() {
   const [forgotMode, setForgotMode] = useState(false)
   const [forgotSent, setForgotSent] = useState(false)
   const [forgotLoading, setForgotLoading] = useState(false)
-  const { login } = useAuth()
+  const { login, isAuthenticated } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const from = location.state?.from?.pathname || ROUTES.DASHBOARD
+
+  // Redireciona assim que o user for carregado após o login
+  useEffect(() => {
+    if (isAuthenticated) navigate(from, { replace: true })
+  }, [isAuthenticated])
 
   async function handleSubmit(e) {
     e.preventDefault()
     setError('')
     setLoading(true)
     const result = await login(email, password)
-    setLoading(false)
-    if (result.success) {
-      navigate(from, { replace: true })
-    } else {
+    if (!result.success) {
+      setLoading(false)
       setError(result.error)
     }
+    // sucesso: o useEffect acima redireciona quando isAuthenticated mudar
   }
 
   async function handleForgot(e) {
