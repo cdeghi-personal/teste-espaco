@@ -39,6 +39,7 @@ import AppointmentTypesPage from './pages/admin/appointmenttypes/AppointmentType
 import RoomsPage from './pages/admin/rooms/RoomsPage'
 import AuditPage from './pages/admin/audit/AuditPage'
 import ContactLeadsPage from './pages/admin/contactleads/ContactLeadsPage'
+import ReportsPage from './pages/admin/reports/ReportsPage'
 
 // Common
 import ScrollToTop from './components/common/ScrollToTop'
@@ -94,6 +95,7 @@ export default function App() {
                 <Route path={ROUTES.ROOMS} element={<RoomsPage />} />
                 <Route path={ROUTES.AUDIT} element={<AuditPage />} />
                 <Route path={ROUTES.CONTACT_LEADS} element={<ContactLeadsPage />} />
+                <Route path={ROUTES.REPORTS} element={<ReportsPage />} />
               </Route>
             </Route>
 

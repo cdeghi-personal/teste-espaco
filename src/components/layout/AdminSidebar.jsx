@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
-import { FiGrid, FiCalendar, FiUsers, FiUserCheck, FiClipboard, FiLogOut, FiUserPlus, FiLayers, FiCreditCard, FiActivity, FiFlag, FiHome, FiChevronDown, FiChevronUp, FiBookOpen, FiTag, FiShield, FiMessageSquare } from 'react-icons/fi'
+import { FiGrid, FiCalendar, FiUsers, FiUserCheck, FiClipboard, FiLogOut, FiUserPlus, FiLayers, FiCreditCard, FiActivity, FiFlag, FiHome, FiChevronDown, FiChevronUp, FiBookOpen, FiTag, FiShield, FiMessageSquare, FiBarChart2 } from 'react-icons/fi'
 import { ROUTES } from '../../constants/routes'
 import { useAuth } from '../../context/AuthContext'
 import { SPECIALTIES } from '../../constants/specialties'
@@ -98,6 +98,15 @@ export default function AdminSidebar({ open, onClose }) {
             label="Contatos"
             onClick={onClose}
             badge={newLeadsCount}
+          />
+        )}
+
+        {isAdmin && (
+          <NavItem
+            to={ROUTES.REPORTS}
+            icon={FiBarChart2}
+            label="Relatórios"
+            onClick={onClose}
           />
         )}
 

@@ -26,4 +26,5 @@ export const ROUTES = {
   ROOMS:                '/admin/salas',
   AUDIT:                '/admin/auditoria',
   CONTACT_LEADS:        '/admin/contatos',
+  REPORTS:              '/admin/relatorios',
 }
