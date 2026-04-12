@@ -66,6 +66,7 @@ src/
       consultationstatus/ ConsultationStatusPage, ConsultationStatusFormModal
       appointmenttypes/ AppointmentTypesPage, AppointmentTypeFormModal
       rooms/            RoomsPage, RoomFormModal
+      audit/            AuditPage
 supabase/
   01_schema.sql                  # Tabelas, enums, índices, trigger de criação de profile
   02_rls.sql                     # Row Level Security — admin vê tudo, terapeuta vê só os seus
@@ -79,6 +80,15 @@ supabase/
   10_guardian_neighborhood.sql   # Campo neighborhood em guardians
   11_consultation_time_room.sql  # Campos time e room_id em consultations
   12_involved_therapists.sql     # Tabela patient_involved_therapists + RLS atualizado para Gerente de Conta + Envolvidos
+  25_audit_log.sql               # Cria tabela audit_logs + triggers INSERT/UPDATE/DELETE em todas as tabelas principais
+  26_fix_audit_log.sql           # Fix: usa current_setting('request.jwt.claims') em vez de auth.uid()
+  27_fix_audit_always_log.sql    # Fix: remove guard de NULL — trigger sempre grava (diagnóstico)
+  28_fix_audit_rls.sql           # Fix: SET row_security = off na fn_audit_log + recria policies
+  29_audit_debug.sql             # Script de diagnóstico (sem EXCEPTION — expõe o erro real)
+  30_fix_audit_resource_name.sql # Fix: COALESCE(NEW.full_name, NEW.date) falha em tabelas sem "date"
+  31_audit_grant.sql             # GRANT INSERT/SELECT em audit_logs para role authenticated
+  32_log_view_rpc.sql            # Função RPC log_view_audit() SECURITY DEFINER para logs VIEW do frontend
+  33_fix_log_view_rpc.sql        # Fix: p_resource_id vira TEXT (cast interno) + GRANT para anon
   functions/
     invite-therapist/index.ts    # Edge Function — envia convite por e-mail ao criar terapeuta
 ```
@@ -123,6 +133,7 @@ Encontrar em: Supabase Dashboard → Project Settings → API.
 | `medical_record_medications` | Medicamentos do paciente — N por prontuário |
 | `medical_record_conducts` | Conduta & objetivo terapêutico — N por prontuário, vinculado ao terapeuta/especialidade |
 | `patient_involved_therapists` | Terapeutas envolvidos no atendimento do paciente (N:N) — complementa o Gerente de Conta |
+| `audit_logs` | Log de auditoria — registra VIEW/INSERT/UPDATE/DELETE com user_id, user_email, action, resource_type, resource_id, resource_name |
 
 ### Mappers (DB → App)
 
@@ -240,7 +251,7 @@ Cada especialidade tem `label`, `color` (Tailwind), `bgColor`, `textColor`, `cal
 '/admin/responsaveis', '/admin/consultas', '/admin/prontuario'
 '/admin/terapeutas', '/admin/especialidades', '/admin/formapagamento'
 '/admin/diagnostico', '/admin/statuspaciente', '/admin/statusconsulta'
-'/admin/tipoatendimento', '/admin/salas'
+'/admin/tipoatendimento', '/admin/salas', '/admin/auditoria'
 ```
 
 ## Padrões de código
@@ -348,8 +359,19 @@ Funções no DataContext: `addAppointmentType(data)` / `updateAppointmentType(id
 - Campos **Horário** (type=time) e **Sala** no formulário de registro
 - Adicionar atividades usa link inline expandido (padrão prontuário): `+ Adicionar atividade`
 - Card na listagem exibe: Paciente, Especialidade, Status, Tipo / Data + Hora, Terapeuta, Sala
+- Editar/excluir visível apenas para o terapeuta responsável pelo atendimento ou admin
 
-## Agenda (`/admin/agenda`)
+## Política de Senha Forte (ResetPasswordPage)
+
+- Regras validadas em tempo real com indicador visual (FiCheck/FiX por regra):
+  - Mínimo 8 caracteres
+  - Pelo menos 1 letra maiúscula
+  - Pelo menos 1 letra minúscula
+  - Pelo menos 1 número
+  - Pelo menos 1 caractere especial
+- Botão de submit desabilitado até todas as regras passarem
+
+## Agenda (DataContext)
 
 - `mapAppointment` expõe `startTime` (= `time` do banco) e `endTime` (calculado: startTime + duration)
 - `DataContext.addAppointment` e `updateAppointment` aceitam `startTime` ou `time`
@@ -377,6 +399,30 @@ Constantes de SELECT no DataContext: `PATIENT_SELECT`, `GUARDIAN_SELECT`, `CONSU
   - Project Ref: `ffkkgmikvsqhutftoajh`
   - Secret necessária: `SITE_URL` (URL do app)
   - JWT Verification deve estar **desativado** na função (ver seção acima)
+
+## Auditoria de Acesso (`/admin/auditoria`)
+
+- Tabela `audit_logs` no banco — campos: `user_id`, `user_email`, `action`, `resource_type`, `resource_id`, `resource_name`, `created_at`
+- **INSERT/UPDATE/DELETE** são capturados por triggers AFTER em todas as tabelas principais (fn_audit_log — SECURITY DEFINER, SET row_security = off)
+- **VIEW** é registrado pelo frontend via RPC `log_view_audit()` — função SECURITY DEFINER que lê o usuário de `request.jwt.claims`
+- `logAudit(action, resourceType, resourceId, resourceName)` em `DataContext` — chama `supabase.rpc('log_view_audit', ...)`
+- Pontos de VIEW implementados:
+  - Pacientes: clicar na linha ou no olhinho da listagem (`PatientsPage`)
+  - Pacientes: acessar `/admin/pacientes/:id` diretamente (`PatientDetailPage`)
+  - Responsáveis: clicar no olhinho da listagem (`GuardiansPage`)
+  - Prontuário: selecionar paciente e carregar prontuário (`MedicalRecordsPage`)
+- Página `AuditPage`: só admin acessa; filtros por ação, recurso, data e texto; paginação 50/página
+- **IMPORTANTE:** triggers usam `COALESCE(v_rec.full_name, v_rec.date::TEXT, '')` para resource_name — funciona para tabelas com `full_name` (patients, guardians, therapists) ou `date` (consultations). Cada campo em sub-bloco BEGIN/EXCEPTION para não quebrar com tabelas que não têm a coluna.
+- RLS na audit_logs: INSERT livre, SELECT apenas para admin. A função fn_audit_log tem SET row_security = off para bypass dentro do trigger.
+
+## Agenda (`/admin/agenda`)
+
+- Usa a tabela `consultations` (a tabela `appointments` está vazia e não é usada pelo sistema)
+- 6 colunas: Seg/Ter/Qua/Qui/Sex + Sáb-Dom combinados (mobile: aba "FDS")
+- Card: `HH:MM - PrimeiroNome Ultimo` + sala em 10px
+- Botão de excluir **removido** (delete físico — irreversível)
+- Editar/excluir visível apenas para o terapeuta responsável ou admin
+- Legenda inferior exibe nome completo do terapeuta
 
 ## Site público
 
