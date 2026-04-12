@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
-import { FiPlus, FiTrash2, FiEdit2, FiCheck, FiX, FiSearch, FiChevronLeft, FiChevronRight, FiCalendar } from 'react-icons/fi'
+import { FiPlus, FiTrash2, FiEdit2, FiCheck, FiX, FiSearch, FiChevronLeft, FiChevronRight, FiCalendar, FiFileText } from 'react-icons/fi'
 import { useData } from '../../../context/DataContext'
 import { useAuth } from '../../../context/AuthContext'
+import { generateProntuarioPDF } from '../../../utils/generateProntuarioPDF'
 import Button from '../../../components/ui/Button'
 import Input from '../../../components/ui/Input'
 import Select from '../../../components/ui/Select'
@@ -218,6 +219,7 @@ export default function MedicalRecordsPage() {
     getExams, addExam, updateExam, deleteExam,
     getMedications, addMedication, updateMedication, deleteMedication,
     getConducts, addConduct, updateConduct, deleteConduct,
+    getGuardiansForPatient,
     logAudit,
   } = useData()
   const { user } = useAuth()
@@ -372,6 +374,30 @@ export default function MedicalRecordsPage() {
     })
   }
 
+  const [pdfLoading, setPdfLoading] = useState(false)
+
+  async function handleGeneratePDF() {
+    if (!selectedPatient) return
+    setPdfLoading(true)
+    try {
+      await generateProntuarioPDF({
+        patient: selectedPatient,
+        guardians: getGuardiansForPatient(selectedPatientId),
+        exams,
+        medications,
+        conducts,
+        consultations: patientConsultations,
+        therapists,
+        consultationStatuses,
+        appointmentTypes,
+        rooms,
+        specialtiesData,
+      })
+    } finally {
+      setPdfLoading(false)
+    }
+  }
+
   async function batchSetStatus(statusName) {
     const status = consultationStatuses.find(s => s.name === statusName)
     if (!status) { alert(`Status "${statusName}" não encontrado. Verifique o cadastro de Status Atendimento.`); return }
@@ -440,7 +466,20 @@ export default function MedicalRecordsPage() {
                   </div>
                 </div>
               </div>
-              <Button variant="ghost" onClick={() => handleSelectPatient('')}>Trocar paciente</Button>
+              <div className="flex items-center gap-2">
+                {user?.role === 'admin' && (
+                  <Button
+                    variant="ghost"
+                    onClick={handleGeneratePDF}
+                    disabled={pdfLoading || loading}
+                    title="Gerar PDF do prontuário"
+                  >
+                    <FiFileText size={15} />
+                    {pdfLoading ? 'Gerando...' : 'PDF'}
+                  </Button>
+                )}
+                <Button variant="ghost" onClick={() => handleSelectPatient('')}>Trocar paciente</Button>
+              </div>
             </div>
           </div>
 
