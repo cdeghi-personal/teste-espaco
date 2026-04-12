@@ -32,6 +32,7 @@ export default function ReportsPage() {
   const [therapistSearch, setTherapistSearch] = useState('')
   const [patientOpen, setPatientOpen] = useState(false)
   const [therapistOpen, setTherapistOpen] = useState(false)
+  const [selectedStatusIds, setSelectedStatusIds] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -64,16 +65,24 @@ export default function ReportsPage() {
     return { type: 'range', from: periodFrom, to: periodTo }
   }
 
-  function filterConsultationsByPeriod(list) {
-    if (periodType === 'month') {
-      return list.filter(c => c.date && c.date.startsWith(periodMonth))
-    }
+  function filterConsultations(list) {
     return list.filter(c => {
-      if (!c.date) return false
-      if (periodFrom && c.date < periodFrom) return false
-      if (periodTo && c.date > periodTo) return false
+      if (periodType === 'month') {
+        if (!c.date || !c.date.startsWith(periodMonth)) return false
+      } else {
+        if (!c.date) return false
+        if (periodFrom && c.date < periodFrom) return false
+        if (periodTo && c.date > periodTo) return false
+      }
+      if (selectedStatusIds.length > 0 && !selectedStatusIds.includes(c.consultationStatusId)) return false
       return true
     })
+  }
+
+  function toggleStatus(id) {
+    setSelectedStatusIds(prev =>
+      prev.includes(id) ? prev.filter(s => s !== id) : [...prev, id]
+    )
   }
 
   function validateForm() {
@@ -98,7 +107,7 @@ export default function ReportsPage() {
       const specialtiesArr = specialtiesData || Object.entries(SPECIALTIES).map(([key, v]) => ({ key, label: v.label }))
 
       if (reportType === 'patient') {
-        const patientConsultations = filterConsultationsByPeriod(
+        const patientConsultations = filterConsultations(
           allConsults.filter(c => c.patientId === selectedPatientId)
         ).sort((a, b) => (a.date > b.date ? 1 : -1))
 
@@ -115,7 +124,7 @@ export default function ReportsPage() {
           filter,
         })
       } else {
-        const therapistConsultations = filterConsultationsByPeriod(
+        const therapistConsultations = filterConsultations(
           allConsults.filter(c => c.therapistId === selectedTherapistId)
         ).sort((a, b) => (a.date > b.date ? 1 : -1))
 
@@ -346,6 +355,50 @@ export default function ReportsPage() {
             </div>
           )}
         </div>
+
+        {/* Status do Atendimento */}
+        {(consultationStatuses || []).filter(s => !s.automatic && s.active !== false).length > 0 && (
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
+              Status do Atendimento
+              <span className="ml-2 text-xs font-normal text-gray-400">(deixe em branco para incluir todos)</span>
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {(consultationStatuses || [])
+                .filter(s => !s.automatic && s.active !== false)
+                .map(s => {
+                  const checked = selectedStatusIds.includes(s.id)
+                  return (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => toggleStatus(s.id)}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-medium transition-all ${
+                        checked
+                          ? 'border-brand-blue bg-blue-50 text-brand-blue'
+                          : 'border-gray-200 text-gray-600 hover:border-gray-300 bg-white'
+                      }`}
+                    >
+                      <span
+                        className="w-2 h-2 rounded-full shrink-0"
+                        style={{ backgroundColor: s.color || '#6b7280' }}
+                      />
+                      {s.name}
+                    </button>
+                  )
+                })}
+            </div>
+            {selectedStatusIds.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setSelectedStatusIds([])}
+                className="mt-2 text-xs text-gray-400 hover:text-gray-600 underline"
+              >
+                Limpar seleção
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Erro */}
         {error && (
