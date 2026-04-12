@@ -1,23 +1,36 @@
 import { useState } from 'react'
 import { FiMapPin, FiPhone, FiMail, FiClock, FiSend, FiCheck } from 'react-icons/fi'
 import { SPECIALTIES } from '../../constants/specialties'
+import { supabase } from '../../lib/supabase'
 
 export default function ContactPage() {
   const [form, setForm] = useState({ name: '', phone: '', email: '', specialty: '', message: '', howFound: '' })
   const [sent, setSent] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
 
   function handleChange(e) {
     setForm({ ...form, [e.target.name]: e.target.value })
   }
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault()
     setLoading(true)
-    setTimeout(() => {
+    setError('')
+    const { error: err } = await supabase.from('contact_leads').insert({
+      name:       form.name,
+      phone:      form.phone,
+      email:      form.email || null,
+      specialty:  form.specialty || null,
+      how_found:  form.howFound || null,
+      message:    form.message,
+    })
+    setLoading(false)
+    if (err) {
+      setError('Ocorreu um erro ao enviar. Tente novamente ou entre em contato por WhatsApp.')
+    } else {
       setSent(true)
-      setLoading(false)
-    }, 1000)
+    }
   }
 
   return (
@@ -136,6 +149,9 @@ export default function ContactPage() {
                     />
                   </div>
 
+                  {error && (
+                    <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700">{error}</div>
+                  )}
                   <button
                     type="submit"
                     disabled={loading}

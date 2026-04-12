@@ -25,4 +25,5 @@ export const ROUTES = {
   APPOINTMENT_TYPES:    '/admin/tipoatendimento',
   ROOMS:                '/admin/salas',
   AUDIT:                '/admin/auditoria',
+  CONTACT_LEADS:        '/admin/contatos',
 }

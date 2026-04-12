@@ -1,9 +1,13 @@
-import { FiUsers, FiCalendar, FiClipboard, FiTrendingUp } from 'react-icons/fi'
+import { FiUsers, FiCalendar, FiClipboard, FiTrendingUp, FiMessageSquare, FiArrowRight } from 'react-icons/fi'
+import { useState, useEffect } from 'react'
 import { format } from 'date-fns'
+import { Link } from 'react-router-dom'
 import { useData } from '../../context/DataContext'
 import { useAuth } from '../../context/AuthContext'
 import Badge from '../../components/ui/Badge'
 import { formatDateShort } from '../../utils/dateUtils'
+import { supabase } from '../../lib/supabase'
+import { ROUTES } from '../../constants/routes'
 
 function textColorForBg(hex) {
   if (!hex) return '#1f2937'
@@ -34,6 +38,16 @@ export default function DashboardPage() {
   const weekEndIso = format(weekEnd, 'yyyy-MM-dd')
 
   const isAdmin = user?.role === 'admin'
+
+  const [newLeadsCount, setNewLeadsCount] = useState(0)
+  useEffect(() => {
+    if (!isAdmin) return
+    supabase
+      .from('contact_leads')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'novo')
+      .then(({ count }) => setNewLeadsCount(count || 0))
+  }, [isAdmin])
 
   const visiblePatients = isAdmin || user?.belongsToTeam
     ? patients.filter(p => !p.deleted)
@@ -92,6 +106,25 @@ export default function DashboardPage() {
           </p>
         )}
       </div>
+
+      {/* Alerta de novos contatos — apenas admin */}
+      {isAdmin && newLeadsCount > 0 && (
+        <Link
+          to={ROUTES.CONTACT_LEADS}
+          className="flex items-center gap-3 bg-red-500 text-white px-4 py-3.5 rounded-2xl shadow-sm hover:bg-red-600 transition-colors"
+        >
+          <div className="w-9 h-9 bg-white/20 rounded-xl flex items-center justify-center shrink-0">
+            <FiMessageSquare size={18} />
+          </div>
+          <div className="flex-1">
+            <div className="font-bold text-sm">
+              {newLeadsCount} {newLeadsCount === 1 ? 'nova mensagem de contato' : 'novas mensagens de contato'}
+            </div>
+            <div className="text-xs text-red-100">Clique para visualizar e tratar</div>
+          </div>
+          <FiArrowRight size={18} className="opacity-70 shrink-0" />
+        </Link>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 md:gap-4">

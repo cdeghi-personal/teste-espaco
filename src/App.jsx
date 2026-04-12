@@ -38,6 +38,7 @@ import ConsultationStatusPage from './pages/admin/consultationstatus/Consultatio
 import AppointmentTypesPage from './pages/admin/appointmenttypes/AppointmentTypesPage'
 import RoomsPage from './pages/admin/rooms/RoomsPage'
 import AuditPage from './pages/admin/audit/AuditPage'
+import ContactLeadsPage from './pages/admin/contactleads/ContactLeadsPage'
 
 // Common
 import ScrollToTop from './components/common/ScrollToTop'
@@ -92,6 +93,7 @@ export default function App() {
                 <Route path={ROUTES.APPOINTMENT_TYPES} element={<AppointmentTypesPage />} />
                 <Route path={ROUTES.ROOMS} element={<RoomsPage />} />
                 <Route path={ROUTES.AUDIT} element={<AuditPage />} />
+                <Route path={ROUTES.CONTACT_LEADS} element={<ContactLeadsPage />} />
               </Route>
             </Route>
 

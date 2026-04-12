@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
-import { FiGrid, FiCalendar, FiUsers, FiUserCheck, FiClipboard, FiLogOut, FiUserPlus, FiLayers, FiCreditCard, FiActivity, FiFlag, FiHome, FiChevronDown, FiChevronUp, FiBookOpen, FiTag, FiShield } from 'react-icons/fi'
+import { FiGrid, FiCalendar, FiUsers, FiUserCheck, FiClipboard, FiLogOut, FiUserPlus, FiLayers, FiCreditCard, FiActivity, FiFlag, FiHome, FiChevronDown, FiChevronUp, FiBookOpen, FiTag, FiShield, FiMessageSquare } from 'react-icons/fi'
 import { ROUTES } from '../../constants/routes'
 import { useAuth } from '../../context/AuthContext'
 import { SPECIALTIES } from '../../constants/specialties'
+import { supabase } from '../../lib/supabase'
 
 const mainNavItems = [
   { to: ROUTES.DASHBOARD, icon: FiGrid, label: 'Dashboard', end: true },
@@ -26,7 +27,7 @@ const adminNavItems = [
   { to: ROUTES.AUDIT, icon: FiShield, label: 'Log de Auditoria' },
 ]
 
-function NavItem({ to, icon: Icon, label, end, onClick }) {
+function NavItem({ to, icon: Icon, label, end, onClick, badge }) {
   return (
     <NavLink
       to={to}
@@ -41,7 +42,10 @@ function NavItem({ to, icon: Icon, label, end, onClick }) {
       }
     >
       <Icon size={18} />
-      {label}
+      <span className="flex-1">{label}</span>
+      {badge > 0 && (
+        <span className="px-1.5 py-0.5 bg-red-500 text-white text-xs font-bold rounded-full leading-none">{badge}</span>
+      )}
     </NavLink>
   )
 }
@@ -50,6 +54,16 @@ export default function AdminSidebar({ open, onClose }) {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
   const [adminExpanded, setAdminExpanded] = useState(false)
+  const [newLeadsCount, setNewLeadsCount] = useState(0)
+
+  useEffect(() => {
+    if (user?.role !== 'admin') return
+    supabase
+      .from('contact_leads')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'novo')
+      .then(({ count }) => setNewLeadsCount(count || 0))
+  }, [user?.role])
 
   function handleLogout() {
     logout()
@@ -76,6 +90,16 @@ export default function AdminSidebar({ open, onClose }) {
       {/* Nav — scrollável apenas no desktop; no mobile é fixo para caber tudo */}
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto md:overflow-y-auto">
         {mainNavItems.map(item => <NavItem key={item.to} {...item} onClick={onClose} />)}
+
+        {isAdmin && (
+          <NavItem
+            to={ROUTES.CONTACT_LEADS}
+            icon={FiMessageSquare}
+            label="Contatos"
+            onClick={onClose}
+            badge={newLeadsCount}
+          />
+        )}
 
         {isAdmin && (
           <>
