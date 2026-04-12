@@ -407,9 +407,11 @@ Constantes de SELECT no DataContext: `PATIENT_SELECT`, `GUARDIAN_SELECT`, `CONSU
 - **VIEW** é registrado pelo frontend via RPC `log_view_audit()` — função SECURITY DEFINER que lê o usuário de `request.jwt.claims`
 - `logAudit(action, resourceType, resourceId, resourceName)` em `DataContext` — chama `supabase.rpc('log_view_audit', ...)`
 - Pontos de VIEW implementados:
-  - Pacientes: clicar na linha ou no olhinho da listagem (`PatientsPage`)
+  - Pacientes: clicar na linha, olhinho ou lápis da listagem (`PatientsPage`)
   - Pacientes: acessar `/admin/pacientes/:id` diretamente (`PatientDetailPage`)
-  - Responsáveis: clicar no olhinho da listagem (`GuardiansPage`)
+  - Responsáveis: clicar no olhinho ou lápis da listagem (`GuardiansPage`)
+  - Atendimentos: clicar no olhinho ou lápis da listagem (`ConsultationsPage`)
+  - Agenda: clicar no lápis do card (desktop e mobile) (`AgendaPage`)
   - Prontuário: selecionar paciente e carregar prontuário (`MedicalRecordsPage`)
 - Página `AuditPage`: só admin acessa; filtros por ação, recurso, data e texto; paginação 50/página
 - **IMPORTANTE:** triggers usam `COALESCE(v_rec.full_name, v_rec.date::TEXT, '')` para resource_name — funciona para tabelas com `full_name` (patients, guardians, therapists) ou `date` (consultations). Cada campo em sub-bloco BEGIN/EXCEPTION para não quebrar com tabelas que não têm a coluna.
