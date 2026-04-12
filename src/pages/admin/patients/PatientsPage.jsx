@@ -161,7 +161,7 @@ export default function PatientsPage() {
                           <button onClick={() => { setViewPatient(p); logAudit('VIEW', 'patients', p.id, p.fullName) }} className="p-2 rounded-lg text-gray-400">
                             <FiEye size={15} />
                           </button>
-                          <button onClick={() => { setEditPatient(p); setShowModal(true) }} className="p-2 rounded-lg text-gray-400">
+                          <button onClick={() => { setEditPatient(p); setShowModal(true); logAudit('VIEW', 'patients', p.id, p.fullName) }} className="p-2 rounded-lg text-gray-400">
                             <FiEdit2 size={15} />
                           </button>
                           <button onClick={() => handleDelete(p.id, p.fullName)} className="p-2 rounded-lg text-gray-400">
@@ -241,7 +241,7 @@ export default function PatientsPage() {
                               <button onClick={() => { setViewPatient(p); logAudit('VIEW', 'patients', p.id, p.fullName) }} className="p-1.5 rounded-lg text-gray-400 hover:text-brand-blue hover:bg-blue-50 transition-colors">
                                 <FiEye size={15} />
                               </button>
-                              <button onClick={() => { setEditPatient(p); setShowModal(true) }} className="p-1.5 rounded-lg text-gray-400 hover:text-brand-blue hover:bg-blue-50 transition-colors">
+                              <button onClick={() => { setEditPatient(p); setShowModal(true); logAudit('VIEW', 'patients', p.id, p.fullName) }} className="p-1.5 rounded-lg text-gray-400 hover:text-brand-blue hover:bg-blue-50 transition-colors">
                                 <FiEdit2 size={15} />
                               </button>
                               <button onClick={() => handleDelete(p.id, p.fullName)} className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors">

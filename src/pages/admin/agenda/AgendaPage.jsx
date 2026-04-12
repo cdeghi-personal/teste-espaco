@@ -34,7 +34,7 @@ function formatDay(date) {
 }
 
 export default function AgendaPage() {
-  const { consultations, patients, rooms, therapists } = useData()
+  const { consultations, patients, rooms, therapists, logAudit } = useData()
   const { user } = useAuth()
   const [weekRef, setWeekRef] = useState(new Date())
   const [search, setSearch] = useState('')
@@ -224,7 +224,7 @@ export default function AgendaPage() {
                       {(user?.role === 'admin' || user?.id === item.therapistId) && (
                         <div className="absolute top-1 right-1 hidden group-hover:flex gap-0.5">
                           <button
-                            onClick={() => { setEditItem(item); setShowModal(true) }}
+                            onClick={() => { setEditItem(item); setShowModal(true); logAudit('VIEW', 'consultations', item.id, getPatient(item.patientId)?.fullName || item.id) }}
                             className="w-5 h-5 rounded flex items-center justify-center bg-black/20 hover:bg-black/40 transition-colors"
                           >
                             <FiEdit2 size={10} />
@@ -266,7 +266,7 @@ export default function AgendaPage() {
                       {(user?.role === 'admin' || user?.id === item.therapistId) && (
                         <div className="absolute top-1 right-1 hidden group-hover:flex gap-0.5">
                           <button
-                            onClick={() => { setEditItem(item); setShowModal(true) }}
+                            onClick={() => { setEditItem(item); setShowModal(true); logAudit('VIEW', 'consultations', item.id, getPatient(item.patientId)?.fullName || item.id) }}
                             className="w-5 h-5 rounded flex items-center justify-center bg-black/20 hover:bg-black/40 transition-colors"
                           >
                             <FiEdit2 size={10} />
@@ -362,7 +362,7 @@ export default function AgendaPage() {
                       </div>
                       {(user?.role === 'admin' || user?.id === item.therapistId) && (
                         <div className="flex gap-1 shrink-0">
-                          <button onClick={() => { setEditItem(item); setShowModal(true) }} className="p-2 rounded-lg text-gray-400 hover:text-brand-blue hover:bg-blue-50">
+                          <button onClick={() => { setEditItem(item); setShowModal(true); logAudit('VIEW', 'consultations', item.id, patient?.fullName || item.id) }} className="p-2 rounded-lg text-gray-400 hover:text-brand-blue hover:bg-blue-50">
                             <FiEdit2 size={15} />
                           </button>
 

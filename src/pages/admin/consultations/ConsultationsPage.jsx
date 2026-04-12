@@ -9,7 +9,7 @@ import ConsultationFormModal from './ConsultationFormModal'
 import { formatDateShort } from '../../../utils/dateUtils'
 
 export default function ConsultationsPage() {
-  const { consultations, patients, therapists, rooms, specialtiesData, consultationStatuses, appointmentTypes, deleteConsultation } = useData()
+  const { consultations, patients, therapists, rooms, specialtiesData, consultationStatuses, appointmentTypes, deleteConsultation, logAudit } = useData()
   const { user } = useAuth()
   const [search, setSearch] = useState('')
   const [filterSpecialty, setFilterSpecialty] = useState('')
@@ -133,14 +133,14 @@ export default function ConsultationsPage() {
                 </div>
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={() => setViewConsultation(c)}
+                    onClick={() => { setViewConsultation(c); logAudit('VIEW', 'consultations', c.id, patients.find(p => p.id === c.patientId)?.fullName || c.id) }}
                     className="p-1.5 rounded-lg text-gray-400 hover:text-brand-blue hover:bg-blue-50 transition-colors"
                   >
                     <FiEye size={15} />
                   </button>
                   {(user?.role === 'admin' || user?.id === c.therapistId) && (<>
                   <button
-                    onClick={() => { setEditConsultation(c); setShowModal(true) }}
+                    onClick={() => { setEditConsultation(c); setShowModal(true); logAudit('VIEW', 'consultations', c.id, patients.find(p => p.id === c.patientId)?.fullName || c.id) }}
                     className="p-1.5 rounded-lg text-gray-400 hover:text-brand-blue hover:bg-blue-50 transition-colors"
                   >
                     <FiEdit2 size={15} />
