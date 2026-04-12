@@ -67,6 +67,7 @@ src/
       appointmenttypes/ AppointmentTypesPage, AppointmentTypeFormModal
       rooms/            RoomsPage, RoomFormModal
       audit/            AuditPage
+      contactleads/     ContactLeadsPage
 supabase/
   01_schema.sql                  # Tabelas, enums, índices, trigger de criação de profile
   02_rls.sql                     # Row Level Security — admin vê tudo, terapeuta vê só os seus
@@ -89,6 +90,9 @@ supabase/
   31_audit_grant.sql             # GRANT INSERT/SELECT em audit_logs para role authenticated
   32_log_view_rpc.sql            # Função RPC log_view_audit() SECURITY DEFINER para logs VIEW do frontend
   33_fix_log_view_rpc.sql        # Fix: p_resource_id vira TEXT (cast interno) + GRANT para anon
+  34_contact_leads.sql           # Tabela contact_leads + RLS + GRANT para anon (INSERT público)
+  35_fix_contact_leads_grant.sql # Revoga GRANT SELECT/UPDATE de authenticated (corrigido em 36)
+  36_fix_contact_leads_grant2.sql # Restaura GRANT SELECT/UPDATE — GRANT + RLS devem coexistir
   functions/
     invite-therapist/index.ts    # Edge Function — envia convite por e-mail ao criar terapeuta
 ```
@@ -134,6 +138,7 @@ Encontrar em: Supabase Dashboard → Project Settings → API.
 | `medical_record_conducts` | Conduta & objetivo terapêutico — N por prontuário, vinculado ao terapeuta/especialidade |
 | `patient_involved_therapists` | Terapeutas envolvidos no atendimento do paciente (N:N) — complementa o Gerente de Conta |
 | `audit_logs` | Log de auditoria — registra VIEW/INSERT/UPDATE/DELETE com user_id, user_email, action, resource_type, resource_id, resource_name |
+| `contact_leads` | Contatos do site público — name, phone, email, specialty, how_found, message, status, internal_note, assigned_to, last_contact_at |
 
 ### Mappers (DB → App)
 
@@ -251,7 +256,7 @@ Cada especialidade tem `label`, `color` (Tailwind), `bgColor`, `textColor`, `cal
 '/admin/responsaveis', '/admin/consultas', '/admin/prontuario'
 '/admin/terapeutas', '/admin/especialidades', '/admin/formapagamento'
 '/admin/diagnostico', '/admin/statuspaciente', '/admin/statusconsulta'
-'/admin/tipoatendimento', '/admin/salas', '/admin/auditoria'
+'/admin/tipoatendimento', '/admin/salas', '/admin/auditoria', '/admin/contatos'
 ```
 
 ## Padrões de código
@@ -285,6 +290,7 @@ Cada especialidade tem `label`, `color` (Tailwind), `bgColor`, `textColor`, `cal
 - Botão "Esqueci minha senha" ao lado do label do campo senha
 - Dispara `supabase.auth.resetPasswordForEmail()` com redirect para `/reset-senha`
 - Exibe tela de confirmação após envio do e-mail
+- **Race condition corrigida:** `LoginPage` não chama `navigate()` diretamente — usa `useEffect` que observa `isAuthenticated` e redireciona somente após `loadUser()` terminar. Evita o problema de ter que clicar "Entrar" múltiplas vezes.
 
 ## Campos do Terapeuta
 
@@ -425,6 +431,34 @@ Constantes de SELECT no DataContext: `PATIENT_SELECT`, `GUARDIAN_SELECT`, `CONSU
 - Botão de excluir **removido** (delete físico — irreversível)
 - Editar/excluir visível apenas para o terapeuta responsável ou admin
 - Legenda inferior exibe nome completo do terapeuta
+
+## CRM de Contatos (`/admin/contatos`)
+
+- Tabela `contact_leads` — INSERT permitido para `anon` (formulário público); SELECT/UPDATE apenas admin via RLS
+- **GRANT:** `anon` tem GRANT INSERT. `authenticated` tem GRANT SELECT/UPDATE — o RLS restringe para admin apenas. Ambas as camadas são necessárias: GRANT abre a porta, RLS controla as linhas.
+- `ContactPage` (site público) grava diretamente no Supabase via `supabase.from('contact_leads').insert()`
+- **Status do lead:**
+  - `novo` (vermelho) — recém chegou, ninguém tocou
+  - `em_contato` (amarelo) — já contatado, aguardando retorno
+  - `agendado` (azul) — visita/avaliação marcada
+  - `convertido` (verde) — virou paciente
+  - `sem_interesse` (cinza) — desistiu
+- `ContactLeadsPage`: cards expansíveis com status, nota interna, responsável, atalhos tel/email; badge vermelho com total de novos no título
+- `AdminSidebar`: item "Contatos" visível apenas para admin, com badge vermelho mostrando contagem de `novo`
+- `DashboardPage`: banner vermelho clicável aparece quando há leads com status `novo` — link direto para `/admin/contatos`
+- Filtros por ação, recurso, data e **usuário** (select populado com e-mails dos logs)
+
+## Sidebar Admin
+
+- Item "Contatos" aparece no menu principal (não dentro de Administração) — visível apenas para admin
+- Badge vermelho no item mostra contagem de leads `novo`, carregado no mount via query COUNT
+- Seção "Administração" é **colapsável** — começa fechada no mobile
+- "Sair" sempre visível no rodapé
+
+## Log de Auditoria — Filtro de Usuário
+
+- `AuditPage` tem select "Todos os Usuários" populado dinamicamente com e-mails distintos existentes nos logs
+- Filtro de texto busca apenas por `resource_name` (antes buscava também em `user_email`, conflitava com o select)
 
 ## Site público
 
