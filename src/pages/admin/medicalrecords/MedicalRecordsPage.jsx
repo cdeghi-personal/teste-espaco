@@ -238,8 +238,11 @@ export default function MedicalRecordsPage() {
   const [medDraft, setMedDraft] = useState(null)
   const [conductDraft, setConductDraft] = useState(null)
 
-  // Month navigation for history
-  const [consultMonth, setConsultMonth] = useState(currentYearMonth())
+  // Period + status filter for history
+  const [periodMode, setPeriodMode] = useState('current') // 'prev2'|'prev1'|'current'|'next'|'range'
+  const [rangeFrom, setRangeFrom] = useState('')
+  const [rangeTo, setRangeTo] = useState('')
+  const [filterStatusIds, setFilterStatusIds] = useState([])
   const [showConsultationModal, setShowConsultationModal] = useState(false)
   const [editConsultation, setEditConsultation] = useState(null)
   const [selectedConsultIds, setSelectedConsultIds] = useState(new Set())
@@ -268,10 +271,28 @@ export default function MedicalRecordsPage() {
     })
     .sort((a, b) => b.date.localeCompare(a.date))
 
-  const monthConsultations = patientConsultations.filter(c => c.date.startsWith(consultMonth))
+  const todayYM = currentYearMonth()
+  const periodMonthMap = {
+    prev2:   prevMonth(prevMonth(todayYM)),
+    prev1:   prevMonth(todayYM),
+    current: todayYM,
+    next:    nextMonth(todayYM),
+  }
 
-  const hasPrev = patientConsultations.some(c => c.date < `${consultMonth}-01`)
-  const isCurrentMonth = consultMonth === currentYearMonth()
+  const displayConsultations = patientConsultations.filter(c => {
+    if (periodMode === 'range') {
+      if (rangeFrom && c.date < rangeFrom) return false
+      if (rangeTo   && c.date > rangeTo)   return false
+    } else {
+      if (!c.date.startsWith(periodMonthMap[periodMode])) return false
+    }
+    if (filterStatusIds.length > 0 && !filterStatusIds.includes(c.consultationStatusId)) return false
+    return true
+  })
+
+  const periodLabel = periodMode === 'range'
+    ? (rangeFrom && rangeTo ? `${formatDateBR(rangeFrom)} a ${formatDateBR(rangeTo)}` : 'Período personalizado')
+    : monthLabel(periodMonthMap[periodMode])
 
   const loadData = useCallback(async (patientId) => {
     setLoading(true)
@@ -292,7 +313,9 @@ export default function MedicalRecordsPage() {
     setSelectedPatientId(id)
     setSearch('')
     setExamDraft(null); setMedDraft(null); setConductDraft(null)
-    setConsultMonth(currentYearMonth())
+    setPeriodMode('current')
+    setRangeFrom(''); setRangeTo('')
+    setFilterStatusIds([])
     setSelectedConsultIds(new Set())
     if (id) await loadData(id)
     else setMedicalRecordId(null)
@@ -636,37 +659,85 @@ export default function MedicalRecordsPage() {
                   </div>
                 )}
 
-                {/* Navegação de meses */}
-                <div className="flex items-center gap-2 mb-4 flex-wrap">
-                  <button
-                    onClick={() => setConsultMonth(currentYearMonth())}
-                    disabled={isCurrentMonth}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition-all ${isCurrentMonth ? 'bg-brand-blue text-white border-brand-blue' : 'bg-white text-gray-600 border-gray-200 hover:border-brand-blue hover:text-brand-blue'}`}
-                  >
-                    <FiCalendar size={11} className="inline mr-1" />Mês Corrente
-                  </button>
-                  <button
-                    onClick={() => setConsultMonth(prevMonth(consultMonth))}
-                    disabled={!hasPrev}
-                    className={`p-1.5 rounded-xl border transition-all ${!hasPrev ? 'text-gray-300 border-gray-100 cursor-not-allowed' : 'text-gray-600 border-gray-200 hover:border-brand-blue hover:text-brand-blue'}`}
-                  >
-                    <FiChevronLeft size={16} />
-                  </button>
-                  <span className="text-sm font-medium text-gray-700 px-1">{monthLabel(consultMonth)}</span>
-                  <button
-                    onClick={() => setConsultMonth(nextMonth(consultMonth))}
-                    disabled={isCurrentMonth}
-                    className={`p-1.5 rounded-xl border transition-all ${isCurrentMonth ? 'text-gray-300 border-gray-100 cursor-not-allowed' : 'text-gray-600 border-gray-200 hover:border-brand-blue hover:text-brand-blue'}`}
-                  >
-                    <FiChevronRight size={16} />
-                  </button>
+                {/* Filtro de período */}
+                <div className="mb-3">
+                  <div className="flex flex-wrap gap-1.5 mb-2">
+                    {[
+                      { key: 'prev2',   label: 'Mês -2',        sub: monthLabel(periodMonthMap.prev2) },
+                      { key: 'prev1',   label: 'Mês Anterior',  sub: monthLabel(periodMonthMap.prev1) },
+                      { key: 'current', label: 'Mês Corrente',  sub: monthLabel(periodMonthMap.current) },
+                      { key: 'next',    label: 'Mês Seguinte',  sub: monthLabel(periodMonthMap.next) },
+                      { key: 'range',   label: 'Período',       sub: 'De & Até' },
+                    ].map(opt => (
+                      <button
+                        key={opt.key}
+                        onClick={() => setPeriodMode(opt.key)}
+                        className={`flex flex-col items-center px-3 py-1.5 rounded-xl border text-xs font-medium transition-all leading-tight ${
+                          periodMode === opt.key
+                            ? 'bg-brand-blue text-white border-brand-blue'
+                            : 'bg-white text-gray-600 border-gray-200 hover:border-brand-blue hover:text-brand-blue'
+                        }`}
+                      >
+                        <span>{opt.label}</span>
+                        <span className={`text-[10px] font-normal mt-0.5 ${periodMode === opt.key ? 'text-blue-100' : 'text-gray-400'}`}>{opt.sub}</span>
+                      </button>
+                    ))}
+                  </div>
+                  {periodMode === 'range' && (
+                    <div className="flex flex-wrap items-center gap-2 mt-2">
+                      <div className="flex items-center gap-1.5">
+                        <label className="text-xs text-gray-500 shrink-0">De</label>
+                        <input
+                          type="date"
+                          value={rangeFrom}
+                          onChange={e => setRangeFrom(e.target.value)}
+                          className="px-2 py-1.5 border border-gray-300 rounded-lg text-xs focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none"
+                        />
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <label className="text-xs text-gray-500 shrink-0">Até</label>
+                        <input
+                          type="date"
+                          value={rangeTo}
+                          min={rangeFrom || undefined}
+                          onChange={e => setRangeTo(e.target.value)}
+                          className="px-2 py-1.5 border border-gray-300 rounded-lg text-xs focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none"
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
 
-                {monthConsultations.length === 0 ? (
-                  <p className="text-sm text-gray-400 text-center py-6">Nenhum atendimento em {monthLabel(consultMonth)}.</p>
+                {/* Filtro de status */}
+                {consultationStatuses.filter(s => s.active !== false).length > 0 && (
+                  <div className="flex flex-wrap items-center gap-1.5 mb-3">
+                    <span className="text-xs text-gray-500 shrink-0">Status:</span>
+                    {consultationStatuses.filter(s => s.active !== false).map(s => {
+                      const checked = filterStatusIds.includes(s.id)
+                      return (
+                        <button
+                          key={s.id}
+                          onClick={() => setFilterStatusIds(prev => checked ? prev.filter(x => x !== s.id) : [...prev, s.id])}
+                          className={`flex items-center gap-1 px-2 py-1 rounded-full border text-xs font-medium transition-all ${
+                            checked ? 'border-brand-blue bg-blue-50 text-brand-blue' : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300'
+                          }`}
+                        >
+                          {s.color && <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: s.color }} />}
+                          {s.name}
+                        </button>
+                      )
+                    })}
+                    {filterStatusIds.length > 0 && (
+                      <button onClick={() => setFilterStatusIds([])} className="text-xs text-gray-400 hover:text-gray-600 underline ml-1">limpar</button>
+                    )}
+                  </div>
+                )}
+
+                {displayConsultations.length === 0 ? (
+                  <p className="text-sm text-gray-400 text-center py-6">Nenhum atendimento em {periodLabel}.</p>
                 ) : (
                   <div className="space-y-3">
-                    {monthConsultations.map(c => {
+                    {displayConsultations.map(c => {
                       const therapist = therapists.find(t => t.id === c.therapistId)
                       const status = consultationStatuses.find(s => s.id === c.consultationStatusId)
                       const apptType = appointmentTypes.find(t => t.id === c.appointmentTypeId)
