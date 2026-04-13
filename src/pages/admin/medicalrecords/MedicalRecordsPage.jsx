@@ -398,12 +398,9 @@ export default function MedicalRecordsPage() {
     }
   }
 
-  async function batchSetStatus(statusName) {
-    const status = consultationStatuses.find(s => s.name === statusName)
-    if (!status) { alert(`Status "${statusName}" não encontrado. Verifique o cadastro de Status Atendimento.`); return }
+  async function batchSetStatus(status) {
     const ids = [...selectedConsultIds]
-    const action = statusName === 'Faturado' ? 'Faturar' : 'Registrar Pagamento'
-    if (!confirm(`${action} ${ids.length} atendimento(s)?`)) return
+    if (!confirm(`Alterar status para "${status.name}" em ${ids.length} atendimento(s)?`)) return
     await Promise.all(ids.map(id => updateConsultation(id, { consultationStatusId: status.id })))
     setSelectedConsultIds(new Set())
   }
@@ -613,20 +610,23 @@ export default function MedicalRecordsPage() {
               <Section title="Histórico de Atendimentos" count={patientConsultations.length}>
                 {/* Ações em lote (admin) */}
                 {user?.role === 'admin' && selectedConsultIds.size > 0 && (
-                  <div className="flex items-center gap-2 mb-3 p-2 bg-brand-blue/5 rounded-xl border border-brand-blue/20">
-                    <span className="text-xs text-gray-600 flex-1">{selectedConsultIds.size} selecionado(s)</span>
-                    <button
-                      onClick={() => batchSetStatus('Faturado')}
-                      className="px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-100 text-amber-700 hover:bg-amber-200 transition-colors"
-                    >
-                      Faturado
-                    </button>
-                    <button
-                      onClick={() => batchSetStatus('Pago')}
-                      className="px-3 py-1.5 rounded-lg text-xs font-medium bg-green-100 text-green-700 hover:bg-green-200 transition-colors"
-                    >
-                      Pago
-                    </button>
+                  <div className="flex items-center gap-2 mb-3 p-2 bg-brand-blue/5 rounded-xl border border-brand-blue/20 flex-wrap">
+                    <span className="text-xs text-gray-600 flex-1 min-w-max">{selectedConsultIds.size} selecionado(s) — alterar status para:</span>
+                    {consultationStatuses
+                      .filter(s => s.active !== false)
+                      .map(s => (
+                        <button
+                          key={s.id}
+                          onClick={() => batchSetStatus(s)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-white border border-gray-200 hover:border-brand-blue hover:text-brand-blue transition-colors"
+                        >
+                          {s.color && (
+                            <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
+                          )}
+                          {s.name}
+                        </button>
+                      ))
+                    }
                     <button
                       onClick={() => setSelectedConsultIds(new Set())}
                       className="px-2 py-1.5 rounded-lg text-xs text-gray-400 hover:text-gray-600"
