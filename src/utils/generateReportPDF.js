@@ -93,6 +93,12 @@ function labelValue(doc, label, value, x, y, maxWidth = 80) {
   return y + 4 + lines.length * 4
 }
 
+function formatCurrency(val) {
+  const n = parseFloat(val)
+  if (isNaN(n) || n === 0) return 'R$ 0,00'
+  return 'R$ ' + n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
 function addFooters(doc) {
   const total = doc.internal.getNumberOfPages()
   const pageW = doc.internal.pageSize.width
@@ -171,16 +177,20 @@ export async function generateConsultasPacientePDF({
     doc.text('Nenhum atendimento encontrado no período selecionado.', margin, y + 4)
     y += 12
   } else {
+    let totalValue = 0
     autoTable(doc, {
       startY: y,
       margin: { left: margin, right: margin },
-      head: [['Data', 'Hora', 'Terapeuta', 'Especialidade', 'Conselho', 'Status', 'Tipo', 'Objetivo da Sessão']],
+      head: [['Data', 'Hora', 'Terapeuta', 'Especialidade', 'Conselho', 'Status', 'Tipo', 'Valor (R$)', 'Objetivo da Sessão']],
       body: consultations.map(c => {
         const therapist = therapists.find(t => t.id === c.therapistId)
         const spec = specialtiesData.find(s => s.key === c.specialty)
         const specCredential = therapist?.therapistSpecialties?.find(s => s.specialty === c.specialty)?.credential || '—'
         const status = consultationStatuses.find(s => s.id === c.consultationStatusId)
         const type = appointmentTypes.find(t => t.id === c.appointmentTypeId)
+        const specValue = patient.specialties?.find(s => s.key === c.specialty)?.patientValue
+        const value = specValue != null && specValue !== '' ? parseFloat(specValue) : 0
+        totalValue += isNaN(value) ? 0 : value
         return [
           formatDate(c.date),
           c.time ? c.time.slice(0, 5) : '—',
@@ -189,6 +199,7 @@ export async function generateConsultasPacientePDF({
           specCredential,
           status?.name || '—',
           type?.name || '—',
+          formatCurrency(value),
           c.mainObjective || '—',
         ]
       }),
@@ -198,12 +209,13 @@ export async function generateConsultasPacientePDF({
       columnStyles: {
         0: { cellWidth: 16 },
         1: { cellWidth: 12 },
-        2: { cellWidth: 30 },
-        3: { cellWidth: 25 },
-        4: { cellWidth: 20 },
-        5: { cellWidth: 22 },
-        6: { cellWidth: 22 },
-        7: { cellWidth: 'auto' },
+        2: { cellWidth: 28 },
+        3: { cellWidth: 22 },
+        4: { cellWidth: 18 },
+        5: { cellWidth: 20 },
+        6: { cellWidth: 20 },
+        7: { cellWidth: 20, halign: 'right' },
+        8: { cellWidth: 'auto' },
       },
     })
     y = doc.lastAutoTable.finalY + 4
@@ -212,7 +224,8 @@ export async function generateConsultasPacientePDF({
     doc.setFontSize(8)
     doc.setFont('helvetica', 'bold')
     doc.setTextColor(...BLUE)
-    doc.text(`Total de atendimentos no período: ${consultations.length}`, margin, y + 4)
+    doc.text(`Total de atendimentos: ${consultations.length}`, margin, y + 4)
+    doc.text(`Total do período: ${formatCurrency(totalValue)}`, pageW - margin, y + 4, { align: 'right' })
   }
 
   addFooters(doc)
@@ -266,15 +279,19 @@ export async function generateConsultasTerapeutaPDF({
     doc.text('Nenhum atendimento encontrado no período selecionado.', margin, y + 4)
     y += 12
   } else {
+    let totalValue = 0
     autoTable(doc, {
       startY: y,
       margin: { left: margin, right: margin },
-      head: [['Data', 'Hora', 'Paciente', 'Especialidade', 'Status', 'Tipo', 'Objetivo da Sessão']],
+      head: [['Data', 'Hora', 'Paciente', 'Especialidade', 'Status', 'Tipo', 'Valor (R$)', 'Objetivo da Sessão']],
       body: consultations.map(c => {
         const patient = patients.find(p => p.id === c.patientId)
         const spec = specialtiesData.find(s => s.key === c.specialty)
         const status = consultationStatuses.find(s => s.id === c.consultationStatusId)
         const type = appointmentTypes.find(t => t.id === c.appointmentTypeId)
+        const specValue = patient?.specialties?.find(s => s.key === c.specialty)?.therapistValue
+        const value = specValue != null && specValue !== '' ? parseFloat(specValue) : 0
+        totalValue += isNaN(value) ? 0 : value
         return [
           formatDate(c.date),
           c.time ? c.time.slice(0, 5) : '—',
@@ -282,6 +299,7 @@ export async function generateConsultasTerapeutaPDF({
           spec?.label || c.specialty || '—',
           status?.name || '—',
           type?.name || '—',
+          formatCurrency(value),
           c.mainObjective || '—',
         ]
       }),
@@ -291,11 +309,12 @@ export async function generateConsultasTerapeutaPDF({
       columnStyles: {
         0: { cellWidth: 16 },
         1: { cellWidth: 12 },
-        2: { cellWidth: 38 },
-        3: { cellWidth: 28 },
-        4: { cellWidth: 24 },
-        5: { cellWidth: 24 },
-        6: { cellWidth: 'auto' },
+        2: { cellWidth: 35 },
+        3: { cellWidth: 26 },
+        4: { cellWidth: 22 },
+        5: { cellWidth: 22 },
+        6: { cellWidth: 20, halign: 'right' },
+        7: { cellWidth: 'auto' },
       },
     })
     y = doc.lastAutoTable.finalY + 4
@@ -303,7 +322,8 @@ export async function generateConsultasTerapeutaPDF({
     doc.setFontSize(8)
     doc.setFont('helvetica', 'bold')
     doc.setTextColor(...BLUE)
-    doc.text(`Total de atendimentos no período: ${consultations.length}`, margin, y + 4)
+    doc.text(`Total de atendimentos: ${consultations.length}`, margin, y + 4)
+    doc.text(`Total do período: ${formatCurrency(totalValue)}`, pageW - margin, y + 4, { align: 'right' })
   }
 
   addFooters(doc)
