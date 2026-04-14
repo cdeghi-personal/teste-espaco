@@ -27,4 +27,5 @@ export const ROUTES = {
   AUDIT:                '/admin/auditoria',
   CONTACT_LEADS:        '/admin/contatos',
   REPORTS:              '/admin/relatorios',
+  SUPPORT:              '/admin/suporte',
 }

@@ -40,6 +40,7 @@ import RoomsPage from './pages/admin/rooms/RoomsPage'
 import AuditPage from './pages/admin/audit/AuditPage'
 import ContactLeadsPage from './pages/admin/contactleads/ContactLeadsPage'
 import ReportsPage from './pages/admin/reports/ReportsPage'
+import SupportPage from './pages/admin/support/SupportPage'
 
 // Common
 import ScrollToTop from './components/common/ScrollToTop'
@@ -96,6 +97,7 @@ export default function App() {
                 <Route path={ROUTES.AUDIT} element={<AuditPage />} />
                 <Route path={ROUTES.CONTACT_LEADS} element={<ContactLeadsPage />} />
                 <Route path={ROUTES.REPORTS} element={<ReportsPage />} />
+                <Route path={ROUTES.SUPPORT} element={<SupportPage />} />
               </Route>
             </Route>
 
