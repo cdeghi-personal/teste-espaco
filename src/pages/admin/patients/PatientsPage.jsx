@@ -148,7 +148,7 @@ export default function PatientsPage() {
                           ? <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">Excluído</span>
                           : ps && <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${ps.color}`}>{ps.name}</span>
                         }
-                        {p.specialties?.slice(0, 1).map(s => <Badge key={s} specialty={s} />)}
+                        {p.specialties?.slice(0, 1).map(s => <Badge key={s.key} specialty={s.key} />)}
                       </div>
                     </div>
                     <div className="flex items-center gap-1 shrink-0" onClick={e => e.stopPropagation()}>
@@ -215,7 +215,7 @@ export default function PatientsPage() {
                       </td>
                       <td className="px-4 py-3 hidden lg:table-cell">
                         <div className="flex flex-wrap gap-1">
-                          {p.specialties?.slice(0, 2).map(s => <Badge key={s} specialty={s} />)}
+                          {p.specialties?.slice(0, 2).map(s => <Badge key={s.key} specialty={s.key} />)}
                           {p.specialties?.length > 2 && <span className="text-xs text-gray-400">+{p.specialties.length - 2}</span>}
                         </div>
                       </td>

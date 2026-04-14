@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { FiArrowLeft, FiEdit2, FiUser, FiPhone, FiMail } from 'react-icons/fi'
 import { useData } from '../../../context/DataContext'
+import { useAuth } from '../../../context/AuthContext'
 import Badge from '../../../components/ui/Badge'
 import Button from '../../../components/ui/Button'
 import PatientFormModal from './PatientFormModal'
@@ -11,7 +12,9 @@ import { calculateAge, formatDateBR, formatDateShort } from '../../../utils/date
 export default function PatientDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { getPatientById, getGuardiansForPatient, consultations, therapists, paymentMethods, patientStatuses, diagnoses, consultationStatuses, appointmentTypes, rooms, logAudit } = useData()
+  const { getPatientById, getGuardiansForPatient, consultations, therapists, paymentMethods, patientStatuses, diagnoses, consultationStatuses, appointmentTypes, rooms, specialtiesData, logAudit } = useData()
+  const { user } = useAuth()
+  const isAdmin = user?.role === 'admin'
   const [showEdit, setShowEdit] = useState(false)
 
   const patient = getPatientById(id)
@@ -67,7 +70,7 @@ export default function PatientDetailPage() {
                   ? <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${patientStatus.color}`}>{patientStatus.name}</span>
                   : <Badge patientStatus={patient.status} />
                 }
-                {patient.specialties?.map(s => <Badge key={s} specialty={s} />)}
+                {patient.specialties?.map(s => <Badge key={s.key} specialty={s.key} />)}
               </div>
             </div>
             <Button variant="outline" onClick={() => setShowEdit(true)} className="shrink-0">
@@ -118,14 +121,6 @@ export default function PatientDetailPage() {
                 })}
               </div>
             </div>
-            {patient.specialties?.length > 0 && (
-              <div className="text-sm">
-                <span className="text-gray-500 block mb-1.5">Especialidades em Atendimento</span>
-                <div className="flex flex-wrap gap-1">
-                  {patient.specialties.map(s => <Badge key={s} specialty={s} />)}
-                </div>
-              </div>
-            )}
             <div className="text-sm flex justify-between">
               <span className="text-gray-500">Forma de Pagamento</span>
               <span className="font-medium text-gray-900">{paymentMethod?.name || '—'}</span>
@@ -137,7 +132,7 @@ export default function PatientDetailPage() {
             <div className="bg-white rounded-2xl border border-gray-100 p-5 space-y-3">
               <h3 className="font-semibold text-gray-900 text-sm">Terapeutas</h3>
               <div className="flex justify-between items-center text-sm">
-                <span className="text-gray-500">Gerente de Conta</span>
+                <span className="text-gray-500">Gerente do Caso</span>
                 {primaryTherapist ? (
                   <div className="flex items-center gap-1.5">
                     <div
@@ -164,6 +159,39 @@ export default function PatientDetailPage() {
                         {t.name}
                       </span>
                     ))}
+                  </div>
+                </div>
+              )}
+              {patient.specialties?.length > 0 && (
+                <div className="text-sm">
+                  <span className="text-gray-500 block mb-2">Especialidades em Atendimento</span>
+                  <div className="rounded-xl border border-gray-100 overflow-hidden">
+                    <table className="w-full text-xs">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="text-left px-3 py-2 font-semibold text-gray-500">Especialidade</th>
+                          {isAdmin && <th className="text-left px-3 py-2 font-semibold text-gray-500">Valor Paciente</th>}
+                          {isAdmin && <th className="text-left px-3 py-2 font-semibold text-gray-500">Valor Terapeuta</th>}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {patient.specialties.map(s => {
+                          const spec = specialtiesData.find(sd => sd.key === s.key)
+                          const color = spec?.color || '#6b7280'
+                          return (
+                            <tr key={s.key} className="border-t border-gray-100">
+                              <td className="px-3 py-2">
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium text-white" style={{ backgroundColor: color }}>
+                                  {spec?.label || s.key}
+                                </span>
+                              </td>
+                              {isAdmin && <td className="px-3 py-2 text-gray-700">{s.patientValue != null && s.patientValue !== '' ? `R$ ${Number(s.patientValue).toFixed(2)}` : '—'}</td>}
+                              {isAdmin && <td className="px-3 py-2 text-gray-700">{s.therapistValue != null && s.therapistValue !== '' ? `R$ ${Number(s.therapistValue).toFixed(2)}` : '—'}</td>}
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
                   </div>
                 </div>
               )}

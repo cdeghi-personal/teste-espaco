@@ -106,7 +106,7 @@ export async function generateProntuarioPDF({
   const primaryTherapist = therapists.find(t => t.id === patient.therapistId)
   const patientAge = age(patient.dateOfBirth)
   const specialtyLabels = (patient.specialties || [])
-    .map(k => specialtiesData.find(s => s.key === k)?.label || k)
+    .map(s => { const k = s?.key ?? s; return specialtiesData.find(sd => sd.key === k)?.label || k })
     .join(', ')
 
   const col1x = margin

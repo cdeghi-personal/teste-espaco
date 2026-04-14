@@ -357,7 +357,7 @@ export default function ReportsPage() {
         </div>
 
         {/* Status do Atendimento */}
-        {(consultationStatuses || []).filter(s => !s.automatic && s.active !== false).length > 0 && (
+        {(consultationStatuses || []).filter(s => s.active !== false).length > 0 && (
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">
               Status do Atendimento
@@ -365,7 +365,7 @@ export default function ReportsPage() {
             </label>
             <div className="flex flex-wrap gap-2">
               {(consultationStatuses || [])
-                .filter(s => !s.automatic && s.active !== false)
+                .filter(s => s.active !== false)
                 .map(s => {
                   const checked = selectedStatusIds.includes(s.id)
                   return (

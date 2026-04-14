@@ -28,7 +28,7 @@ const PATIENT_SELECT = `
   doctor_insurance, doctor_name, doctor_specialty, doctor_phone,
   diagnosis, notes, deleted,
   status_id, payment_method_id, primary_therapist_id, created_at, updated_at,
-  patient_specialties(specialty),
+  patient_specialties(specialty, patient_value, therapist_value),
   patient_conditions(diagnosis_id),
   patient_external_therapists(id, name, specialty, phone, sort_order),
   patient_involved_therapists(therapist_id)
@@ -43,7 +43,7 @@ const PATIENT_SELECT_FALLBACK = `
   doctor_insurance, doctor_name, doctor_specialty, doctor_phone,
   diagnosis, notes, deleted,
   status_id, payment_method_id, primary_therapist_id, created_at, updated_at,
-  patient_specialties(specialty),
+  patient_specialties(specialty, patient_value, therapist_value),
   patient_conditions(diagnosis_id),
   patient_external_therapists(id, name, specialty, phone, sort_order)
 `
@@ -185,7 +185,7 @@ export function DataProvider({ children }) {
 
     const newPatient = mapPatient({
       ...inserted,
-      patient_specialties: (data.specialties || []).map(s => ({ specialty: s })),
+      patient_specialties: (data.specialties || []).map(s => ({ specialty: s.key ?? s, patient_value: s.patientValue ?? null, therapist_value: s.therapistValue ?? null })),
       patient_conditions: (data.conditionIds || []).map(id => ({ diagnosis_id: id })),
       patient_external_therapists: (data.externalTherapists || []).map((t, i) => ({ ...t, sort_order: i })),
       patient_involved_therapists: (data.involvedTherapistIds || []).map(tid => ({ therapist_id: tid })),

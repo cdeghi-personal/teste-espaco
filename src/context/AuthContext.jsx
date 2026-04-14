@@ -67,7 +67,7 @@ export function AuthProvider({ children }) {
         id: therapist?.id || null,
         email: authUser.email,
         role,
-        name: therapist?.name || authUser.email,
+        name: therapist?.name || authUser.user_metadata?.full_name || authUser.user_metadata?.name || authUser.email.split('@')[0],
         specialty: therapist?.specialty || null,
         belongsToTeam: therapist?.belongs_to_team || false,
       })
@@ -79,7 +79,7 @@ export function AuthProvider({ children }) {
         id: null,
         email: authUser.email,
         role: 'admin',
-        name: authUser.email,
+        name: authUser.user_metadata?.full_name || authUser.user_metadata?.name || authUser.email.split('@')[0],
         specialty: null,
       })
     } finally {

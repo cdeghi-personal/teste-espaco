@@ -42,7 +42,7 @@ export function mapPatient(row) {
     therapistId: row.primary_therapist_id,
     involvedTherapistIds: (row.patient_involved_therapists || []).map(r => r.therapist_id),
     conditionIds: (row.patient_conditions || []).map(r => r.diagnosis_id),
-    specialties: (row.patient_specialties || []).map(r => r.specialty),
+    specialties: (row.patient_specialties || []).map(r => ({ key: r.specialty, patientValue: r.patient_value ?? null, therapistValue: r.therapist_value ?? null })),
     externalTherapists: (row.patient_external_therapists || [])
       .sort((a, b) => a.sort_order - b.sort_order)
       .map(r => ({ id: r.id, name: r.name, specialty: r.specialty || '', phone: r.phone || '' })),
@@ -239,7 +239,12 @@ export async function syncPatientRelations(patientId, data) {
     if (data.specialties.length) {
       ops.push(
         supabase.from('patient_specialties').insert(
-          data.specialties.map(s => ({ patient_id: patientId, specialty: s }))
+          data.specialties.map(s => ({
+            patient_id: patientId,
+            specialty: s.key ?? s,
+            patient_value: s.patientValue ?? null,
+            therapist_value: s.therapistValue ?? null,
+          }))
         )
       )
     }
