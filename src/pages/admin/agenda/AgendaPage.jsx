@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { FiPlus, FiChevronLeft, FiChevronRight, FiSearch, FiCalendar, FiEdit2 } from 'react-icons/fi'
+import HelpButton from '../../../components/ui/HelpButton'
 import { addDays, startOfWeek, format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { useData } from '../../../context/DataContext'
@@ -114,11 +115,20 @@ export default function AgendaPage() {
           <h1 className="text-xl md:text-2xl font-bold text-gray-900">Agenda</h1>
           <p className="text-sm text-gray-500 mt-0.5 capitalize">{formatMonthYear(weekRef)}</p>
         </div>
-        <Button variant="primary" onClick={() => { setEditItem(null); setShowModal(true) }}>
-          <FiPlus size={16} />
-          <span className="hidden sm:inline">Novo Atendimento</span>
+        <div className="flex items-center gap-2">
+          <HelpButton title="Como usar a Agenda">
+            <p><strong>Visualização semanal:</strong> a agenda exibe os atendimentos da semana atual. Use as setas para navegar entre semanas. No mobile, as abas mostram os dias separadamente.</p>
+            <p><strong>Criar atendimento:</strong> clique em <em>Novo Atendimento</em> e preencha paciente, terapeuta, especialidade, data e horário.</p>
+            <p><strong>Editar:</strong> clique no lápis (✏) no card do atendimento para abrir o formulário de edição.</p>
+            <p><strong>Filtro "Minha Agenda":</strong> terapeutas veem apenas seus próprios atendimentos. Admins veem todos.</p>
+            <p><strong>Legenda:</strong> as cores na legenda inferior identificam cada terapeuta.</p>
+          </HelpButton>
+          <Button variant="primary" onClick={() => { setEditItem(null); setShowModal(true) }}>
+            <FiPlus size={16} />
+            <span className="hidden sm:inline">Novo Atendimento</span>
           <span className="sm:hidden">Novo</span>
-        </Button>
+          </Button>
+        </div>
       </div>
 
       {/* Filters */}

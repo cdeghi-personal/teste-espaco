@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
 import { FiFileText, FiUser, FiUsers, FiCalendar, FiChevronDown } from 'react-icons/fi'
+import HelpButton from '../../../components/ui/HelpButton'
 import { useData } from '../../../context/DataContext'
 import { useAuth } from '../../../context/AuthContext'
 import { generateConsultasPacientePDF, generateConsultasTerapeutaPDF } from '../../../utils/generateReportPDF'
@@ -156,9 +157,19 @@ export default function ReportsPage() {
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-8">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Relatórios em PDF</h1>
-        <p className="text-sm text-gray-500 mt-1">Gere relatórios de atendimentos por paciente ou terapeuta.</p>
+      <div className="flex items-center justify-between gap-3 mb-6">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Relatórios em PDF</h1>
+          <p className="text-sm text-gray-500 mt-1">Gere relatórios de atendimentos por paciente ou terapeuta.</p>
+        </div>
+        <HelpButton title="Como gerar Relatórios">
+          <p><strong>Tipo de relatório:</strong> escolha entre <em>Consultas por Paciente</em> (mostra o valor cobrado do paciente por atendimento) ou <em>Consultas por Terapeuta</em> (mostra o valor do repasse ao terapeuta).</p>
+          <p><strong>Selecionar:</strong> use o campo de busca para encontrar o paciente ou terapeuta desejado.</p>
+          <p><strong>Período:</strong> selecione <em>Por mês</em> para escolher um mês específico, ou <em>Intervalo de datas</em> para definir um período personalizado.</p>
+          <p><strong>Status:</strong> filtre por um ou mais status de atendimento para incluir apenas os registros desejados. Deixe em branco para incluir todos.</p>
+          <p><strong>Valores:</strong> os valores por especialidade são configurados no cadastro de cada paciente (seção Terapeutas → Especialidades em Atendimento).</p>
+          <p><strong>PDF:</strong> clique em <em>Gerar PDF</em> para baixar o arquivo.</p>
+        </HelpButton>
       </div>
 
       <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 space-y-6">

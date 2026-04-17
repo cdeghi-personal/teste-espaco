@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { FiPlus, FiSearch, FiClipboard, FiChevronDown, FiChevronUp, FiEdit2, FiTrash2, FiEye } from 'react-icons/fi'
+import HelpButton from '../../../components/ui/HelpButton'
 import { useData } from '../../../context/DataContext'
 import { useAuth } from '../../../context/AuthContext'
 import Badge from '../../../components/ui/Badge'
@@ -55,11 +56,20 @@ export default function ConsultationsPage() {
           <h1 className="text-xl md:text-2xl font-bold text-gray-900">Atendimentos</h1>
           <p className="text-xs text-gray-500 mt-0.5">{filtered.length} registro(s)</p>
         </div>
-        <Button variant="primary" onClick={() => { setEditConsultation(null); setShowModal(true) }}>
-          <FiPlus size={16} />
-          <span className="hidden sm:inline">Novo Registro</span>
-          <span className="sm:hidden">Novo</span>
-        </Button>
+        <div className="flex items-center gap-2 shrink-0">
+          <HelpButton title="Como usar Atendimentos">
+            <p><strong>Registrar atendimento:</strong> clique em <em>Novo Registro</em> e preencha paciente, terapeuta, especialidade, data, horário, status e tipo.</p>
+            <p><strong>Filtros:</strong> use os filtros de especialidade, status, tipo e terapeuta para localizar atendimentos específicos.</p>
+            <p><strong>Editar:</strong> clique no lápis (✏) ou olhinho (👁) na linha para editar ou visualizar o atendimento.</p>
+            <p><strong>Status:</strong> os status disponíveis são configurados em Administração → Status Atendimento. Status marcados como automáticos são atribuídos pelo sistema.</p>
+            <p><strong>Atividades:</strong> dentro do formulário é possível registrar atividades realizadas durante o atendimento.</p>
+          </HelpButton>
+          <Button variant="primary" onClick={() => { setEditConsultation(null); setShowModal(true) }}>
+            <FiPlus size={16} />
+            <span className="hidden sm:inline">Novo Registro</span>
+            <span className="sm:hidden">Novo</span>
+          </Button>
+        </div>
       </div>
 
       <div className="flex flex-col sm:flex-row gap-2">

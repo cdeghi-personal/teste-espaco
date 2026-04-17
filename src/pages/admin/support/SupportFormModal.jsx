@@ -32,7 +32,10 @@ const EMPTY = { subject: '', type: '', author: '', description: '', solution: ''
 
 export default function SupportFormModal({ onClose, initial = null, onSaved }) {
   const { user } = useAuth()
+  const isAdmin = user?.role === 'admin'
   const isEdit = !!initial?.id
+  // Não-admin vê seus tickets em modo somente leitura (sem editar status/solução)
+  const readOnly = isEdit && !isAdmin
 
   const [form, setForm] = useState(isEdit ? { ...initial } : { ...EMPTY })
   const [history, setHistory] = useState(initial?.history || [])
@@ -69,6 +72,7 @@ export default function SupportFormModal({ onClose, initial = null, onSaved }) {
             author: form.author.trim(),
             description: form.description.trim(),
             status: 'novo',
+            created_by_id: user?.authId || null,
           })
           .select()
           .single()
@@ -161,22 +165,34 @@ export default function SupportFormModal({ onClose, initial = null, onSaved }) {
           rows={4}
         />
 
-        {/* Solução e Status — apenas na edição */}
-        {isEdit && (
-          <>
-            <Textarea
-              label="Solução"
-              value={form.solution || ''}
-              onChange={e => set('solution', e.target.value)}
-              placeholder="Descreva a solução aplicada..."
-              rows={3}
-            />
-            <Select label="Status" value={form.status} onChange={e => set('status', e.target.value)}>
-              {Object.entries(TICKET_STATUS).map(([k, v]) => (
-                <option key={k} value={k}>{v.label}</option>
-              ))}
-            </Select>
-          </>
+        {/* Solução — admin pode editar; não-admin vê somente leitura se preenchida */}
+        {isEdit && (isAdmin || form.solution) && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Solução</label>
+            {readOnly
+              ? <p className="text-sm text-gray-700 bg-gray-50 rounded-xl px-3 py-2 border border-gray-100 whitespace-pre-wrap">{form.solution || '—'}</p>
+              : <Textarea value={form.solution || ''} onChange={e => set('solution', e.target.value)} placeholder="Descreva a solução aplicada..." rows={3} />
+            }
+          </div>
+        )}
+
+        {/* Status — apenas para admin */}
+        {isEdit && isAdmin && (
+          <Select label="Status" value={form.status} onChange={e => set('status', e.target.value)}>
+            {Object.entries(TICKET_STATUS).map(([k, v]) => (
+              <option key={k} value={k}>{v.label}</option>
+            ))}
+          </Select>
+        )}
+
+        {/* Status — não-admin vê badge sem editar */}
+        {isEdit && !isAdmin && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+            {(() => { const st = TICKET_STATUS[form.status]; return (
+              <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${st?.color || 'bg-gray-100 text-gray-600'}`}>{st?.label || form.status}</span>
+            )})()}
+          </div>
         )}
 
         {/* Histórico — apenas na edição */}
@@ -217,10 +233,12 @@ export default function SupportFormModal({ onClose, initial = null, onSaved }) {
 
         {/* Botões */}
         <div className="flex justify-end gap-2 pt-2">
-          <Button variant="outline" onClick={onClose}>Cancelar</Button>
-          <Button onClick={handleSave} disabled={saving}>
-            {saving ? 'Salvando...' : isEdit ? 'Salvar Alterações' : 'Criar Suporte'}
-          </Button>
+          <Button variant="outline" onClick={onClose}>{readOnly ? 'Fechar' : 'Cancelar'}</Button>
+          {!readOnly && (
+            <Button onClick={handleSave} disabled={saving}>
+              {saving ? 'Salvando...' : isEdit ? 'Salvar Alterações' : 'Abrir Chamado'}
+            </Button>
+          )}
         </div>
       </div>
     </Modal>

@@ -110,14 +110,12 @@ export default function AdminSidebar({ open, onClose }) {
           />
         )}
 
-        {isAdmin && (
-          <NavItem
-            to={ROUTES.SUPPORT}
-            icon={FiLifeBuoy}
-            label="Suporte"
-            onClick={onClose}
-          />
-        )}
+        <NavItem
+          to={ROUTES.SUPPORT}
+          icon={FiLifeBuoy}
+          label="Suporte"
+          onClick={onClose}
+        />
 
         {isAdmin && (
           <>

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { FiPlus, FiRefreshCw, FiSearch } from 'react-icons/fi'
+import HelpButton from '../../../components/ui/HelpButton'
 import { supabase } from '../../../lib/supabase'
 import { useAuth } from '../../../context/AuthContext'
 import SupportFormModal, { TICKET_TYPES, TICKET_STATUS } from './SupportFormModal'
@@ -51,7 +52,6 @@ export default function SupportPage() {
     return true
   })
 
-  if (!isAdmin) return <div className="p-8 text-center text-gray-500">Acesso restrito a administradores.</div>
 
   return (
     <div className="p-3 md:p-6">
@@ -59,14 +59,25 @@ export default function SupportPage() {
       <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Suporte</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Registro de erros, dúvidas e melhorias do sistema.</p>
+          <p className="text-sm text-gray-500 mt-0.5">
+            {isAdmin ? 'Todos os chamados abertos no sistema.' : 'Seus chamados de suporte.'}
+          </p>
         </div>
-        <button
-          onClick={openCreate}
-          className="flex items-center gap-2 bg-brand-blue text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-brand-blue-dark transition-colors"
-        >
-          <FiPlus size={16} /> Novo Suporte
-        </button>
+        <div className="flex items-center gap-2">
+          <HelpButton title="Como usar o Suporte">
+            <p><strong>Abrir chamado:</strong> clique em <em>Novo Suporte</em>, preencha assunto, tipo (Erro, Dúvida ou Melhoria), autor e uma descrição detalhada.</p>
+            <p><strong>Tipos:</strong> <em>Erro</em> para problemas no sistema, <em>Dúvida</em> para perguntas de uso, <em>Melhoria</em> para sugestões.</p>
+            <p><strong>Acompanhar:</strong> clique em qualquer chamado para ver o status atual e o histórico de mudanças.</p>
+            <p><strong>Status do chamado:</strong> Novo → Em Análise → Em Desenvolvimento → Resolvido → Fechado. Somente administradores podem alterar o status e registrar a solução.</p>
+            <p><strong>Visibilidade:</strong> cada usuário vê apenas seus próprios chamados. Administradores veem todos.</p>
+          </HelpButton>
+          <button
+            onClick={openCreate}
+            className="flex items-center gap-2 bg-brand-blue text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-brand-blue-dark transition-colors"
+          >
+            <FiPlus size={16} /> Novo Suporte
+          </button>
+        </div>
       </div>
 
       {/* Filtros */}

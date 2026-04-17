@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { FiPlus, FiSearch, FiEdit2, FiTrash2, FiUser, FiRotateCcw, FiEyeOff, FiEye, FiChevronRight } from 'react-icons/fi'
+import HelpButton from '../../../components/ui/HelpButton'
 import { useData } from '../../../context/DataContext'
 import { useAuth } from '../../../context/AuthContext'
 import Badge from '../../../components/ui/Badge'
@@ -57,6 +58,14 @@ export default function PatientsPage() {
           <p className="text-xs text-gray-500 mt-0.5">{filtered.length} exibido(s)</p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          <HelpButton title="Como usar Pacientes">
+            <p><strong>Buscar:</strong> use o campo de busca para filtrar por nome, CPF, diagnóstico ou terapeuta.</p>
+            <p><strong>Cadastrar:</strong> clique em <em>Novo Paciente</em> e preencha dados pessoais, clínicos e vínculos com responsáveis e terapeutas.</p>
+            <p><strong>Editar:</strong> clique no lápis (✏) na linha do paciente para editar os dados.</p>
+            <p><strong>Detalhe:</strong> clique na linha ou no olhinho (👁) para abrir a ficha completa do paciente com histórico de atendimentos.</p>
+            <p><strong>Excluídos:</strong> o botão de lixeira no canto superior ativa/desativa a exibição de pacientes excluídos (soft delete).</p>
+            <p><strong>Especialidades:</strong> na edição, a seção Terapeutas permite adicionar as especialidades em atendimento com valores por especialidade.</p>
+          </HelpButton>
           <button
             onClick={() => setShowDeleted(v => !v)}
             className={`p-2 rounded-xl border transition-all ${

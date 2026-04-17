@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { FiPlus, FiSearch, FiEdit2, FiTrash2, FiUserCheck, FiPhone, FiMail, FiEyeOff, FiEye, FiRotateCcw } from 'react-icons/fi'
+import HelpButton from '../../../components/ui/HelpButton'
 import { useData } from '../../../context/DataContext'
 import { useAuth } from '../../../context/AuthContext'
 import Button from '../../../components/ui/Button'
@@ -56,6 +57,13 @@ export default function GuardiansPage() {
           <p className="text-xs text-gray-500 mt-0.5">{filtered.length} exibido(s)</p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          <HelpButton title="Como usar Responsáveis">
+            <p><strong>Buscar:</strong> pesquise por nome do responsável, CPF, telefone ou nome de um paciente vinculado.</p>
+            <p><strong>Cadastrar:</strong> clique em <em>Novo Responsável</em>, preencha os dados e vincule os pacientes sob sua responsabilidade.</p>
+            <p><strong>Editar:</strong> clique no lápis (✏) para editar dados ou alterar os pacientes vinculados.</p>
+            <p><strong>Inativos:</strong> o botão no canto superior alterna a exibição de responsáveis inativos.</p>
+            <p><strong>Um responsável pode estar vinculado a vários pacientes</strong> (ex: pai com dois filhos em atendimento).</p>
+          </HelpButton>
           <button
             onClick={() => setShowInactive(v => !v)}
             className={`p-2 rounded-xl border transition-all ${showInactive ? 'bg-red-50 text-red-700 border-red-200' : 'bg-white text-gray-500 border-gray-200'}`}
