@@ -19,6 +19,7 @@ Sistema de gestão para uma clínica de terapias infantis multidisciplinares cha
 - **react-icons** (prefixo `Fi` do Feather Icons)
 - **date-fns** para manipulação de datas
 - **@supabase/supabase-js**
+- **jspdf** + **jspdf-autotable** — geração de PDFs
 
 ## Estrutura de pastas relevante
 
@@ -38,6 +39,8 @@ src/
     storageUtils.js              # generateId (helpers locais)
     dateUtils.js                 # formatDateBR, formatDateShort, formatWeekDay, isoToday, calculateAge, getWeekDays, formatMonthYear
     validators.js
+    generateProntuarioPDF.js     # Gera PDF completo do prontuário (admin only)
+    generateReportPDF.js         # Gera relatórios PDF: consultas por paciente ou terapeuta
   components/
     layout/
       PublicLayout.jsx, PublicHeader.jsx, PublicFooter.jsx
@@ -47,7 +50,8 @@ src/
     common/
       ScrollToTop.jsx
     ui/
-      Badge.jsx, Button.jsx, Input.jsx, Select.jsx, Textarea.jsx, Modal.jsx, EmptyState.jsx, Spinner.jsx, Toast.jsx
+      Badge.jsx, Button.jsx, Input.jsx, Select.jsx, Textarea.jsx, Modal.jsx,
+      EmptyState.jsx, Spinner.jsx, Toast.jsx, HelpButton.jsx
   pages/
     public/   HomePage, AboutPage, ServicesPage, TeamPage, ContactPage
     auth/     LoginPage, ResetPasswordPage
@@ -68,6 +72,8 @@ src/
       rooms/            RoomsPage, RoomFormModal
       audit/            AuditPage
       contactleads/     ContactLeadsPage
+      reports/          ReportsPage
+      support/          SupportPage, SupportFormModal
 supabase/
   01_schema.sql                  # Tabelas, enums, índices, trigger de criação de profile
   02_rls.sql                     # Row Level Security — admin vê tudo, terapeuta vê só os seus
@@ -80,7 +86,7 @@ supabase/
   09_consultation_status_automatic.sql  # Flag automatic em consultation_statuses
   10_guardian_neighborhood.sql   # Campo neighborhood em guardians
   11_consultation_time_room.sql  # Campos time e room_id em consultations
-  12_involved_therapists.sql     # Tabela patient_involved_therapists + RLS atualizado para Gerente de Conta + Envolvidos
+  12_involved_therapists.sql     # Tabela patient_involved_therapists + RLS atualizado para Gerente do Caso + Envolvidos
   25_audit_log.sql               # Cria tabela audit_logs + triggers INSERT/UPDATE/DELETE em todas as tabelas principais
   26_fix_audit_log.sql           # Fix: usa current_setting('request.jwt.claims') em vez de auth.uid()
   27_fix_audit_always_log.sql    # Fix: remove guard de NULL — trigger sempre grava (diagnóstico)
@@ -93,6 +99,10 @@ supabase/
   34_contact_leads.sql           # Tabela contact_leads + RLS + GRANT para anon (INSERT público)
   35_fix_contact_leads_grant.sql # Revoga GRANT SELECT/UPDATE de authenticated (corrigido em 36)
   36_fix_contact_leads_grant2.sql # Restaura GRANT SELECT/UPDATE — GRANT + RLS devem coexistir
+  37_patient_specialty_values.sql # Adiciona patient_value e therapist_value em patient_specialties
+  38_support_tickets.sql         # Tabela support_tickets + support_ticket_history + RLS admin-only inicial
+  39_support_tickets_all_users.sql # Adiciona created_by_id; abre INSERT p/ todos, SELECT por dono ou admin
+  40_audit_resource_name_consultations.sql # fn_audit_log: consultations → "Paciente | Terapeuta | Data"; prontuário → "Paciente | Exames/Medicamentos/Conduta"
   functions/
     invite-therapist/index.ts    # Edge Function — envia convite por e-mail ao criar terapeuta
 ```
@@ -116,7 +126,7 @@ Encontrar em: Supabase Dashboard → Project Settings → API.
 | `profiles` | Vincula `auth.users` ao role (`admin` ou `therapist`) |
 | `therapists` | Terapeutas — tem `user_id` que referencia `auth.users` |
 | `patients` | Pacientes — soft delete com `deleted = true` |
-| `patient_specialties` | Relação N:N paciente ↔ especialidade |
+| `patient_specialties` | Relação N:N paciente ↔ especialidade; colunas `patient_value` e `therapist_value` (NUMERIC 10,2) |
 | `patient_conditions` | Relação N:N paciente ↔ diagnósticos (comorbidades) |
 | `guardians` | Responsáveis — soft delete com `active = false`; tem campo `neighborhood` |
 | `patient_guardians` | Relação N:N paciente ↔ responsável |
@@ -136,17 +146,20 @@ Encontrar em: Supabase Dashboard → Project Settings → API.
 | `medical_record_exams` | Exames complementares do paciente — N por prontuário |
 | `medical_record_medications` | Medicamentos do paciente — N por prontuário |
 | `medical_record_conducts` | Conduta & objetivo terapêutico — N por prontuário, vinculado ao terapeuta/especialidade |
-| `patient_involved_therapists` | Terapeutas envolvidos no atendimento do paciente (N:N) — complementa o Gerente de Conta |
+| `patient_involved_therapists` | Terapeutas envolvidos no atendimento do paciente (N:N) — complementa o Gerente do Caso |
 | `audit_logs` | Log de auditoria — registra VIEW/INSERT/UPDATE/DELETE com user_id, user_email, action, resource_type, resource_id, resource_name |
 | `contact_leads` | Contatos do site público — name, phone, email, specialty, how_found, message, status, internal_note, assigned_to, last_contact_at |
+| `support_tickets` | Chamados de suporte — subject, type, author, description, solution, status, created_by_id |
+| `support_ticket_history` | Histórico de status dos chamados — ticket_id, status, changed_at, changed_by |
 
 ### Mappers (DB → App)
 
 Todos em `src/lib/supabase.js`. Convertem snake_case do banco para camelCase do app:
-- `mapPatient`, `mapGuardian` (inclui `neighborhood`), `mapTherapist`, `mapAppointment` (inclui `startTime`, `endTime` calculado via duration), `mapConsultation` (inclui `time`, `roomId`)
+- `mapPatient` — `specialties` agora é `[{ key, patientValue, therapistValue }]` (não mais string[])
+- `mapGuardian` (inclui `neighborhood`), `mapTherapist`, `mapAppointment` (inclui `startTime`, `endTime` calculado via duration), `mapConsultation` (inclui `time`, `roomId`)
 - `mapSpecialty`, `mapPaymentMethod`, `mapDiagnosis`, `mapPatientStatus`, `mapRoom`
 - `mapConsultationStatus` (inclui `automatic`), `mapAppointmentType`, `mapExam`, `mapMedication`, `mapConduct`
-- `syncPatientRelations(patientId, { specialties, conditionIds })`
+- `syncPatientRelations(patientId, { specialties, conditionIds })` — specialties agora `[{ key, patientValue, therapistValue }]`
 - `syncGuardianPatients(guardianId, patientIds)`
 - `syncTherapistSpecialties(therapistId, [{ specialty, credential }])`
 - `syncExternalTherapists(patientId, [{ name, specialty, phone }])`
@@ -155,23 +168,32 @@ Todos em `src/lib/supabase.js`. Convertem snake_case do banco para camelCase do 
 
 1. Supabase Dashboard → Authentication → Users → "+ Add user" → Create new user
 2. Preencher email + senha + marcar "Auto Confirm User"
-3. Rodar no SQL Editor (pode adicionar múltiplos de uma vez):
+3. Rodar no SQL Editor:
 ```sql
 INSERT INTO public.profiles (id, role)
 VALUES
-  ((SELECT id FROM auth.users WHERE email = 'admin1@email.com'), 'admin'),
-  ((SELECT id FROM auth.users WHERE email = 'admin2@email.com'), 'admin')
+  ((SELECT id FROM auth.users WHERE email = 'admin1@email.com'), 'admin')
 ON CONFLICT (id) DO UPDATE SET role = 'admin';
 ```
+
+### Como definir nome do admin (exibido no menu)
+
+O nome do admin vem de `authUser.user_metadata.full_name`. Para definir:
+```sql
+UPDATE auth.users
+SET raw_user_meta_data = raw_user_meta_data || '{"full_name": "Nome do Admin"}'::jsonb
+WHERE id = 'UUID-DO-USUARIO';
+```
+Após salvar, o admin faz logout e login para atualizar a sessão.
 
 ## Autenticação e Roles
 
 - Autenticação via **Supabase Auth** (JWT real)
 - Dois roles: `admin` e `therapist` — armazenados na tabela `profiles`
-- Role definido no `app_metadata` do Supabase (só o backend pode escrever)
 - **Admin** vê tudo. **Therapist** vê apenas seus próprios dados (via RLS no banco)
 - `user.id` no contexto = ID da tabela `therapists` (não o UUID do auth)
 - `user.authId` = UUID do `auth.users`
+- `user.name` = `therapist.name` para terapeutas; para admins: `user_metadata.full_name` → `user_metadata.name` → prefixo do e-mail
 
 ### Fluxo de convite de terapeuta
 
@@ -190,29 +212,25 @@ Admin cria terapeuta no TherapistFormModal
 npx supabase functions deploy invite-therapist --project-ref ffkkgmikvsqhutftoajh
 ```
 
-O Project Ref está em: Supabase Dashboard → Project Settings → General → Reference ID.
-Também configurar a secret `SITE_URL` em: Edge Functions → invite-therapist → Secrets.
-
-> **IMPORTANTE — JWT Verification:** A Edge Function `invite-therapist` deve ter **JWT Verification DESATIVADO** (Supabase Dashboard → Edge Functions → invite-therapist → Settings → JWT Verification → off). A função faz sua própria verificação de admin via `getUser()` + perfil. Com JWT Verification ativado, o gateway do Supabase rejeita a requisição com 401 antes de qualquer código rodar, e nenhum log aparece.
+Project Ref: `ffkkgmikvsqhutftoajh` (Supabase Dashboard → Project Settings → General → Reference ID).
+Secret necessária: `SITE_URL`. JWT Verification deve estar **desativado**.
 
 ### Fluxo de reset de senha / convite
 
 - Supabase redireciona para o app com evento `PASSWORD_RECOVERY`
-- `AuthContext` detecta esse evento e seta `needsPasswordReset = true`
+- `AuthContext` detecta e seta `needsPasswordReset = true`
 - `App.jsx` tem `<AuthRedirect />` que redireciona para `/reset-senha`
 - `ResetPasswordPage` chama `updatePassword()` → entra no dashboard
+
+### Race condition de login corrigida
+
+`LoginPage` não chama `navigate()` diretamente — usa `useEffect` que observa `isAuthenticated` e redireciona somente após `loadUser()` terminar.
 
 ### Configuração de URL no Supabase
 
 Authentication → URL Configuration:
 - Site URL: URL do ambiente (localhost ou produção)
-- Redirect URLs: adicionar `http://localhost:5175/**` para dev e URL do Vercel para prod
-
-### SMTP (e-mails)
-
-O plano gratuito do Supabase tem limite de **2 e-mails/hora**.
-Para produção, configurar SMTP próprio em Project Settings → Auth → SMTP Settings.
-Recomendado: **Resend** (resend.com) — 3.000 e-mails/mês grátis.
+- Redirect URLs: `http://localhost:5175/**` para dev + URL do Vercel para prod
 
 ## Entidades e CRUD
 
@@ -234,15 +252,8 @@ Recomendado: **Resend** (resend.com) — 3.000 e-mails/mês grátis.
 | medical_record_exams | Hard delete | — |
 | medical_record_medications | Hard delete | — |
 | medical_record_conducts | Hard delete | — |
-
-## Especialidades
-
-```js
-SPECIALTIES = {
-  FISIOTERAPIA, FONOAUDIOLOGIA, TO (Terapia Ocupacional), PSICOLOGIA
-}
-```
-Cada especialidade tem `label`, `color` (Tailwind), `bgColor`, `textColor`, `calendarColor`.
+| support_tickets | Hard delete | — |
+| support_ticket_history | Hard delete | — |
 
 ## Rotas
 
@@ -257,6 +268,8 @@ Cada especialidade tem `label`, `color` (Tailwind), `bgColor`, `textColor`, `cal
 '/admin/terapeutas', '/admin/especialidades', '/admin/formapagamento'
 '/admin/diagnostico', '/admin/statuspaciente', '/admin/statusconsulta'
 '/admin/tipoatendimento', '/admin/salas', '/admin/auditoria', '/admin/contatos'
+'/admin/relatorios'   // admin only
+'/admin/suporte'      // todos os usuários autenticados
 ```
 
 ## Padrões de código
@@ -265,7 +278,6 @@ Cada especialidade tem `label`, `color` (Tailwind), `bgColor`, `textColor`, `cal
 - Formulários em Modais (`*FormModal.jsx`) — padrão: recebem `onClose` e `initial` (para edição)
 - `Badge` component aceita props `specialty`, `quality` ou `patientStatus`
 - Datas armazenadas como string ISO `YYYY-MM-DD`; timestamps como ISO completo
-- Quando um agendamento vira consulta: `appointment.consultationId = consultation.id` e `appointment.status = 'completed'`
 - DataContext é **async** — todas as funções CRUD retornam Promise
 - Erros do Supabase são exibidos via `Toast` (notificação na parte inferior da tela, 4s)
 - Funções CRUD retornam `{ error: string }` em caso de falha, ou o objeto criado em caso de sucesso
@@ -276,190 +288,132 @@ Cada especialidade tem `label`, `color` (Tailwind), `bgColor`, `textColor`, `cal
 - Componente em `src/components/ui/Toast.jsx`
 - `ToastProvider` envolve o app em `App.jsx` (dentro de `AuthProvider`)
 - Hook `useToast()` retorna `{ show(message, type) }` — type: `'error'` (padrão) ou `'success'`
-- Aparece na parte inferior centralizada, desaparece em 4s, pode ser fechado manualmente
 
-## Sidebar Admin (mobile)
+## HelpButton
 
-- Seção "Administração" é **colapsável** — começa fechada no mobile
-- Botão `▼/▲` ao lado do título "Administração" abre/fecha os itens de config
-- "Sair" sempre visível no rodapé da sidebar (fora da área rolável)
+- Componente em `src/components/ui/HelpButton.jsx`
+- Uso: `<HelpButton title="Título"><p>Conteúdo JSX...</p></HelpButton>`
+- Renderiza botão "Ajuda" com ícone `FiHelpCircle`; abre modal com as instruções
+- Adicionado nas páginas: Agenda, Pacientes, Responsáveis, Atendimentos, Prontuário, Relatórios, Suporte
 
-## Tela de Login
+## Sidebar Admin
 
-- Logo oficial `/logo.jpg` no topo
-- Botão "Esqueci minha senha" ao lado do label do campo senha
-- Dispara `supabase.auth.resetPasswordForEmail()` com redirect para `/reset-senha`
-- Exibe tela de confirmação após envio do e-mail
-- **Race condition corrigida:** `LoginPage` não chama `navigate()` diretamente — usa `useEffect` que observa `isAuthenticated` e redireciona somente após `loadUser()` terminar. Evita o problema de ter que clicar "Entrar" múltiplas vezes.
-
-## Campos do Terapeuta
-
-- **Especialidades múltiplas:** tabela `therapist_specialties` — cada linha tem `specialty` (chave do enum) e `credential` (nº do conselho, ex: CRFa 2/12345)
-- O campo `therapists.specialty` guarda a especialidade principal (primeira da lista) para compatibilidade com queries existentes
-- **Dados bancários:** `bank`, `agency`, `account_number`, `pix_key` na tabela `therapists`
-- No formulário, dados bancários ficam em linha (4 campos lado a lado)
+- Item "Contatos" — visível apenas para admin, com badge vermelho mostrando contagem de `novo`
+- Item "Relatórios" — visível apenas para admin
+- Item "Suporte" — visível para **todos** os usuários autenticados
+- Seção "Administração" é colapsável — começa fechada no mobile
+- "Sair" sempre visível no rodapé
 
 ## Campos do Paciente
 
-- **Terapeutas:** `primary_therapist_id` (Gerente de Conta) + tabela `patient_involved_therapists` (Terapeutas Envolvidos, N:N). No app: `therapistId` e `involvedTherapistIds[]`. Terapeuta vê pacientes onde é Gerente OU Envolvido (RLS).
+- **Terapeutas:** `primary_therapist_id` (**Gerente do Caso**) + tabela `patient_involved_therapists` (Terapeutas Envolvidos, N:N). No app: `therapistId` e `involvedTherapistIds[]`.
+- **Especialidades em Atendimento:** tabela `patient_specialties` com colunas `specialty` (key), `patient_value` e `therapist_value`. No app: `patient.specialties = [{ key, patientValue, therapistValue }]`. Valores visíveis/editáveis somente por admin.
 - **Dados pessoais extras:** `rg`, `phone`, `email`, `address`, `neighborhood`, `city`, `state`, `zip_code`, `indication`
 - **Dados escolares:** `school_name`, `school_phone`, `school_address`, `school_neighborhood`, `school_city`, `school_state`, `school_zip`, `school_coordinator`
 - **Médico responsável:** `doctor_insurance`, `doctor_name`, `doctor_specialty`, `doctor_phone`
 - **Terapeutas externos:** tabela `patient_external_therapists` — lista N por paciente, com `name`, `specialty`, `phone`
-- **Diagnóstico Principal:** campo `diagnosis` (texto) — no formulário é um Select do cadastro de diagnósticos
-- **Comorbidades:** tabela `patient_conditions` — exclui automaticamente o diagnóstico principal da lista
+- **Diagnóstico Principal:** campo `diagnosis` (texto livre via Select)
+- **Comorbidades:** tabela `patient_conditions` — exclui o diagnóstico principal da lista
 
 ## Campos do Responsável
 
 - Endereço completo: `address`, `neighborhood`, `city`, `state`, `cep`
-- Seleção de pacientes vinculados: lista pesquisável com checkboxes (suporta muitos pacientes)
-- Busca na listagem: por nome do responsável, CPF, telefone ou **nome do paciente vinculado**
+- Seleção de pacientes vinculados: lista pesquisável com checkboxes
+- Busca na listagem: por nome, CPF, telefone ou **nome do paciente vinculado**
 
 ## PatientDetailPage
 
-Tela sem abas — apenas **Resumo** em tela única.
-
-- **Dados Pessoais:** Nome, Nasc, Idade, Sexo, CPF + Terapeuta Principal
-- **Informações Clínicas:** Diagnóstico Principal, Comorbidades, **Especialidades em Atendimento** (badges), Forma de Pagamento
-- **Responsáveis:** card inline com Nome, Parentesco, Tel, E-mail
-- **Observações Gerais:** notas do paciente
-- **Últimos Atendimentos:** 10 mais recentes, cada card mostra Data + Horário, Especialidade, Status, Tipo, Terapeuta, Sala
+- **Informações Clínicas:** Diagnóstico Principal, Comorbidades, Forma de Pagamento (especialidades removidas daqui)
+- **Terapeutas:** Gerente do Caso, Terapeutas Envolvidos, **tabela de Especialidades em Atendimento** (Especialidade | Valor Paciente | Valor Terapeuta — colunas de valor apenas para admin)
+- **Responsáveis:** card inline
+- **Últimos Atendimentos:** 10 mais recentes
 
 ## Prontuário Clínico (MedicalRecordsPage — `/admin/prontuario`)
 
-Página independente de prontuário. Fluxo: busca paciente → carrega/cria `medical_record` → exibe 4 seções colapsáveis:
+4 seções colapsáveis: Exames Complementares, Medicamentos, Conduta & Objetivo Terapêutico, Histórico de Atendimentos.
 
-| Seção | Tabela | Inicia | Descrição |
-|---|---|---|---|
-| Exames Complementares | `medical_record_exams` | **Fechada** | Descrição, data, link/anexo, observações |
-| Medicamentos | `medical_record_medications` | **Fechada** | Medicamento, data, status (ativa/interrompida), observações |
-| Conduta & Objetivo Terapêutico | `medical_record_conducts` | **Fechada** | Terapeuta, especialidade, conduta, objetivo, datas, status |
-| Histórico de Atendimentos | `consultations` | **Aberta** | Navegação por mês; card compacto com Data+Horário/Especialidade/Terapeuta/Status/Tipo/Sala/Objetivo; lápis abre `ConsultationFormModal`; link "Adicionar atendimento" no rodapé |
+**Histórico de Atendimentos — filtros:**
+- **Período:** 5 botões fixos — Mês -2, Mês Anterior, Mês Corrente (default), Mês Seguinte, Período (De & Até)
+- **Status:** chips de múltipla seleção; vazio = todos
+- **Ações em lote (admin):** checkbox por atendimento + botões de status dinâmicos (todos os status ativos)
 
-**Padrão de edição inline:** cada linha tem lápis (abre draft local) e lixeira. Novo item usa formulário dashed expandido (link `+ Adicionar ...`).
+**PDF do prontuário:** botão "PDF" no header (admin only) → `generateProntuarioPDF()`
 
-**Funções do DataContext para prontuário:**
-- `getOrCreateMedicalRecord(patientId, authUserId)` → retorna `medicalRecordId`
-- `getExams(mrId)` / `addExam(mrId, data)` / `updateExam(id, data)` / `deleteExam(id)`
-- `getMedications(mrId)` / `addMedication(mrId, data)` / `updateMedication(id, data)` / `deleteMedication(id)`
-- `getConducts(mrId)` / `addConduct(mrId, data)` / `updateConduct(id, data)` / `deleteConduct(id)`
+## Relatórios PDF (`/admin/relatorios`)
 
-**Componentes internos (não exportados):** `ExamRow`, `MedRow`, `ConductRow`, `InlineRow`, `Section(defaultOpen)` — cada Row gerencia seu próprio estado de edição via `useState` local.
+- **Consultas por Paciente:** coluna Valor (R$) usa `patient.specialties.find(s => s.key === c.specialty)?.patientValue`
+- **Consultas por Terapeuta:** coluna Valor (R$) usa `patient.specialties.find(s => s.key === c.specialty)?.therapistValue` (buscando o paciente do atendimento)
+- Ambos exibem total de atendimentos + total do período no rodapé
+- Filtros: tipo de relatório, paciente/terapeuta (searchable), período (mês ou De/Até), status (múltipla seleção — inclui automáticos)
+- Funções: `generateConsultasPacientePDF()`, `generateConsultasTerapeutaPDF()` em `src/utils/generateReportPDF.js`
+
+## Suporte (`/admin/suporte`)
+
+- **Acesso:** todos os usuários autenticados. Admin vê todos os chamados; usuário vê apenas os próprios.
+- **Criar chamado:** Assunto, Tipo (Erro/Dúvida/Melhoria), Autor, Descrição. Status inicia sempre como "Novo".
+- **Editar (admin):** todos os campos + Solução + Status + tabela de Histórico de Mudanças de Status.
+- **Visualizar (não-admin):** apenas leitura; vê status como badge e solução se preenchida.
+- `support_tickets.created_by_id` = `auth.uid()` do criador — base do RLS por usuário.
+- `support_ticket_history`: cada mudança de status registra `status`, `changed_at`, `changed_by` (nome do usuário).
+- Status: `novo` → `em_analise` → `em_desenvolvimento` → `resolvido` → `fechado`
 
 ## Status Atendimento (`/admin/statusconsulta`)
 
-Tabela `consultation_statuses` — toggle `active`, cor do badge configurável, flag `automatic`.
-
-- Status marcados como `automatic = true` **não aparecem** no Select de Status Atendimento do `ConsultationFormModal` (reservados para atribuição automática pelo sistema)
-- Funções no DataContext: `addConsultationStatus(data)` / `updateConsultationStatus(id, data)`
-
-## Tipos de Atendimento (`/admin/tipoatendimento`)
-
-Tabela `appointment_types` — toggle `active`. Dados iniciais: Sessão Individual, Grupo Terapêutico, Avaliação, Devolutiva.
-Funções no DataContext: `addAppointmentType(data)` / `updateAppointmentType(id, data)`
+- Flag `automatic = true` → não aparece no Select do `ConsultationFormModal`, mas **aparece** nos filtros de relatório e no prontuário
+- Ações em lote do prontuário mostram **todos os status ativos** (incluindo automáticos)
 
 ## Consultas (`/admin/consultas`)
 
-- Campo **Status Atendimento** filtra automáticos (só mostra os manuais)
-- Campo **Tipo de Atendimento** vinculado à tabela `appointment_types`
-- Campos **Horário** (type=time) e **Sala** no formulário de registro
-- Adicionar atividades usa link inline expandido (padrão prontuário): `+ Adicionar atividade`
-- Card na listagem exibe: Paciente, Especialidade, Status, Tipo / Data + Hora, Terapeuta, Sala
-- Editar/excluir visível apenas para o terapeuta responsável pelo atendimento ou admin
-
-## Política de Senha Forte (ResetPasswordPage)
-
-- Regras validadas em tempo real com indicador visual (FiCheck/FiX por regra):
-  - Mínimo 8 caracteres
-  - Pelo menos 1 letra maiúscula
-  - Pelo menos 1 letra minúscula
-  - Pelo menos 1 número
-  - Pelo menos 1 caractere especial
-- Botão de submit desabilitado até todas as regras passarem
-
-## Agenda (DataContext)
-
-- `mapAppointment` expõe `startTime` (= `time` do banco) e `endTime` (calculado: startTime + duration)
-- `DataContext.addAppointment` e `updateAppointment` aceitam `startTime` ou `time`
-- Filtro "Minha Agenda" mostra todos os agendamentos quando o usuário é `admin`
-
-## Atenção — SELECTs explícitos no DataContext
-
-`CONSULTATION_SELECT` lista colunas explicitamente. Ao adicionar novas colunas ao banco, **sempre incluir no SELECT** correspondente, caso contrário o campo só aparece após edição (o insert/update retorna tudo, mas a carga inicial não).
-
-Constantes de SELECT no DataContext: `PATIENT_SELECT`, `GUARDIAN_SELECT`, `CONSULTATION_SELECT`.
-
-## Especialidades (tabela `specialties` no banco)
-
-- Campos no banco: `key` (identificador único, ex: `MUSICOTERAPIA`) e `label` (nome exibido)
-- `SpecialtyFormModal` gera o `key` automaticamente a partir do `label` digitado
-- `key` aceita apenas letras maiúsculas, números e `_`
-- A página exibe tanto o `label` quanto o `key` em cada linha
-
-## Deploy
-
-- **Vercel** — conectado ao GitHub (branch `main`)
-- `vercel.json` com rewrite `/* → /index.html` para SPA routing
-- Variáveis de ambiente do Supabase configuradas em Vercel → Settings → Environment Variables
-- Edge Functions: `npx supabase functions deploy invite-therapist --project-ref ffkkgmikvsqhutftoajh`
-  - Project Ref: `ffkkgmikvsqhutftoajh`
-  - Secret necessária: `SITE_URL` (URL do app)
-  - JWT Verification deve estar **desativado** na função (ver seção acima)
-
-## Auditoria de Acesso (`/admin/auditoria`)
-
-- Tabela `audit_logs` no banco — campos: `user_id`, `user_email`, `action`, `resource_type`, `resource_id`, `resource_name`, `created_at`
-- **INSERT/UPDATE/DELETE** são capturados por triggers AFTER em todas as tabelas principais (fn_audit_log — SECURITY DEFINER, SET row_security = off)
-- **VIEW** é registrado pelo frontend via RPC `log_view_audit()` — função SECURITY DEFINER que lê o usuário de `request.jwt.claims`
-- `logAudit(action, resourceType, resourceId, resourceName)` em `DataContext` — chama `supabase.rpc('log_view_audit', ...)`
-- Pontos de VIEW implementados:
-  - Pacientes: clicar na linha, olhinho ou lápis da listagem (`PatientsPage`)
-  - Pacientes: acessar `/admin/pacientes/:id` diretamente (`PatientDetailPage`)
-  - Responsáveis: clicar no olhinho ou lápis da listagem (`GuardiansPage`)
-  - Atendimentos: clicar no olhinho ou lápis da listagem (`ConsultationsPage`)
-  - Agenda: clicar no lápis do card (desktop e mobile) (`AgendaPage`)
-  - Prontuário: selecionar paciente e carregar prontuário (`MedicalRecordsPage`)
-- Página `AuditPage`: só admin acessa; filtros por ação, recurso, data e texto; paginação 50/página
-- **IMPORTANTE:** triggers usam `COALESCE(v_rec.full_name, v_rec.date::TEXT, '')` para resource_name — funciona para tabelas com `full_name` (patients, guardians, therapists) ou `date` (consultations). Cada campo em sub-bloco BEGIN/EXCEPTION para não quebrar com tabelas que não têm a coluna.
-- RLS na audit_logs: INSERT livre, SELECT apenas para admin. A função fn_audit_log tem SET row_security = off para bypass dentro do trigger.
+- Status Atendimento: filtra automáticos no formulário (só mostra manuais)
+- Campos Horário (time) e Sala no formulário
+- Card na listagem: Paciente, Especialidade, Status, Tipo / Data + Hora, Terapeuta, Sala
+- Editar/excluir: visível apenas para o terapeuta responsável ou admin
 
 ## Agenda (`/admin/agenda`)
 
-- Usa a tabela `consultations` (a tabela `appointments` está vazia e não é usada pelo sistema)
-- 6 colunas: Seg/Ter/Qua/Qui/Sex + Sáb-Dom combinados (mobile: aba "FDS")
+- Usa a tabela `consultations` (appointments não é usada)
+- 6 colunas: Seg/Ter/Qua/Qui/Sex + Sáb-Dom; mobile: abas
 - Card: `HH:MM - PrimeiroNome Ultimo` + sala em 10px
-- Botão de excluir **removido** (delete físico — irreversível)
-- Editar/excluir visível apenas para o terapeuta responsável ou admin
 - Legenda inferior exibe nome completo do terapeuta
 
 ## CRM de Contatos (`/admin/contatos`)
 
-- Tabela `contact_leads` — INSERT permitido para `anon` (formulário público); SELECT/UPDATE apenas admin via RLS
-- **GRANT:** `anon` tem GRANT INSERT. `authenticated` tem GRANT SELECT/UPDATE — o RLS restringe para admin apenas. Ambas as camadas são necessárias: GRANT abre a porta, RLS controla as linhas.
-- `ContactPage` (site público) grava diretamente no Supabase via `supabase.from('contact_leads').insert()`
-- **Status do lead:**
-  - `novo` (vermelho) — recém chegou, ninguém tocou
-  - `em_contato` (amarelo) — já contatado, aguardando retorno
-  - `agendado` (azul) — visita/avaliação marcada
-  - `convertido` (verde) — virou paciente
-  - `sem_interesse` (cinza) — desistiu
-- `ContactLeadsPage`: cards expansíveis com status, nota interna, responsável, atalhos tel/email; badge vermelho com total de novos no título
-- `AdminSidebar`: item "Contatos" visível apenas para admin, com badge vermelho mostrando contagem de `novo`
-- `DashboardPage`: banner vermelho clicável aparece quando há leads com status `novo` — link direto para `/admin/contatos`
-- Filtros por ação, recurso, data e **usuário** (select populado com e-mails dos logs)
+- `ContactPage` grava em `contact_leads` via Supabase anon
+- Status: `novo` (vermelho), `em_contato` (amarelo), `agendado` (azul), `convertido` (verde), `sem_interesse` (cinza)
+- Dashboard: banner vermelho clicável quando há leads `novo`
+- Sidebar: badge vermelho com contagem de `novo`
 
-## Sidebar Admin
+## Auditoria de Acesso (`/admin/auditoria`)
 
-- Item "Contatos" aparece no menu principal (não dentro de Administração) — visível apenas para admin
-- Badge vermelho no item mostra contagem de leads `novo`, carregado no mount via query COUNT
-- Seção "Administração" é **colapsável** — começa fechada no mobile
-- "Sair" sempre visível no rodapé
+- Triggers AFTER em todas as tabelas principais → `fn_audit_log` SECURITY DEFINER, SET row_security = off
+- **resource_name por tabela:**
+  - `patients`, `guardians`, `therapists` → `full_name`
+  - `consultations` → `"Paciente | Terapeuta | YYYY-MM-DD"` (JOIN em patients + therapists)
+  - `medical_record_exams` → `"Paciente | Exames"`
+  - `medical_record_medications` → `"Paciente | Medicamentos"`
+  - `medical_record_conducts` → `"Paciente | Conduta"`
+  - demais tabelas → `date::TEXT` ou vazio
+- **VIEW** registrado via RPC `log_view_audit(resource_type, resource_id, resource_name)`
+- `AuditPage`: só admin; filtros por ação, recurso, usuário (select dinâmico), data e texto (busca em resource_name)
 
-## Log de Auditoria — Filtro de Usuário
+## Atenção — SELECTs explícitos no DataContext
 
-- `AuditPage` tem select "Todos os Usuários" populado dinamicamente com e-mails distintos existentes nos logs
-- Filtro de texto busca apenas por `resource_name` (antes buscava também em `user_email`, conflitava com o select)
+`CONSULTATION_SELECT` lista colunas explicitamente. Ao adicionar novas colunas ao banco, **sempre incluir no SELECT** correspondente.
+Constantes: `PATIENT_SELECT` (inclui `patient_specialties(specialty, patient_value, therapist_value)`), `GUARDIAN_SELECT`, `CONSULTATION_SELECT`.
 
-## Site público
+## Especialidades (tabela `specialties` no banco)
 
-Páginas institucionais em português. Usam `PublicLayout` com `PublicHeader` e `PublicFooter`. Design com cores `brand-blue` e `brand-yellow`.
+- Campos: `key` (identificador único, ex: `MUSICOTERAPIA`) e `label` (nome exibido)
+- `SpecialtyFormModal` gera o `key` automaticamente a partir do `label`
+- `key` aceita apenas letras maiúsculas, números e `_`
+
+## Deploy
+
+- **Vercel** — conectado ao GitHub (branch `main`), deploy automático no push
+- `vercel.json` com rewrite `/* → /index.html` para SPA routing
+- Variáveis de ambiente: `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY` no Vercel
+- Edge Functions: `npx supabase functions deploy invite-therapist --project-ref ffkkgmikvsqhutftoajh`
+
+## Política de Senha Forte (ResetPasswordPage)
+
+Regras validadas em tempo real: mínimo 8 chars, maiúscula, minúscula, número, caractere especial. Botão desabilitado até todas passarem.
