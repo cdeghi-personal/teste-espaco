@@ -17,7 +17,9 @@ export default function AppointmentTypesPage() {
   const filtered = appointmentTypes.filter(s => showInactive ? s.active === false : s.active !== false)
 
   function getCount(id) {
-    return consultations.filter(c => c.appointmentTypeId === id).length
+    const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 30)
+    const cutoffStr = cutoff.toISOString().split('T')[0]
+    return consultations.filter(c => c.appointmentTypeId === id && c.date >= cutoffStr).length
   }
 
   function toggleActive(s) {
@@ -61,7 +63,7 @@ export default function AppointmentTypesPage() {
                 <div key={s.id} className={`flex items-center gap-3 px-4 py-3 hover:bg-gray-50/50 transition-colors ${isInactive ? 'opacity-60' : ''}`}>
                   <div className="flex-1 min-w-0">
                     <div className="font-medium text-sm text-gray-900">{s.name}</div>
-                    {count > 0 && <div className="text-xs text-gray-400 mt-0.5">{count} atendimento(s)</div>}
+                    <div className="text-xs text-gray-400 mt-0.5">{count} atendimento(s) (últimos 30 dias)</div>
                   </div>
                   {isAdmin && (
                     <div className="flex items-center gap-1 shrink-0">

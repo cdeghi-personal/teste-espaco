@@ -24,6 +24,7 @@ import DashboardPage from './pages/admin/DashboardPage'
 import AgendaPage from './pages/admin/agenda/AgendaPage'
 import PatientsPage from './pages/admin/patients/PatientsPage'
 import PatientDetailPage from './pages/admin/patients/PatientDetailPage'
+import PatientAdvancedSearchPage from './pages/admin/patients/PatientAdvancedSearchPage'
 import GuardiansPage from './pages/admin/guardians/GuardiansPage'
 import ConsultationsPage from './pages/admin/consultations/ConsultationsPage'
 import MedicalRecordsPage from './pages/admin/medicalrecords/MedicalRecordsPage'
@@ -40,6 +41,7 @@ import RoomsPage from './pages/admin/rooms/RoomsPage'
 import AuditPage from './pages/admin/audit/AuditPage'
 import ContactLeadsPage from './pages/admin/contactleads/ContactLeadsPage'
 import ReportsPage from './pages/admin/reports/ReportsPage'
+import ConvenioReportPage from './pages/admin/reports/ConvenioReportPage'
 import SupportPage from './pages/admin/support/SupportPage'
 import AgeRangesPage from './pages/admin/ageranges/AgeRangesPage'
 
@@ -83,6 +85,7 @@ export default function App() {
                 <Route path={ROUTES.DASHBOARD} element={<DashboardPage />} />
                 <Route path={ROUTES.AGENDA} element={<AgendaPage />} />
                 <Route path={ROUTES.PATIENTS} element={<PatientsPage />} />
+                <Route path={ROUTES.PATIENTS_ADVANCED} element={<PatientAdvancedSearchPage />} />
                 <Route path={ROUTES.PATIENT_DETAIL} element={<PatientDetailPage />} />
                 <Route path={ROUTES.GUARDIANS} element={<GuardiansPage />} />
                 <Route path={ROUTES.CONSULTATIONS} element={<ConsultationsPage />} />
@@ -98,6 +101,7 @@ export default function App() {
                 <Route path={ROUTES.AGE_RANGES} element={<AgeRangesPage />} />
                 <Route path={ROUTES.AUDIT} element={<AuditPage />} />
                 <Route path={ROUTES.CONTACT_LEADS} element={<ContactLeadsPage />} />
+                <Route path={ROUTES.CONVENIO_REPORT} element={<ConvenioReportPage />} />
                 <Route path={ROUTES.REPORTS} element={<ReportsPage />} />
                 <Route path={ROUTES.SUPPORT} element={<SupportPage />} />
               </Route>

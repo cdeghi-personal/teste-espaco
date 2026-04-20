@@ -1,15 +1,18 @@
 import { useState, useMemo } from 'react'
-import { FiFileText, FiUser, FiUsers, FiCalendar, FiChevronDown } from 'react-icons/fi'
+import { useNavigate } from 'react-router-dom'
+import { FiFileText, FiUser, FiUsers, FiCalendar, FiChevronDown, FiExternalLink } from 'react-icons/fi'
 import HelpButton from '../../../components/ui/HelpButton'
 import { useData } from '../../../context/DataContext'
 import { useAuth } from '../../../context/AuthContext'
 import { generateConsultasPacientePDF, generateConsultasTerapeutaPDF } from '../../../utils/generateReportPDF'
 import { SPECIALTIES } from '../../../constants/specialties'
+import { ROUTES } from '../../../constants/routes'
 
 const CURRENT_MONTH = new Date().toISOString().slice(0, 7) // YYYY-MM
 
 export default function ReportsPage() {
   const { user } = useAuth()
+  const navigate = useNavigate()
   const {
     patients,
     therapists,
@@ -150,6 +153,23 @@ export default function ReportsPage() {
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-8">
+      {/* Card de acesso rápido — Relatório de Convênio */}
+      <div
+        onClick={() => navigate(ROUTES.CONVENIO_REPORT)}
+        className="mb-5 flex items-center justify-between gap-3 bg-blue-50 border border-blue-200 rounded-2xl px-5 py-4 cursor-pointer hover:bg-blue-100 transition-colors"
+      >
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-brand-blue flex items-center justify-center shrink-0">
+            <FiFileText size={18} className="text-white" />
+          </div>
+          <div>
+            <div className="font-semibold text-gray-900 text-sm">Relatório de Convênio</div>
+            <div className="text-xs text-gray-500 mt-0.5">Gera o Relatório ao Convênio e a Lista de Presença para planos de saúde</div>
+          </div>
+        </div>
+        <FiExternalLink size={16} className="text-brand-blue shrink-0" />
+      </div>
+
       <div className="flex items-center justify-between gap-3 mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Relatórios em PDF</h1>

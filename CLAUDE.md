@@ -37,7 +37,7 @@ src/
     DataContext.jsx              # useData() — todos os dados e CRUD (Supabase)
   utils/
     storageUtils.js              # generateId (helpers locais)
-    dateUtils.js                 # formatDateBR, formatDateShort, formatWeekDay, isoToday, calculateAge, getWeekDays, formatMonthYear
+    dateUtils.js                 # formatDateBR, formatDateShort, formatWeekDay, isoToday, calculateAge, calculateAgeYears, getWeekDays, formatMonthYear
     validators.js
     generateProntuarioPDF.js     # Gera PDF completo do prontuário (admin only)
     generateReportPDF.js         # Gera relatórios PDF: consultas por paciente ou terapeuta
@@ -58,7 +58,7 @@ src/
     admin/
       DashboardPage.jsx
       agenda/           AgendaPage, AppointmentFormModal
-      patients/         PatientsPage, PatientDetailPage, PatientFormModal
+      patients/         PatientsPage, PatientDetailPage, PatientFormModal, PatientAdvancedSearchPage
       guardians/        GuardiansPage, GuardianFormModal
       consultations/    ConsultationsPage, ConsultationFormModal
       medicalrecords/   MedicalRecordsPage
@@ -70,6 +70,7 @@ src/
       consultationstatus/ ConsultationStatusPage, ConsultationStatusFormModal
       appointmenttypes/ AppointmentTypesPage, AppointmentTypeFormModal
       rooms/            RoomsPage, RoomFormModal
+      ageranges/        AgeRangesPage, AgeRangeFormModal
       audit/            AuditPage
       contactleads/     ContactLeadsPage
       reports/          ReportsPage
@@ -103,6 +104,7 @@ supabase/
   38_support_tickets.sql         # Tabela support_tickets + support_ticket_history + RLS admin-only inicial
   39_support_tickets_all_users.sql # Adiciona created_by_id; abre INSERT p/ todos, SELECT por dono ou admin
   40_audit_resource_name_consultations.sql # fn_audit_log: consultations → "Paciente | Terapeuta | Data"; prontuário → "Paciente | Exames/Medicamentos/Conduta"
+  41_age_ranges.sql              # Tabela age_ranges — RLS: SELECT p/ todos autenticados, INSERT/UPDATE/DELETE só admin
   functions/
     invite-therapist/index.ts    # Edge Function — envia convite por e-mail ao criar terapeuta
 ```
@@ -151,6 +153,7 @@ Encontrar em: Supabase Dashboard → Project Settings → API.
 | `contact_leads` | Contatos do site público — name, phone, email, specialty, how_found, message, status, internal_note, assigned_to, last_contact_at |
 | `support_tickets` | Chamados de suporte — subject, type, author, description, solution, status, created_by_id |
 | `support_ticket_history` | Histórico de status dos chamados — ticket_id, status, changed_at, changed_by |
+| `age_ranges` | Faixas etárias — name, min_age, max_age, color; critério: min_age ≤ idade < max_age |
 
 ### Mappers (DB → App)
 
@@ -159,10 +162,18 @@ Todos em `src/lib/supabase.js`. Convertem snake_case do banco para camelCase do 
 - `mapGuardian` (inclui `neighborhood`), `mapTherapist`, `mapAppointment` (inclui `startTime`, `endTime` calculado via duration), `mapConsultation` (inclui `time`, `roomId`)
 - `mapSpecialty`, `mapPaymentMethod`, `mapDiagnosis`, `mapPatientStatus`, `mapRoom`
 - `mapConsultationStatus` (inclui `automatic`), `mapAppointmentType`, `mapExam`, `mapMedication`, `mapConduct`
+- `age_ranges` mapeado inline no DataContext: `{ id, name, minAge, maxAge, color }`
 - `syncPatientRelations(patientId, { specialties, conditionIds })` — specialties agora `[{ key, patientValue, therapistValue }]`
 - `syncGuardianPatients(guardianId, patientIds)`
 - `syncTherapistSpecialties(therapistId, [{ specialty, credential }])`
 - `syncExternalTherapists(patientId, [{ name, specialty, phone }])`
+
+### RLS — padrão para verificação de admin
+
+As policies RLS **não usam** a função `is_admin()` (definida no 02 mas não confiável). Usar sempre o subquery inline:
+```sql
+EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
+```
 
 ### Como criar admins
 
@@ -248,6 +259,7 @@ Authentication → URL Configuration:
 | consultations | Hard delete | — |
 | consultationStatuses | Toggle | `active` |
 | appointmentTypes | Toggle | `active` |
+| ageRanges | Hard delete | — |
 | medical_records | Hard delete | — |
 | medical_record_exams | Hard delete | — |
 | medical_record_medications | Hard delete | — |
@@ -267,9 +279,13 @@ Authentication → URL Configuration:
 '/admin/responsaveis', '/admin/consultas', '/admin/prontuario'
 '/admin/terapeutas', '/admin/especialidades', '/admin/formapagamento'
 '/admin/diagnostico', '/admin/statuspaciente', '/admin/statusconsulta'
-'/admin/tipoatendimento', '/admin/salas', '/admin/auditoria', '/admin/contatos'
-'/admin/relatorios'   // admin only
-'/admin/suporte'      // todos os usuários autenticados
+'/admin/tipoatendimento', '/admin/salas', '/admin/faixaetaria'
+'/admin/auditoria'              // admin only
+'/admin/contatos'               // admin only
+'/admin/relatorios'             // todos autenticados (terapeuta vê só próprios dados)
+'/admin/suporte'                // todos os usuários autenticados
+'/admin/pacientes/avancado'     // busca avançada de pacientes — todos autenticados (filtros: terapeuta, gerente de caso, especialidade, forma de pagamento, diagnóstico, status, faixa etária); exporta CSV
+'/admin/relatorios/convenio'    // relatório de convênio — todos autenticados; gera Relatório ao Convênio + Lista de Presença em PDF
 ```
 
 ## Padrões de código
@@ -282,6 +298,7 @@ Authentication → URL Configuration:
 - Erros do Supabase são exibidos via `Toast` (notificação na parte inferior da tela, 4s)
 - Funções CRUD retornam `{ error: string }` em caso de falha, ou o objeto criado em caso de sucesso
 - AuthContext usa `.maybeSingle()` no fetch de profile — nunca trava o login mesmo sem perfil cadastrado
+- **Padrão read-only para terapeutas:** `const isAdmin = user?.role === 'admin'` → condicionar botões de novo/editar/toggle com `{isAdmin && ...}`
 
 ## Toast (notificações)
 
@@ -299,10 +316,25 @@ Authentication → URL Configuration:
 ## Sidebar Admin
 
 - Item "Contatos" — visível apenas para admin, com badge vermelho mostrando contagem de `novo`
-- Item "Relatórios" — visível apenas para admin
+- Item "Relatórios" — visível para **todos** os autenticados (terapeuta vê apenas próprios dados na página)
 - Item "Suporte" — visível para **todos** os usuários autenticados
-- Seção "Administração" é colapsável — começa fechada no mobile
+- Seção "Administração" — colapsável, visível a **todos** os autenticados; contém: Terapeutas, Especialidades, Formas de Pagamento, Diagnósticos, Status do Paciente, Status Atendimento, Tipos de Atendimento, Salas, Faixas Etárias (read-only para terapeutas) + Log de Auditoria (admin only)
 - "Sair" sempre visível no rodapé
+
+## Site Público
+
+- Telefone de contato: **(11) 9 7579-9590** — link abre WhatsApp (`https://wa.me/5511975799590`)
+- Botão "Área Restrita" **removido** do header público (desktop e mobile)
+
+## Faixas Etárias (`/admin/faixaetaria`)
+
+- **Admin:** CRUD completo (nome, idade inicial, idade final, cor)
+- **Terapeuta:** somente consulta
+- Critério de classificação: `min_age ≤ idade_do_paciente < max_age`
+- Idade calculada **dinamicamente** via `calculateAgeYears(dateOfBirth)` — não é atributo fixo do paciente
+- Tag colorida exibida nos cards de paciente (mobile e desktop), calculada em tempo real
+- Listagem mostra contador de pacientes por faixa (calculado no frontend)
+- `calculateAgeYears(dateOfBirth)` em `src/utils/dateUtils.js` retorna número inteiro de anos
 
 ## Campos do Paciente
 
@@ -314,6 +346,7 @@ Authentication → URL Configuration:
 - **Terapeutas externos:** tabela `patient_external_therapists` — lista N por paciente, com `name`, `specialty`, `phone`
 - **Diagnóstico Principal:** campo `diagnosis` (texto livre via Select)
 - **Comorbidades:** tabela `patient_conditions` — exclui o diagnóstico principal da lista
+- **Tag de Faixa Etária:** exibida nos cards/tabela de PatientsPage, calculada dinamicamente a partir de `dateOfBirth` + tabela `age_ranges`
 
 ## Campos do Responsável
 
@@ -341,11 +374,23 @@ Authentication → URL Configuration:
 
 ## Relatórios PDF (`/admin/relatorios`)
 
-- **Consultas por Paciente:** coluna Valor (R$) usa `patient.specialties.find(s => s.key === c.specialty)?.patientValue`
-- **Consultas por Terapeuta:** coluna Valor (R$) usa `patient.specialties.find(s => s.key === c.specialty)?.therapistValue` (buscando o paciente do atendimento)
+- **Acesso:** todos os autenticados. Terapeutas veem apenas "Consultas por Terapeuta", com campo Terapeuta pré-preenchido (read-only) com seu próprio nome (`user.id`).
+- **Consultas por Paciente:** coluna Valor (R$) usa `patient.specialties.find(s => s.key === c.specialty)?.patientValue` — admin only
+- **Consultas por Terapeuta:** coluna Valor (R$) usa `patient.specialties.find(s => s.key === c.specialty)?.therapistValue`
 - Ambos exibem total de atendimentos + total do período no rodapé
 - Filtros: tipo de relatório, paciente/terapeuta (searchable), período (mês ou De/Até), status (múltipla seleção — inclui automáticos)
 - Funções: `generateConsultasPacientePDF()`, `generateConsultasTerapeutaPDF()` em `src/utils/generateReportPDF.js`
+- Card de acesso rápido ao "Relatório de Convênio" na parte superior da página
+
+## Relatório de Convênio (`/admin/relatorios/convenio`)
+
+- **Acesso:** todos os autenticados. Terapeutas veem seus próprios pacientes; admin seleciona qualquer terapeuta.
+- **Fluxo:** (1) Seleciona terapeuta (admin) + paciente + especialidade + período → Buscar Atendimentos; (2) Edita sessões (data + valor, add/remove); (3) Preenche Horário, Diagnóstico com CID, Encaminhamento, Objetivos, Desempenho; (4) Gera PDFs.
+- **Relatório ao Convênio (PDF):** seções Identificação, Atendimentos do Mês, Encaminhamento, Objetivos de Intervenção, Desempenho e Conclusão, assinatura em caixa. Rodapé com endereço/contato em todas as páginas.
+- **Lista de Presença (PDF):** tabela Data | Valor | Local | Horário | Assinatura Profissional | Assinatura Responsável + linhas de assinatura.
+- **Diagnóstico:** pré-preenchido com `patient.diagnosis` + nomes das comorbidades; editável (terapeuta acrescenta CID).
+- **Registro/credencial:** `therapist.specialties.find(s => s.specialty === selectedSpecialty)?.credential`.
+- Funções em `src/utils/generateConvenioPDF.js`: `generateRelatórioConvenioPDF()`, `generateListaPresencaPDF()`, `formatMesLabel()`, `MONTHS`.
 
 ## Suporte (`/admin/suporte`)
 
@@ -368,6 +413,7 @@ Authentication → URL Configuration:
 - Campos Horário (time) e Sala no formulário
 - Card na listagem: Paciente, Especialidade, Status, Tipo / Data + Hora, Terapeuta, Sala
 - Editar/excluir: visível apenas para o terapeuta responsável ou admin
+- **Campos obrigatórios quando status = "Realizada":** Objetivo da Sessão, Relato da Sessão / Evolução, Objetivo da Próxima Sessão
 
 ## Agenda (`/admin/agenda`)
 
@@ -395,6 +441,16 @@ Authentication → URL Configuration:
   - demais tabelas → `date::TEXT` ou vazio
 - **VIEW** registrado via RPC `log_view_audit(resource_type, resource_id, resource_name)`
 - `AuditPage`: só admin; filtros por ação, recurso, usuário (select dinâmico), data e texto (busca em resource_name)
+
+## Contadores nas páginas de configuração
+
+- **Especialidades:** `N paciente(s)` — conta `patients` onde `patient.specialties.some(s => s.key === specialtyKey)`
+- **Formas de Pagamento:** `N paciente(s)` — conta `patients` com `paymentMethodId === pm.id`
+- **Diagnósticos:** `N paciente(s)` — conta `patients` onde `conditionIds.includes(d.id)` OR `p.diagnosis === d.name` (inclui diagnóstico principal)
+- **Status do Paciente:** `N paciente(s)` — conta `patients` com `statusId === status.id`
+- **Tipos de Atendimento:** `N atendimento(s) (últimos 30 dias)` — conta `consultations` com `appointmentTypeId === type.id` e `date >= hoje-30d`
+- **Status Atendimento:** `N atendimento(s) (últimos 30 dias)` — conta `consultations` com `consultationStatusId === status.id` e `date >= hoje-30d`
+- **Salas:** `N atendimento(s) nos últimos 30 dias` — conta `consultations` com `roomId === room.id` e `date >= hoje-30d`
 
 ## Atenção — SELECTs explícitos no DataContext
 

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { FiPlus, FiSearch, FiEdit2, FiTrash2, FiUser, FiRotateCcw, FiEyeOff, FiEye, FiChevronRight } from 'react-icons/fi'
+import { FiPlus, FiSearch, FiEdit2, FiTrash2, FiUser, FiRotateCcw, FiEyeOff, FiEye, FiChevronRight, FiSliders } from 'react-icons/fi'
 import HelpButton from '../../../components/ui/HelpButton'
 import { useData } from '../../../context/DataContext'
 import { useAuth } from '../../../context/AuthContext'
@@ -9,6 +9,7 @@ import Button from '../../../components/ui/Button'
 import EmptyState from '../../../components/ui/EmptyState'
 import PatientFormModal from './PatientFormModal'
 import { calculateAge, formatDateShort, calculateAgeYears } from '../../../utils/dateUtils'
+import { ROUTES } from '../../../constants/routes'
 
 export default function PatientsPage() {
   const { patients, deletePatient, restorePatient, patientStatuses, specialtiesData, ageRanges, logAudit } = useData()
@@ -66,6 +67,14 @@ export default function PatientsPage() {
           <p className="text-xs text-gray-500 mt-0.5">{filtered.length} exibido(s)</p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={() => navigate(ROUTES.PATIENTS_ADVANCED)}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-gray-200 bg-white text-gray-600 text-xs font-medium hover:bg-gray-50 transition-colors"
+            title="Busca Avançada"
+          >
+            <FiSliders size={15} />
+            <span className="hidden sm:inline">Busca Avançada</span>
+          </button>
           <HelpButton title="Como usar Pacientes">
             <p><strong>Buscar:</strong> use o campo de busca para filtrar por nome, CPF, diagnóstico ou terapeuta.</p>
             <p><strong>Cadastrar:</strong> clique em <em>Novo Paciente</em> e preencha dados pessoais, clínicos e vínculos com responsáveis e terapeutas.</p>

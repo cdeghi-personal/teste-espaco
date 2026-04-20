@@ -10,8 +10,9 @@ export const ROUTES = {
   // Admin
   DASHBOARD:        '/admin',
   AGENDA:           '/admin/agenda',
-  PATIENTS:         '/admin/pacientes',
-  PATIENT_DETAIL:   '/admin/pacientes/:id',
+  PATIENTS:           '/admin/pacientes',
+  PATIENTS_ADVANCED:  '/admin/pacientes/avancado',
+  PATIENT_DETAIL:     '/admin/pacientes/:id',
   GUARDIANS:        '/admin/responsaveis',
   CONSULTATIONS:    '/admin/consultas',
   MEDICAL_RECORDS:  '/admin/prontuario',
@@ -28,5 +29,6 @@ export const ROUTES = {
   AUDIT:                '/admin/auditoria',
   CONTACT_LEADS:        '/admin/contatos',
   REPORTS:              '/admin/relatorios',
+  CONVENIO_REPORT:      '/admin/relatorios/convenio',
   SUPPORT:              '/admin/suporte',
 }
