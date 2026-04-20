@@ -70,8 +70,10 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
     if (!form.consultationStatusId) e.consultationStatusId = 'Selecione o status'
     if (!form.appointmentTypeId) e.appointmentTypeId = 'Selecione o tipo'
     const selectedStatus = consultationStatuses.find(s => s.id === form.consultationStatusId)
-    if (selectedStatus?.name?.toLowerCase().includes('realizada') && !form.mainObjective.trim()) {
-      e.mainObjective = 'Informe o objetivo da sessão'
+    if (selectedStatus?.name?.toLowerCase().includes('realizada')) {
+      if (!form.mainObjective.trim()) e.mainObjective = 'Informe o objetivo da sessão'
+      if (!form.evolutionNotes.trim()) e.evolutionNotes = 'Informe o relato da sessão / evolução'
+      if (!form.nextObjectives.trim()) e.nextObjectives = 'Informe o objetivo da próxima sessão'
     }
     return e
   }
@@ -97,7 +99,8 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
 
   const title = readOnly ? 'Visualizar Atendimento' : isEdit ? 'Editar Registro de Atendimento' : 'Novo Registro de Atendimento'
   const selectedStatus = consultationStatuses.find(s => s.id === form.consultationStatusId)
-  const mainObjectiveRequired = selectedStatus?.name?.toLowerCase().includes('realizada')
+  const realizadaRequired = selectedStatus?.name?.toLowerCase().includes('realizada')
+  const mainObjectiveRequired = realizadaRequired
 
   return (
     <Modal
@@ -256,8 +259,24 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
             Evolução e Observações
           </h3>
           <div className="space-y-3">
-            <Textarea label="Notas de Evolução" value={form.evolutionNotes} onChange={e => set('evolutionNotes', e.target.value)} placeholder="Evolução clínica, comparação com sessões anteriores..." rows={3} disabled={readOnly} />
-            <Textarea label="Objetivos para a Próxima Sessão" value={form.nextObjectives} onChange={e => set('nextObjectives', e.target.value)} placeholder="Metas e foco para a próxima sessão..." rows={2} disabled={readOnly} />
+            <Textarea
+              label={realizadaRequired ? 'Relato da Sessão / Evolução *' : 'Relato da Sessão / Evolução'}
+              value={form.evolutionNotes}
+              onChange={e => set('evolutionNotes', e.target.value)}
+              error={errors.evolutionNotes}
+              placeholder="Evolução clínica, comparação com sessões anteriores..."
+              rows={3}
+              disabled={readOnly}
+            />
+            <Textarea
+              label={realizadaRequired ? 'Objetivo da Próxima Sessão *' : 'Objetivo da Próxima Sessão'}
+              value={form.nextObjectives}
+              onChange={e => set('nextObjectives', e.target.value)}
+              error={errors.nextObjectives}
+              placeholder="Metas e foco para a próxima sessão..."
+              rows={2}
+              disabled={readOnly}
+            />
             <Textarea label="Orientações Passadas ao Responsável" value={form.guardianFeedback} onChange={e => set('guardianFeedback', e.target.value)} placeholder="O que foi comunicado ao responsável ao final da sessão..." rows={2} disabled={readOnly} />
           </div>
         </section>

@@ -65,7 +65,9 @@ export default function PublicFooter() {
               </li>
               <li className="flex items-center gap-2 text-sm text-blue-200">
                 <FiPhone size={15} className="shrink-0 text-brand-yellow" />
-                (11) 9 9999-9999
+                <a href="https://wa.me/5511975799590" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">
+                  (11) 9 7579-9590
+                </a>
               </li>
               <li className="flex items-center gap-2 text-sm text-blue-200">
                 <FiMail size={15} className="shrink-0 text-brand-yellow" />

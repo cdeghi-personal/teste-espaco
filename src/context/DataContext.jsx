@@ -78,13 +78,14 @@ export function DataProvider({ children }) {
   const [rooms, setRooms] = useState([])
   const [consultationStatuses, setConsultationStatuses] = useState([])
   const [appointmentTypes, setAppointmentTypes] = useState([])
+  const [ageRanges, setAgeRanges] = useState([])
   const [isLoading, setIsLoading] = useState(true)
 
   const fetchAll = useCallback(async () => {
     setIsLoading(true)
     const [
       patientsRes, guardiansRes, appointmentsRes, consultationsRes,
-      therapistsRes, specialtiesRes, paymentRes, diagnosesRes, statusesRes, roomsRes, consultStatusRes, apptTypesRes,
+      therapistsRes, specialtiesRes, paymentRes, diagnosesRes, statusesRes, roomsRes, consultStatusRes, apptTypesRes, ageRangesRes,
     ] = await Promise.all([
       supabase.from('patients').select(PATIENT_SELECT).eq('deleted', false).then(res => {
         // Se a query falhar (ex: tabela patient_involved_therapists ainda não existe),
@@ -105,6 +106,7 @@ export function DataProvider({ children }) {
       supabase.from('rooms').select('*').order('name'),
       supabase.from('consultation_statuses').select('*').order('name'),
       supabase.from('appointment_types').select('*').order('name'),
+      supabase.from('age_ranges').select('*').order('min_age'),
     ])
 
     setPatients((patientsRes.data || []).map(mapPatient))
@@ -119,6 +121,9 @@ export function DataProvider({ children }) {
     setRooms((roomsRes.data || []).map(mapRoom))
     setConsultationStatuses((consultStatusRes.data || []).map(mapConsultationStatus))
     setAppointmentTypes((apptTypesRes.data || []).map(mapAppointmentType))
+    setAgeRanges((ageRangesRes.data || []).map(r => ({
+      id: r.id, name: r.name, minAge: r.min_age, maxAge: r.max_age, color: r.color,
+    })))
     setIsLoading(false)
   }, [])
 
@@ -884,6 +889,39 @@ export function DataProvider({ children }) {
     await supabase.from('medical_record_conducts').delete().eq('id', id)
   }
 
+  // ─── Age Ranges ──────────────────────────────────────────────────────────────
+
+  function mapAgeRange(r) {
+    return { id: r.id, name: r.name, minAge: r.min_age, maxAge: r.max_age, color: r.color }
+  }
+
+  async function addAgeRange(data) {
+    const { data: inserted, error } = await supabase
+      .from('age_ranges')
+      .insert({ name: data.name, min_age: data.minAge, max_age: data.maxAge, color: data.color || '#3b82f6' })
+      .select().single()
+    if (error) return dbError(error, toast)
+    const item = mapAgeRange(inserted)
+    setAgeRanges(prev => [...prev, item].sort((a, b) => a.minAge - b.minAge))
+    return item
+  }
+
+  async function updateAgeRange(id, data) {
+    const update = {}
+    if (data.name !== undefined) update.name = data.name
+    if (data.minAge !== undefined) update.min_age = data.minAge
+    if (data.maxAge !== undefined) update.max_age = data.maxAge
+    if (data.color !== undefined) update.color = data.color
+    update.updated_at = new Date().toISOString()
+    await supabase.from('age_ranges').update(update).eq('id', id)
+    setAgeRanges(prev => prev.map(r => r.id === id ? { ...r, ...data } : r).sort((a, b) => a.minAge - b.minAge))
+  }
+
+  async function deleteAgeRange(id) {
+    await supabase.from('age_ranges').delete().eq('id', id)
+    setAgeRanges(prev => prev.filter(r => r.id !== id))
+  }
+
   // ─── Audit Log ───────────────────────────────────────────────────────────────
 
   async function logAudit(action, resourceType, resourceId, resourceName = '') {
@@ -914,6 +952,7 @@ export function DataProvider({ children }) {
     rooms, addRoom, updateRoom,
     consultationStatuses, addConsultationStatus, updateConsultationStatus,
     appointmentTypes, addAppointmentType, updateAppointmentType,
+    ageRanges, addAgeRange, updateAgeRange, deleteAgeRange,
     // Medical Records
     getOrCreateMedicalRecord,
     getExams, addExam, updateExam, deleteExam,

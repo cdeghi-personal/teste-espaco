@@ -24,6 +24,7 @@ export const ROUTES = {
   CONSULTATION_STATUS:  '/admin/statusconsulta',
   APPOINTMENT_TYPES:    '/admin/tipoatendimento',
   ROOMS:                '/admin/salas',
+  AGE_RANGES:           '/admin/faixaetaria',
   AUDIT:                '/admin/auditoria',
   CONTACT_LEADS:        '/admin/contatos',
   REPORTS:              '/admin/relatorios',

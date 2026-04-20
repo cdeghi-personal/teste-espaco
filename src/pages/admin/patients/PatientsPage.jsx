@@ -8,9 +8,10 @@ import Badge from '../../../components/ui/Badge'
 import Button from '../../../components/ui/Button'
 import EmptyState from '../../../components/ui/EmptyState'
 import PatientFormModal from './PatientFormModal'
-import { calculateAge, formatDateShort } from '../../../utils/dateUtils'
+import { calculateAge, formatDateShort, calculateAgeYears } from '../../../utils/dateUtils'
+
 export default function PatientsPage() {
-  const { patients, deletePatient, restorePatient, patientStatuses, specialtiesData, logAudit } = useData()
+  const { patients, deletePatient, restorePatient, patientStatuses, specialtiesData, ageRanges, logAudit } = useData()
   const { user } = useAuth()
   const navigate = useNavigate()
   const [search, setSearch] = useState('')
@@ -47,6 +48,13 @@ export default function PatientsPage() {
 
   function handleRestore(id, name) {
     if (confirm(`Restaurar "${name}"?`)) restorePatient(id)
+  }
+
+  function getAgeRange(dateOfBirth) {
+    if (!dateOfBirth || !ageRanges?.length) return null
+    const years = calculateAgeYears(dateOfBirth)
+    if (years === null) return null
+    return ageRanges.find(r => years >= r.minAge && years < r.maxAge) || null
   }
 
   return (
@@ -157,6 +165,7 @@ export default function PatientsPage() {
                           ? <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">Excluído</span>
                           : ps && <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${ps.color}`}>{ps.name}</span>
                         }
+                        {(() => { const ar = getAgeRange(p.dateOfBirth); return ar ? <span key="ar" className="px-2 py-0.5 rounded-full text-xs font-semibold text-white" style={{ backgroundColor: ar.color }}>{ar.name}</span> : null })()}
                         {p.specialties?.slice(0, 1).map(s => <Badge key={s.key} specialty={s.key} />)}
                       </div>
                     </div>
@@ -218,7 +227,7 @@ export default function PatientsPage() {
                           </div>
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-600">{calculateAge(p.dateOfBirth)}</td>
+                      <td className="px-4 py-3 text-sm text-gray-600"><div>{calculateAge(p.dateOfBirth)}</div>{(() => { const ar = getAgeRange(p.dateOfBirth); return ar ? <span className="mt-1 inline-block px-2 py-0.5 rounded-full text-xs font-semibold text-white" style={{ backgroundColor: ar.color }}>{ar.name}</span> : null })()}</td>
                       <td className="px-4 py-3 text-sm text-gray-600 hidden md:table-cell max-w-xs">
                         <span className="truncate block">{p.diagnosis || '—'}</span>
                       </td>

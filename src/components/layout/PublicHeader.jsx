@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, NavLink, useNavigate } from 'react-router-dom'
+import { Link, NavLink } from 'react-router-dom'
 import { FiMenu, FiX } from 'react-icons/fi'
 import { ROUTES } from '../../constants/routes'
 
@@ -13,7 +13,6 @@ const navLinks = [
 
 export default function PublicHeader() {
   const [mobileOpen, setMobileOpen] = useState(false)
-  const navigate = useNavigate()
 
   return (
     <header className="sticky top-0 z-40 bg-white border-b border-gray-100 shadow-sm">
@@ -45,17 +44,13 @@ export default function PublicHeader() {
           </nav>
 
           <div className="hidden md:flex items-center gap-3">
-            <button
-              onClick={() => navigate(ROUTES.LOGIN)}
-              className="px-4 py-2 text-sm font-medium text-brand-blue border-2 border-brand-blue rounded-lg hover:bg-brand-blue hover:text-white transition-all"
-            >
-              Área Restrita
-            </button>
             <a
-              href="tel:+5511999999999"
+              href="https://wa.me/5511975799590"
+              target="_blank"
+              rel="noopener noreferrer"
               className="px-4 py-2 text-sm font-semibold bg-brand-yellow text-brand-blue rounded-lg hover:bg-brand-yellow-dark transition-all shadow-sm"
             >
-              (11) 9 9999-9999
+              (11) 9 7579-9590
             </a>
           </div>
 
@@ -87,12 +82,14 @@ export default function PublicHeader() {
               </NavLink>
             ))}
             <div className="mt-3 px-4 flex flex-col gap-2">
-              <button
-                onClick={() => { navigate(ROUTES.LOGIN); setMobileOpen(false) }}
-                className="w-full py-2 text-sm font-medium text-brand-blue border-2 border-brand-blue rounded-lg"
+              <a
+                href="https://wa.me/5511975799590"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full py-2 text-sm font-semibold text-center bg-brand-yellow text-brand-blue rounded-lg"
               >
-                Área Restrita
-              </button>
+                (11) 9 7579-9590
+              </a>
             </div>
           </div>
         )}

@@ -46,6 +46,15 @@ export function calculateAge(dateOfBirth) {
   }
 }
 
+export function calculateAgeYears(dateOfBirth) {
+  if (!dateOfBirth) return null
+  try {
+    return differenceInYears(new Date(), parseISO(dateOfBirth))
+  } catch {
+    return null
+  }
+}
+
 export function getWeekDays(referenceDate = new Date()) {
   const start = startOfWeek(referenceDate, { weekStartsOn: 1 })
   return Array.from({ length: 5 }, (_, i) => addDays(start, i))

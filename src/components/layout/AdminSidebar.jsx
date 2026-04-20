@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
-import { FiGrid, FiCalendar, FiUsers, FiUserCheck, FiClipboard, FiLogOut, FiUserPlus, FiLayers, FiCreditCard, FiActivity, FiFlag, FiHome, FiChevronDown, FiChevronUp, FiBookOpen, FiTag, FiShield, FiMessageSquare, FiBarChart2, FiLifeBuoy } from 'react-icons/fi'
+import { FiGrid, FiCalendar, FiUsers, FiUserCheck, FiClipboard, FiLogOut, FiUserPlus, FiLayers, FiCreditCard, FiActivity, FiFlag, FiHome, FiChevronDown, FiChevronUp, FiBookOpen, FiTag, FiShield, FiMessageSquare, FiBarChart2, FiLifeBuoy, FiUserX } from 'react-icons/fi'
 import { ROUTES } from '../../constants/routes'
 import { useAuth } from '../../context/AuthContext'
 import { SPECIALTIES } from '../../constants/specialties'
@@ -15,7 +15,8 @@ const mainNavItems = [
   { to: ROUTES.MEDICAL_RECORDS, icon: FiBookOpen, label: 'Prontuário' },
 ]
 
-const adminNavItems = [
+// Visíveis a todos os usuários autenticados (read-only para terapeutas)
+const configNavItems = [
   { to: ROUTES.THERAPISTS, icon: FiUserPlus, label: 'Terapeutas' },
   { to: ROUTES.SPECIALTIES_ADMIN, icon: FiLayers, label: 'Especialidades' },
   { to: ROUTES.PAYMENT_METHODS, icon: FiCreditCard, label: 'Formas de Pagamento' },
@@ -24,7 +25,7 @@ const adminNavItems = [
   { to: ROUTES.CONSULTATION_STATUS, icon: FiFlag, label: 'Status Atendimento' },
   { to: ROUTES.APPOINTMENT_TYPES, icon: FiTag, label: 'Tipos de Atendimento' },
   { to: ROUTES.ROOMS, icon: FiHome, label: 'Salas' },
-  { to: ROUTES.AUDIT, icon: FiShield, label: 'Log de Auditoria' },
+  { to: ROUTES.AGE_RANGES, icon: FiUserX, label: 'Faixas Etárias' },
 ]
 
 function NavItem({ to, icon: Icon, label, end, onClick, badge }) {
@@ -87,7 +88,6 @@ export default function AdminSidebar({ open, onClose }) {
         </NavLink>
       </div>
 
-      {/* Nav — scrollável apenas no desktop; no mobile é fixo para caber tudo */}
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto md:overflow-y-auto">
         {mainNavItems.map(item => <NavItem key={item.to} {...item} onClick={onClose} />)}
 
@@ -101,14 +101,12 @@ export default function AdminSidebar({ open, onClose }) {
           />
         )}
 
-        {isAdmin && (
-          <NavItem
-            to={ROUTES.REPORTS}
-            icon={FiBarChart2}
-            label="Relatórios"
-            onClick={onClose}
-          />
-        )}
+        <NavItem
+          to={ROUTES.REPORTS}
+          icon={FiBarChart2}
+          label="Relatórios"
+          onClick={onClose}
+        />
 
         <NavItem
           to={ROUTES.SUPPORT}
@@ -117,34 +115,33 @@ export default function AdminSidebar({ open, onClose }) {
           onClick={onClose}
         />
 
-        {isAdmin && (
-          <>
-            {/* Header da seção Admin — clicável para expandir/colapsar */}
-            <div className="px-3 pt-4 pb-1">
-              <button
-                onClick={() => setAdminExpanded(v => !v)}
-                className="w-full flex items-center justify-between group"
-              >
-                <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider group-hover:text-gray-600 transition-colors">
-                  Administração
-                </span>
-                {adminExpanded
-                  ? <FiChevronUp size={13} className="text-gray-400 group-hover:text-gray-600 transition-colors" />
-                  : <FiChevronDown size={13} className="text-gray-400 group-hover:text-gray-600 transition-colors" />
-                }
-              </button>
-            </div>
+        {/* Seção Administração — visível a todos, colapsável */}
+        <div className="px-3 pt-4 pb-1">
+          <button
+            onClick={() => setAdminExpanded(v => !v)}
+            className="w-full flex items-center justify-between group"
+          >
+            <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider group-hover:text-gray-600 transition-colors">
+              Administração
+            </span>
+            {adminExpanded
+              ? <FiChevronUp size={13} className="text-gray-400 group-hover:text-gray-600 transition-colors" />
+              : <FiChevronDown size={13} className="text-gray-400 group-hover:text-gray-600 transition-colors" />
+            }
+          </button>
+        </div>
 
-            {adminExpanded && (
-              <div className="space-y-1">
-                {adminNavItems.map(item => <NavItem key={item.to} {...item} onClick={onClose} />)}
-              </div>
+        {adminExpanded && (
+          <div className="space-y-1">
+            {configNavItems.map(item => <NavItem key={item.to} {...item} onClick={onClose} />)}
+            {isAdmin && (
+              <NavItem to={ROUTES.AUDIT} icon={FiShield} label="Log de Auditoria" onClick={onClose} />
             )}
-          </>
+          </div>
         )}
       </nav>
 
-      {/* User Info + Logout — sempre visível */}
+      {/* User Info + Logout */}
       <div className="px-3 py-3 border-t border-gray-100 shrink-0">
         <div className="flex items-center gap-3 px-3 py-2 mb-1">
           <div className="w-8 h-8 rounded-full bg-brand-yellow flex items-center justify-center text-brand-blue font-bold text-sm shrink-0">

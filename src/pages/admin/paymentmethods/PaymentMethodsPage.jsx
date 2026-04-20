@@ -1,15 +1,18 @@
 import { useState } from 'react'
 import { FiPlus, FiEdit2, FiToggleLeft, FiToggleRight, FiCreditCard } from 'react-icons/fi'
 import { useData } from '../../../context/DataContext'
+import { useAuth } from '../../../context/AuthContext'
 import Button from '../../../components/ui/Button'
 import EmptyState from '../../../components/ui/EmptyState'
 import PaymentMethodFormModal from './PaymentMethodFormModal'
 
 export default function PaymentMethodsPage() {
   const { paymentMethods, updatePaymentMethod, patients } = useData()
+  const { user } = useAuth()
   const [showModal, setShowModal] = useState(false)
   const [editPM, setEditPM] = useState(null)
   const [showInactive, setShowInactive] = useState(false)
+  const isAdmin = user?.role === 'admin'
 
   const filtered = paymentMethods.filter(pm => showInactive ? pm.active === false : pm.active !== false)
 
@@ -35,18 +38,20 @@ export default function PaymentMethodsPage() {
           >
             {showInactive ? 'Ver Ativas' : 'Inativas'}
           </button>
-          <Button variant="primary" onClick={() => { setEditPM(null); setShowModal(true) }}>
-            <FiPlus size={16} />
-            <span className="hidden sm:inline">Nova Forma</span>
-            <span className="sm:hidden">Nova</span>
-          </Button>
+          {isAdmin && (
+            <Button variant="primary" onClick={() => { setEditPM(null); setShowModal(true) }}>
+              <FiPlus size={16} />
+              <span className="hidden sm:inline">Nova Forma</span>
+              <span className="sm:hidden">Nova</span>
+            </Button>
+          )}
         </div>
       </div>
 
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         {filtered.length === 0 ? (
           <EmptyState icon={FiCreditCard} title="Nenhuma forma de pagamento encontrada"
-            action={<Button variant="primary" onClick={() => setShowModal(true)}><FiPlus size={14} /> Cadastrar</Button>} />
+            action={isAdmin && <Button variant="primary" onClick={() => setShowModal(true)}><FiPlus size={14} /> Cadastrar</Button>} />
         ) : (
           <div className="divide-y divide-gray-50">
             {filtered.map(pm => {
@@ -64,14 +69,16 @@ export default function PaymentMethodsPage() {
                   <span className={`shrink-0 px-2 py-0.5 rounded-full text-xs font-medium ${isInactive ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
                     {isInactive ? 'Inativa' : 'Ativa'}
                   </span>
-                  <div className="flex items-center gap-1 shrink-0">
-                    <button onClick={() => { setEditPM(pm); setShowModal(true) }} className="p-1.5 rounded-lg text-gray-400 hover:text-brand-blue hover:bg-blue-50 transition-colors">
-                      <FiEdit2 size={15} />
-                    </button>
-                    <button onClick={() => toggleActive(pm)} className={`p-1.5 rounded-lg transition-colors ${isInactive ? 'text-gray-400 hover:text-green-600 hover:bg-green-50' : 'text-gray-400 hover:text-red-600 hover:bg-red-50'}`} title={isInactive ? 'Ativar' : 'Desativar'}>
-                      {isInactive ? <FiToggleLeft size={18} /> : <FiToggleRight size={18} />}
-                    </button>
-                  </div>
+                  {isAdmin && (
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button onClick={() => { setEditPM(pm); setShowModal(true) }} className="p-1.5 rounded-lg text-gray-400 hover:text-brand-blue hover:bg-blue-50 transition-colors">
+                        <FiEdit2 size={15} />
+                      </button>
+                      <button onClick={() => toggleActive(pm)} className={`p-1.5 rounded-lg transition-colors ${isInactive ? 'text-gray-400 hover:text-green-600 hover:bg-green-50' : 'text-gray-400 hover:text-red-600 hover:bg-red-50'}`} title={isInactive ? 'Ativar' : 'Desativar'}>
+                        {isInactive ? <FiToggleLeft size={18} /> : <FiToggleRight size={18} />}
+                      </button>
+                    </div>
+                  )}
                 </div>
               )
             })}

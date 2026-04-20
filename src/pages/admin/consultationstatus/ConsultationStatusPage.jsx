@@ -1,15 +1,18 @@
 import { useState } from 'react'
 import { FiPlus, FiEdit2, FiToggleLeft, FiToggleRight, FiFlag } from 'react-icons/fi'
 import { useData } from '../../../context/DataContext'
+import { useAuth } from '../../../context/AuthContext'
 import Button from '../../../components/ui/Button'
 import EmptyState from '../../../components/ui/EmptyState'
 import ConsultationStatusFormModal from './ConsultationStatusFormModal'
 
 export default function ConsultationStatusPage() {
   const { consultationStatuses, updateConsultationStatus, consultations } = useData()
+  const { user } = useAuth()
   const [showModal, setShowModal] = useState(false)
   const [editItem, setEditItem] = useState(null)
   const [showInactive, setShowInactive] = useState(false)
+  const isAdmin = user?.role === 'admin'
 
   const filtered = consultationStatuses.filter(s => showInactive ? s.active === false : s.active !== false)
 
@@ -35,18 +38,20 @@ export default function ConsultationStatusPage() {
           >
             {showInactive ? 'Ver Ativos' : 'Inativos'}
           </button>
-          <Button variant="primary" onClick={() => { setEditItem(null); setShowModal(true) }}>
-            <FiPlus size={16} />
-            <span className="hidden sm:inline">Novo Status</span>
-            <span className="sm:hidden">Novo</span>
-          </Button>
+          {isAdmin && (
+            <Button variant="primary" onClick={() => { setEditItem(null); setShowModal(true) }}>
+              <FiPlus size={16} />
+              <span className="hidden sm:inline">Novo Status</span>
+              <span className="sm:hidden">Novo</span>
+            </Button>
+          )}
         </div>
       </div>
 
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         {filtered.length === 0 ? (
           <EmptyState icon={FiFlag} title="Nenhum status encontrado"
-            action={<Button variant="primary" onClick={() => setShowModal(true)}><FiPlus size={14} /> Novo</Button>} />
+            action={isAdmin && <Button variant="primary" onClick={() => setShowModal(true)}><FiPlus size={14} /> Novo</Button>} />
         ) : (
           <div className="divide-y divide-gray-50">
             {filtered.map(s => {
@@ -64,14 +69,16 @@ export default function ConsultationStatusPage() {
                   <span className={`shrink-0 px-2.5 py-0.5 rounded-full text-xs font-medium ${s.color || 'bg-gray-100 text-gray-700'}`}>
                     {s.name}
                   </span>
-                  <div className="flex items-center gap-1 shrink-0">
-                    <button onClick={() => { setEditItem(s); setShowModal(true) }} className="p-1.5 rounded-lg text-gray-400 hover:text-brand-blue hover:bg-blue-50 transition-colors">
-                      <FiEdit2 size={15} />
-                    </button>
-                    <button onClick={() => toggleActive(s)} className={`p-1.5 rounded-lg transition-colors ${isInactive ? 'text-gray-400 hover:text-green-600 hover:bg-green-50' : 'text-gray-400 hover:text-red-600 hover:bg-red-50'}`}>
-                      {isInactive ? <FiToggleLeft size={18} /> : <FiToggleRight size={18} />}
-                    </button>
-                  </div>
+                  {isAdmin && (
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button onClick={() => { setEditItem(s); setShowModal(true) }} className="p-1.5 rounded-lg text-gray-400 hover:text-brand-blue hover:bg-blue-50 transition-colors">
+                        <FiEdit2 size={15} />
+                      </button>
+                      <button onClick={() => toggleActive(s)} className={`p-1.5 rounded-lg transition-colors ${isInactive ? 'text-gray-400 hover:text-green-600 hover:bg-green-50' : 'text-gray-400 hover:text-red-600 hover:bg-red-50'}`}>
+                        {isInactive ? <FiToggleLeft size={18} /> : <FiToggleRight size={18} />}
+                      </button>
+                    </div>
+                  )}
                 </div>
               )
             })}
@@ -79,7 +86,7 @@ export default function ConsultationStatusPage() {
         )}
       </div>
 
-      {showModal && <ConsultationStatusFormModal onClose={() => setShowModal(false)} initial={editItem || {}} />}
+      {showModal && isAdmin && <ConsultationStatusFormModal onClose={() => setShowModal(false)} initial={editItem || {}} />}
     </div>
   )
 }

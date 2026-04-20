@@ -22,10 +22,11 @@ export default function ReportsPage() {
 
   const isAdmin = user?.role === 'admin'
 
-  const [reportType, setReportType] = useState('patient') // 'patient' | 'therapist'
+  // Terapeutas só podem gerar relatório deles mesmos
+  const [reportType, setReportType] = useState('therapist')
   const [selectedPatientId, setSelectedPatientId] = useState('')
-  const [selectedTherapistId, setSelectedTherapistId] = useState('')
-  const [periodType, setPeriodType] = useState('month') // 'month' | 'range'
+  const [selectedTherapistId, setSelectedTherapistId] = useState(isAdmin ? '' : (user?.id || ''))
+  const [periodType, setPeriodType] = useState('month')
   const [periodMonth, setPeriodMonth] = useState(CURRENT_MONTH)
   const [periodFrom, setPeriodFrom] = useState('')
   const [periodTo, setPeriodTo] = useState('')
@@ -147,14 +148,6 @@ export default function ReportsPage() {
     }
   }
 
-  if (!isAdmin) {
-    return (
-      <div className="p-8 text-center text-gray-500">
-        Acesso restrito a administradores.
-      </div>
-    )
-  }
-
   return (
     <div className="max-w-2xl mx-auto px-4 py-8">
       <div className="flex items-center justify-between gap-3 mb-6">
@@ -174,25 +167,27 @@ export default function ReportsPage() {
 
       <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 space-y-6">
 
-        {/* Tipo de Relatório */}
+        {/* Tipo de Relatório — terapeuta só vê Consultas por Terapeuta */}
         <div>
           <label className="block text-sm font-semibold text-gray-700 mb-2">Tipo de Relatório</label>
-          <div className="grid grid-cols-2 gap-3">
+          <div className={`grid gap-3 ${isAdmin ? 'grid-cols-2' : 'grid-cols-1'}`}>
+            {isAdmin && (
+              <button
+                type="button"
+                onClick={() => { setReportType('patient'); setSelectedPatientId(''); setPatientSearch('') }}
+                className={`flex items-center gap-3 px-4 py-3 rounded-xl border-2 text-sm font-medium transition-all ${
+                  reportType === 'patient'
+                    ? 'border-brand-blue bg-blue-50 text-brand-blue'
+                    : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                }`}
+              >
+                <FiUser size={18} />
+                Consultas por Paciente
+              </button>
+            )}
             <button
               type="button"
-              onClick={() => { setReportType('patient'); setSelectedPatientId(''); setPatientSearch('') }}
-              className={`flex items-center gap-3 px-4 py-3 rounded-xl border-2 text-sm font-medium transition-all ${
-                reportType === 'patient'
-                  ? 'border-brand-blue bg-blue-50 text-brand-blue'
-                  : 'border-gray-200 text-gray-600 hover:border-gray-300'
-              }`}
-            >
-              <FiUser size={18} />
-              Consultas por Paciente
-            </button>
-            <button
-              type="button"
-              onClick={() => { setReportType('therapist'); setSelectedTherapistId(''); setTherapistSearch('') }}
+              onClick={() => { setReportType('therapist'); setSelectedTherapistId(isAdmin ? '' : (user?.id || '')); setTherapistSearch('') }}
               className={`flex items-center gap-3 px-4 py-3 rounded-xl border-2 text-sm font-medium transition-all ${
                 reportType === 'therapist'
                   ? 'border-brand-blue bg-blue-50 text-brand-blue'
@@ -205,8 +200,8 @@ export default function ReportsPage() {
           </div>
         </div>
 
-        {/* Seleção de Paciente */}
-        {reportType === 'patient' && (
+        {/* Seleção de Paciente (admin only) */}
+        {reportType === 'patient' && isAdmin && (
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">Paciente</label>
             <div className="relative">
@@ -259,49 +254,55 @@ export default function ReportsPage() {
         {reportType === 'therapist' && (
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">Terapeuta</label>
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => setTherapistOpen(v => !v)}
-                className="w-full flex items-center justify-between px-4 py-3 border border-gray-300 rounded-xl text-sm text-left bg-white hover:border-gray-400 transition focus:outline-none focus:ring-2 focus:ring-brand-blue"
-              >
-                <span className={selectedTherapist ? 'text-gray-900' : 'text-gray-400'}>
-                  {selectedTherapist ? selectedTherapist.name : 'Selecione um terapeuta...'}
-                </span>
-                <FiChevronDown size={16} className="text-gray-400 shrink-0" />
-              </button>
-              {therapistOpen && (
-                <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-lg">
-                  <div className="p-2 border-b border-gray-100">
-                    <input
-                      autoFocus
-                      type="text"
-                      value={therapistSearch}
-                      onChange={e => setTherapistSearch(e.target.value)}
-                      placeholder="Buscar terapeuta..."
-                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-brand-blue"
-                    />
+            {isAdmin ? (
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setTherapistOpen(v => !v)}
+                  className="w-full flex items-center justify-between px-4 py-3 border border-gray-300 rounded-xl text-sm text-left bg-white hover:border-gray-400 transition focus:outline-none focus:ring-2 focus:ring-brand-blue"
+                >
+                  <span className={selectedTherapist ? 'text-gray-900' : 'text-gray-400'}>
+                    {selectedTherapist ? selectedTherapist.name : 'Selecione um terapeuta...'}
+                  </span>
+                  <FiChevronDown size={16} className="text-gray-400 shrink-0" />
+                </button>
+                {therapistOpen && (
+                  <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-lg">
+                    <div className="p-2 border-b border-gray-100">
+                      <input
+                        autoFocus
+                        type="text"
+                        value={therapistSearch}
+                        onChange={e => setTherapistSearch(e.target.value)}
+                        placeholder="Buscar terapeuta..."
+                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-brand-blue"
+                      />
+                    </div>
+                    <ul className="max-h-56 overflow-y-auto py-1">
+                      {filteredTherapists.length === 0 ? (
+                        <li className="px-4 py-2 text-sm text-gray-400">Nenhum terapeuta encontrado</li>
+                      ) : filteredTherapists.map(t => (
+                        <li key={t.id}>
+                          <button
+                            type="button"
+                            onClick={() => { setSelectedTherapistId(t.id); setTherapistOpen(false); setTherapistSearch('') }}
+                            className={`w-full text-left px-4 py-2 text-sm hover:bg-blue-50 transition ${
+                              selectedTherapistId === t.id ? 'bg-blue-50 text-brand-blue font-medium' : 'text-gray-700'
+                            }`}
+                          >
+                            {t.name}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
                   </div>
-                  <ul className="max-h-56 overflow-y-auto py-1">
-                    {filteredTherapists.length === 0 ? (
-                      <li className="px-4 py-2 text-sm text-gray-400">Nenhum terapeuta encontrado</li>
-                    ) : filteredTherapists.map(t => (
-                      <li key={t.id}>
-                        <button
-                          type="button"
-                          onClick={() => { setSelectedTherapistId(t.id); setTherapistOpen(false); setTherapistSearch('') }}
-                          className={`w-full text-left px-4 py-2 text-sm hover:bg-blue-50 transition ${
-                            selectedTherapistId === t.id ? 'bg-blue-50 text-brand-blue font-medium' : 'text-gray-700'
-                          }`}
-                        >
-                          {t.name}
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </div>
+                )}
+              </div>
+            ) : (
+              <div className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm bg-gray-50 text-gray-700 cursor-not-allowed">
+                {selectedTherapist ? selectedTherapist.name : 'Carregando...'}
+              </div>
+            )}
           </div>
         )}
 
@@ -390,10 +391,7 @@ export default function ReportsPage() {
                           : 'border-gray-200 text-gray-600 hover:border-gray-300 bg-white'
                       }`}
                     >
-                      <span
-                        className="w-2 h-2 rounded-full shrink-0"
-                        style={{ backgroundColor: s.color || '#6b7280' }}
-                      />
+                      <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: s.color || '#6b7280' }} />
                       {s.name}
                     </button>
                   )

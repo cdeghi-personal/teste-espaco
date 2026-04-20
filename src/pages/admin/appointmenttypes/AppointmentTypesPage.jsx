@@ -1,15 +1,18 @@
 import { useState } from 'react'
 import { FiPlus, FiEdit2, FiToggleLeft, FiToggleRight, FiTag } from 'react-icons/fi'
 import { useData } from '../../../context/DataContext'
+import { useAuth } from '../../../context/AuthContext'
 import Button from '../../../components/ui/Button'
 import EmptyState from '../../../components/ui/EmptyState'
 import AppointmentTypeFormModal from './AppointmentTypeFormModal'
 
 export default function AppointmentTypesPage() {
   const { appointmentTypes, updateAppointmentType, consultations } = useData()
+  const { user } = useAuth()
   const [showModal, setShowModal] = useState(false)
   const [editItem, setEditItem] = useState(null)
   const [showInactive, setShowInactive] = useState(false)
+  const isAdmin = user?.role === 'admin'
 
   const filtered = appointmentTypes.filter(s => showInactive ? s.active === false : s.active !== false)
 
@@ -35,18 +38,20 @@ export default function AppointmentTypesPage() {
           >
             {showInactive ? 'Ver Ativos' : 'Inativos'}
           </button>
-          <Button variant="primary" onClick={() => { setEditItem(null); setShowModal(true) }}>
-            <FiPlus size={16} />
-            <span className="hidden sm:inline">Novo Tipo</span>
-            <span className="sm:hidden">Novo</span>
-          </Button>
+          {isAdmin && (
+            <Button variant="primary" onClick={() => { setEditItem(null); setShowModal(true) }}>
+              <FiPlus size={16} />
+              <span className="hidden sm:inline">Novo Tipo</span>
+              <span className="sm:hidden">Novo</span>
+            </Button>
+          )}
         </div>
       </div>
 
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         {filtered.length === 0 ? (
           <EmptyState icon={FiTag} title="Nenhum tipo de atendimento encontrado"
-            action={<Button variant="primary" onClick={() => setShowModal(true)}><FiPlus size={14} /> Novo</Button>} />
+            action={isAdmin && <Button variant="primary" onClick={() => setShowModal(true)}><FiPlus size={14} /> Novo</Button>} />
         ) : (
           <div className="divide-y divide-gray-50">
             {filtered.map(s => {
@@ -58,14 +63,16 @@ export default function AppointmentTypesPage() {
                     <div className="font-medium text-sm text-gray-900">{s.name}</div>
                     {count > 0 && <div className="text-xs text-gray-400 mt-0.5">{count} atendimento(s)</div>}
                   </div>
-                  <div className="flex items-center gap-1 shrink-0">
-                    <button onClick={() => { setEditItem(s); setShowModal(true) }} className="p-1.5 rounded-lg text-gray-400 hover:text-brand-blue hover:bg-blue-50 transition-colors">
-                      <FiEdit2 size={15} />
-                    </button>
-                    <button onClick={() => toggleActive(s)} className={`p-1.5 rounded-lg transition-colors ${isInactive ? 'text-gray-400 hover:text-green-600 hover:bg-green-50' : 'text-gray-400 hover:text-red-600 hover:bg-red-50'}`}>
-                      {isInactive ? <FiToggleLeft size={18} /> : <FiToggleRight size={18} />}
-                    </button>
-                  </div>
+                  {isAdmin && (
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button onClick={() => { setEditItem(s); setShowModal(true) }} className="p-1.5 rounded-lg text-gray-400 hover:text-brand-blue hover:bg-blue-50 transition-colors">
+                        <FiEdit2 size={15} />
+                      </button>
+                      <button onClick={() => toggleActive(s)} className={`p-1.5 rounded-lg transition-colors ${isInactive ? 'text-gray-400 hover:text-green-600 hover:bg-green-50' : 'text-gray-400 hover:text-red-600 hover:bg-red-50'}`}>
+                        {isInactive ? <FiToggleLeft size={18} /> : <FiToggleRight size={18} />}
+                      </button>
+                    </div>
+                  )}
                 </div>
               )
             })}
@@ -73,7 +80,7 @@ export default function AppointmentTypesPage() {
         )}
       </div>
 
-      {showModal && <AppointmentTypeFormModal onClose={() => setShowModal(false)} initial={editItem || {}} />}
+      {showModal && isAdmin && <AppointmentTypeFormModal onClose={() => setShowModal(false)} initial={editItem || {}} />}
     </div>
   )
 }

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { FiPlus, FiSearch, FiEdit2, FiToggleLeft, FiToggleRight, FiUserPlus } from 'react-icons/fi'
 import { useData } from '../../../context/DataContext'
+import { useAuth } from '../../../context/AuthContext'
 import Badge from '../../../components/ui/Badge'
 import Button from '../../../components/ui/Button'
 import EmptyState from '../../../components/ui/EmptyState'
@@ -8,10 +9,12 @@ import TherapistFormModal from './TherapistFormModal'
 
 export default function TherapistsPage() {
   const { therapists, updateTherapist, patients } = useData()
+  const { user } = useAuth()
   const [search, setSearch] = useState('')
   const [showInactive, setShowInactive] = useState(false)
   const [showModal, setShowModal] = useState(false)
   const [editTherapist, setEditTherapist] = useState(null)
+  const isAdmin = user?.role === 'admin'
 
   function getPatientCount(therapistId) {
     return patients.filter(p =>
@@ -49,11 +52,13 @@ export default function TherapistsPage() {
           >
             {showInactive ? 'Ver Ativos' : 'Inativos'}
           </button>
-          <Button variant="primary" onClick={() => { setEditTherapist(null); setShowModal(true) }}>
-            <FiPlus size={16} />
-            <span className="hidden sm:inline">Novo Terapeuta</span>
-            <span className="sm:hidden">Novo</span>
-          </Button>
+          {isAdmin && (
+            <Button variant="primary" onClick={() => { setEditTherapist(null); setShowModal(true) }}>
+              <FiPlus size={16} />
+              <span className="hidden sm:inline">Novo Terapeuta</span>
+              <span className="sm:hidden">Novo</span>
+            </Button>
+          )}
         </div>
       </div>
 
@@ -72,7 +77,7 @@ export default function TherapistsPage() {
           <EmptyState
             icon={FiUserPlus}
             title="Nenhum terapeuta encontrado"
-            action={<Button variant="primary" onClick={() => setShowModal(true)}><FiPlus size={14} /> Cadastrar Terapeuta</Button>}
+            action={isAdmin && <Button variant="primary" onClick={() => setShowModal(true)}><FiPlus size={14} /> Cadastrar Terapeuta</Button>}
           />
         ) : (
           <>
@@ -101,15 +106,14 @@ export default function TherapistsPage() {
                       </div>
                       {t.email && <div className="text-xs text-gray-400 truncate mt-0.5">{t.email}</div>}
                     </div>
-                    <div className="flex items-center gap-1 shrink-0">
-                      <button onClick={() => { setEditTherapist(t); setShowModal(true) }} className="p-2 rounded-lg text-gray-400"><FiEdit2 size={15} /></button>
-                      <button
-                        onClick={() => toggleActive(t)}
-                        className={`p-2 rounded-lg ${isInactive ? 'text-gray-400' : 'text-gray-400'}`}
-                      >
-                        {isInactive ? <FiToggleLeft size={18} /> : <FiToggleRight size={18} />}
-                      </button>
-                    </div>
+                    {isAdmin && (
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button onClick={() => { setEditTherapist(t); setShowModal(true) }} className="p-2 rounded-lg text-gray-400"><FiEdit2 size={15} /></button>
+                        <button onClick={() => toggleActive(t)} className={`p-2 rounded-lg ${isInactive ? 'text-gray-400' : 'text-gray-400'}`}>
+                          {isInactive ? <FiToggleLeft size={18} /> : <FiToggleRight size={18} />}
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )
               })}
@@ -166,14 +170,16 @@ export default function TherapistsPage() {
                         <td className="px-4 py-3">
                           <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700">{getPatientCount(t.id)}</span>
                         </td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-1 justify-end">
-                            <button onClick={() => { setEditTherapist(t); setShowModal(true) }} className="p-1.5 rounded-lg text-gray-400 hover:text-brand-blue hover:bg-blue-50 transition-colors"><FiEdit2 size={15} /></button>
-                            <button onClick={() => toggleActive(t)} className={`p-1.5 rounded-lg transition-colors ${isInactive ? 'text-gray-400 hover:text-green-600 hover:bg-green-50' : 'text-gray-400 hover:text-red-600 hover:bg-red-50'}`} title={isInactive ? 'Ativar' : 'Desativar'}>
-                              {isInactive ? <FiToggleLeft size={18} /> : <FiToggleRight size={18} />}
-                            </button>
-                          </div>
-                        </td>
+                        {isAdmin && (
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-1 justify-end">
+                              <button onClick={() => { setEditTherapist(t); setShowModal(true) }} className="p-1.5 rounded-lg text-gray-400 hover:text-brand-blue hover:bg-blue-50 transition-colors"><FiEdit2 size={15} /></button>
+                              <button onClick={() => toggleActive(t)} className={`p-1.5 rounded-lg transition-colors ${isInactive ? 'text-gray-400 hover:text-green-600 hover:bg-green-50' : 'text-gray-400 hover:text-red-600 hover:bg-red-50'}`} title={isInactive ? 'Ativar' : 'Desativar'}>
+                                {isInactive ? <FiToggleLeft size={18} /> : <FiToggleRight size={18} />}
+                              </button>
+                            </div>
+                          </td>
+                        )}
                       </tr>
                     )
                   })}
@@ -184,7 +190,7 @@ export default function TherapistsPage() {
         )}
       </div>
 
-      {showModal && <TherapistFormModal onClose={() => setShowModal(false)} initial={editTherapist || {}} />}
+      {showModal && isAdmin && <TherapistFormModal onClose={() => setShowModal(false)} initial={editTherapist || {}} />}
     </div>
   )
 }

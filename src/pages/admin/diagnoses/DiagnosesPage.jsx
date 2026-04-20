@@ -1,16 +1,19 @@
 import { useState } from 'react'
 import { FiPlus, FiEdit2, FiToggleLeft, FiToggleRight, FiSearch, FiActivity } from 'react-icons/fi'
 import { useData } from '../../../context/DataContext'
+import { useAuth } from '../../../context/AuthContext'
 import Button from '../../../components/ui/Button'
 import EmptyState from '../../../components/ui/EmptyState'
 import DiagnosisFormModal from './DiagnosisFormModal'
 
 export default function DiagnosesPage() {
   const { diagnoses, updateDiagnosis, patients } = useData()
+  const { user } = useAuth()
   const [showModal, setShowModal] = useState(false)
   const [editItem, setEditItem] = useState(null)
   const [showInactive, setShowInactive] = useState(false)
   const [search, setSearch] = useState('')
+  const isAdmin = user?.role === 'admin'
 
   const filtered = diagnoses.filter(d => {
     const matchActive = showInactive ? d.active === false : d.active !== false
@@ -43,11 +46,13 @@ export default function DiagnosesPage() {
           >
             {showInactive ? 'Ver Ativos' : 'Inativos'}
           </button>
-          <Button variant="primary" onClick={() => { setEditItem(null); setShowModal(true) }}>
-            <FiPlus size={16} />
-            <span className="hidden sm:inline">Novo Diagnóstico</span>
-            <span className="sm:hidden">Novo</span>
-          </Button>
+          {isAdmin && (
+            <Button variant="primary" onClick={() => { setEditItem(null); setShowModal(true) }}>
+              <FiPlus size={16} />
+              <span className="hidden sm:inline">Novo Diagnóstico</span>
+              <span className="sm:hidden">Novo</span>
+            </Button>
+          )}
         </div>
       </div>
 
@@ -64,7 +69,7 @@ export default function DiagnosesPage() {
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         {filtered.length === 0 ? (
           <EmptyState icon={FiActivity} title="Nenhum diagnóstico encontrado"
-            action={<Button variant="primary" onClick={() => setShowModal(true)}><FiPlus size={14} /> Novo</Button>} />
+            action={isAdmin && <Button variant="primary" onClick={() => setShowModal(true)}><FiPlus size={14} /> Novo</Button>} />
         ) : (
           <div className="divide-y divide-gray-50">
             {filtered.map(d => {
@@ -79,14 +84,16 @@ export default function DiagnosesPage() {
                   <span className={`shrink-0 px-2 py-0.5 rounded-full text-xs font-medium ${isInactive ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
                     {isInactive ? 'Inativo' : 'Ativo'}
                   </span>
-                  <div className="flex items-center gap-1 shrink-0">
-                    <button onClick={() => { setEditItem(d); setShowModal(true) }} className="p-1.5 rounded-lg text-gray-400 hover:text-brand-blue hover:bg-blue-50 transition-colors">
-                      <FiEdit2 size={15} />
-                    </button>
-                    <button onClick={() => toggleActive(d)} className={`p-1.5 rounded-lg transition-colors ${isInactive ? 'text-gray-400 hover:text-green-600 hover:bg-green-50' : 'text-gray-400 hover:text-red-600 hover:bg-red-50'}`} title={isInactive ? 'Ativar' : 'Desativar'}>
-                      {isInactive ? <FiToggleLeft size={18} /> : <FiToggleRight size={18} />}
-                    </button>
-                  </div>
+                  {isAdmin && (
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button onClick={() => { setEditItem(d); setShowModal(true) }} className="p-1.5 rounded-lg text-gray-400 hover:text-brand-blue hover:bg-blue-50 transition-colors">
+                        <FiEdit2 size={15} />
+                      </button>
+                      <button onClick={() => toggleActive(d)} className={`p-1.5 rounded-lg transition-colors ${isInactive ? 'text-gray-400 hover:text-green-600 hover:bg-green-50' : 'text-gray-400 hover:text-red-600 hover:bg-red-50'}`} title={isInactive ? 'Ativar' : 'Desativar'}>
+                        {isInactive ? <FiToggleLeft size={18} /> : <FiToggleRight size={18} />}
+                      </button>
+                    </div>
+                  )}
                 </div>
               )
             })}
@@ -94,7 +101,7 @@ export default function DiagnosesPage() {
         )}
       </div>
 
-      {showModal && <DiagnosisFormModal onClose={() => setShowModal(false)} initial={editItem || {}} />}
+      {showModal && isAdmin && <DiagnosisFormModal onClose={() => setShowModal(false)} initial={editItem || {}} />}
     </div>
   )
 }

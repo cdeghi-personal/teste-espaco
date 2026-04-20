@@ -41,6 +41,7 @@ import AuditPage from './pages/admin/audit/AuditPage'
 import ContactLeadsPage from './pages/admin/contactleads/ContactLeadsPage'
 import ReportsPage from './pages/admin/reports/ReportsPage'
 import SupportPage from './pages/admin/support/SupportPage'
+import AgeRangesPage from './pages/admin/ageranges/AgeRangesPage'
 
 // Common
 import ScrollToTop from './components/common/ScrollToTop'
@@ -94,6 +95,7 @@ export default function App() {
                 <Route path={ROUTES.CONSULTATION_STATUS} element={<ConsultationStatusPage />} />
                 <Route path={ROUTES.APPOINTMENT_TYPES} element={<AppointmentTypesPage />} />
                 <Route path={ROUTES.ROOMS} element={<RoomsPage />} />
+                <Route path={ROUTES.AGE_RANGES} element={<AgeRangesPage />} />
                 <Route path={ROUTES.AUDIT} element={<AuditPage />} />
                 <Route path={ROUTES.CONTACT_LEADS} element={<ContactLeadsPage />} />
                 <Route path={ROUTES.REPORTS} element={<ReportsPage />} />
