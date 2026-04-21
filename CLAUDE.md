@@ -109,6 +109,7 @@ supabase/
   41_age_ranges.sql              # Tabela age_ranges — RLS: SELECT p/ todos autenticados, INSERT/UPDATE/DELETE só admin
   42_convenio_reports.sql        # Tabela convenio_reports — histórico de PDFs gerados; RLS: admin vê tudo, outros veem só próprios
   43_company_settings.sql        # Tabela company_settings (linha única via CHECK id=1) — razao_social, cnpj; SELECT p/ autenticados, UPDATE só admin
+  44_ai_prompt.sql               # Adiciona coluna ai_system_prompt (TEXT) em company_settings — prompt customizável para a Edge Function suggest-convenio
   functions/
     invite-therapist/index.ts    # Edge Function — envia convite por e-mail ao criar terapeuta
     suggest-convenio/index.ts    # Edge Function — gera sugestões de texto para relatório de convênio via OpenAI gpt-4o-mini
@@ -160,7 +161,7 @@ Encontrar em: Supabase Dashboard → Project Settings → API.
 | `support_ticket_history` | Histórico de status dos chamados — ticket_id, status, changed_at, changed_by |
 | `age_ranges` | Faixas etárias — name, min_age, max_age, color; critério: min_age ≤ idade < max_age |
 | `convenio_reports` | Histórico de relatórios ao convênio gerados em PDF — patient_id, therapist_id, specialty, mes_label, version_label, created_by |
-| `company_settings` | Configurações da empresa — linha única (id=1, CHECK constraint); razao_social, cnpj, updated_at |
+| `company_settings` | Configurações da empresa — linha única (id=1, CHECK constraint); razao_social, cnpj, ai_system_prompt, updated_at |
 
 ### Mappers (DB → App)
 
@@ -170,7 +171,7 @@ Todos em `src/lib/supabase.js`. Convertem snake_case do banco para camelCase do 
 - `mapSpecialty`, `mapPaymentMethod`, `mapDiagnosis`, `mapPatientStatus`, `mapRoom`
 - `mapConsultationStatus` (inclui `automatic`), `mapAppointmentType`, `mapExam`, `mapMedication`, `mapConduct`
 - `age_ranges` mapeado inline no DataContext: `{ id, name, minAge, maxAge, color }`
-- `company_settings` exposto como `companySettings` (`{ razaoSocial, cnpj }`) via `useData()`; função `updateCompanySettings({ razaoSocial, cnpj })` faz `.update().eq('id', 1)`
+- `company_settings` exposto como `companySettings` (`{ razaoSocial, cnpj, aiSystemPrompt }`) via `useData()`; função `updateCompanySettings({ razaoSocial, cnpj, aiSystemPrompt })` faz `.update().eq('id', 1)`
 - `syncPatientRelations(patientId, { specialties, conditionIds })` — specialties agora `[{ key, patientValue, therapistValue }]`
 - `syncGuardianPatients(guardianId, patientIds)`
 - `syncTherapistSpecialties(therapistId, [{ specialty, credential }])`
@@ -406,17 +407,17 @@ Authentication → URL Configuration:
 - **companySettings:** passado para ambas as funções PDF; exibe Razão Social e CNPJ no cabeçalho.
 - **Horários por sessão:** cada sessão tem campo `time` individual (preenchido do banco ao buscar). Campo "Horário padrão" com botão "aplicar a todas" para o caso comum. O PDF agrupa sessões por horário e gera uma linha "Datas e Horários" por grupo — ex: `04, 10 às 17:30` e `05, 12 às 18h`. Internamente: `buildSessionTimeGroups(sessions, fallbackHorario)`.
 - **Auto-refresh do histórico:** após "Baixar e Registrar", a seção recarrega automaticamente via `historyRefreshKey` passado ao `HistorySection`.
-- **Sugestão com IA:** botão "Sugerir com IA" (⚡ violeta) no topo da seção 3. Chama a Edge Function `suggest-convenio` via `supabase.functions.invoke`. Preenche automaticamente Encaminhamento, Objetivos e Desempenho com base em especialidade, diagnóstico, nº de sessões e terapeuta. Requer secret `OPENAI_API_KEY` no Supabase + JWT Verification ATIVADO.
+- **Sugestão com IA:** botão "Sugerir com IA" (⚡ violeta) no topo da seção 3. Chama a Edge Function `suggest-convenio` via `supabase.functions.invoke`. Sintetiza os relatos reais dos atendimentos (Objetivo da Sessão, Relato de Evolução, Objetivo da Próxima Sessão) via GPT-4o-mini. Filtra conteúdo genérico via `isSubstantial()` — exige ao menos 2 sessões com conteúdo substancial ou 1 com evolução >80 chars; bloqueia a chamada e exibe aviso âmbar se insuficiente. Passa `aiSystemPrompt` do `companySettings` à função; fallback para `DEFAULT_SYSTEM_PROMPT` focado em síntese. Requer secret `OPENAI_API_KEY` no Supabase + JWT Verification **DESATIVADO**.
 - Funções em `src/utils/generateConvenioPDF.js`: `generateRelatórioConvenioPDF()`, `generateListaPresencaPDF()`, `formatMesLabel()`, `MONTHS`.
 - `MONTHS` e `formatMesLabel` re-exportados de `pdfShared.js` via `export { MONTHS, formatMesLabel } from './pdfShared'`.
 
 ## Dados da Empresa (`/admin/empresa`)
 
 - **Acesso:** admin only (terapeutas redirecionados para `/admin`).
-- **Campos:** Razão Social e CNPJ (com máscara automática `XX.XXX.XXX/XXXX-XX`).
-- **Armazenamento:** tabela `company_settings` — linha única (id=1, `CHECK (id = 1)`); UPDATE via `updateCompanySettings()`.
-- **Uso:** `companySettings` (do `useData()`) é passado como parâmetro opcional para todas as funções geradoras de PDF — `generateProntuarioPDF`, `generateConsultasPacientePDF`, `generateConsultasTerapeutaPDF`, `generateRelatórioConvenioPDF`, `generateListaPresencaPDF`.
-- **No cabeçalho PDF:** quando `companySettings` está preenchido, exibe Razão Social (y=8), CNPJ (y=13) e texto direito (y=18) dentro da barra azul do header.
+- **Campos:** Razão Social, CNPJ (com máscara automática `XX.XXX.XXX/XXXX-XX`) e **Prompt da IA** (textarea `font-mono`, botão "Restaurar prompt padrão").
+- **Armazenamento:** tabela `company_settings` — linha única (id=1, `CHECK (id = 1)`); UPDATE via `updateCompanySettings()`. Campo `ai_system_prompt` (TEXT) adicionado em `44_ai_prompt.sql`.
+- **Prompt da IA:** `companySettings.aiSystemPrompt` é enviado à Edge Function `suggest-convenio` como systemPrompt. Se vazio, usa `DEFAULT_SYSTEM_PROMPT` (síntese de múltiplas sessões, sem concatenar).
+- `companySettings` (do `useData()`) é passado como parâmetro opcional para todas as funções geradoras de PDF — `generateProntuarioPDF`, `generateConsultasPacientePDF`, `generateConsultasTerapeutaPDF`, `generateRelatórioConvenioPDF`, `generateListaPresencaPDF`.
 
 ## Utilitários PDF Compartilhados (`src/utils/pdfShared.js`)
 
