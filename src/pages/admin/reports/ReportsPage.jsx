@@ -153,8 +153,8 @@ export default function ReportsPage() {
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-8">
-      {/* Card de acesso rápido — Relatório de Convênio */}
-      <div
+      {/* Card de acesso rápido — Relatório de Convênio (apenas equipe) */}
+      {(isAdmin || user?.belongsToTeam) && <div
         onClick={() => navigate(ROUTES.CONVENIO_REPORT)}
         className="mb-5 flex items-center justify-between gap-3 bg-blue-50 border border-blue-200 rounded-2xl px-5 py-4 cursor-pointer hover:bg-blue-100 transition-colors"
       >
@@ -168,7 +168,7 @@ export default function ReportsPage() {
           </div>
         </div>
         <FiExternalLink size={16} className="text-brand-blue shrink-0" />
-      </div>
+      </div>}
 
       <div className="flex items-center justify-between gap-3 mb-6">
         <div>

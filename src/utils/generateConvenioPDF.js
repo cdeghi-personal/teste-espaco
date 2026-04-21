@@ -46,7 +46,7 @@ async function loadLogo() {
   } catch { return null }
 }
 
-function addHeader(doc, logoData, subtitle) {
+function addHeader(doc, logoData, subtitle, versionLabel) {
   const pageW = doc.internal.pageSize.width
   const margin = 14
   doc.setFillColor(...BLUE)
@@ -59,13 +59,12 @@ function addHeader(doc, logoData, subtitle) {
   doc.setFontSize(8)
   doc.setFont('helvetica', 'normal')
   doc.text(subtitle, margin + 21, 16)
-  const now = new Date()
   doc.setFontSize(7)
   doc.setTextColor(200, 210, 255)
-  doc.text(
-    `Gerado em ${now.toLocaleDateString('pt-BR')} às ${now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`,
-    pageW - margin, 18, { align: 'right' }
-  )
+  doc.text(versionLabel || '', pageW - margin, 18, { align: 'right' })
+  // Reset to body defaults — critical to avoid font bleed after page breaks
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(9.5)
   doc.setTextColor(...DARK)
 }
 
@@ -95,15 +94,18 @@ function sectionBar(doc, text, y) {
   doc.setFontSize(9)
   doc.setFont('helvetica', 'bold')
   doc.text(text, margin + 3, y + 5)
+  // Reset to body defaults after section bar
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(9.5)
   doc.setTextColor(...DARK)
   return y + 11
 }
 
-function pageBreak(doc, y, needed, logoData, subtitle) {
+function pageBreak(doc, y, needed, logoData, subtitle, versionLabel) {
   const pageH = doc.internal.pageSize.height
   if (y + needed > pageH - 28) {
     doc.addPage()
-    addHeader(doc, logoData, subtitle)
+    addHeader(doc, logoData, subtitle, versionLabel)
     return 28
   }
   return y
@@ -128,12 +130,14 @@ export async function generateRelatórioConvenioPDF({
   terapeutaNome,
   terapeutaRegistro,
   mesLabel,
-  sessions,       // [{date, time}]
-  sessionValue,   // number — valor por sessão
-  horario,        // string — e.g. "19h às 20h"
+  sessions,
+  sessionValue,
+  horario,
   encaminhamento,
-  objetivos,      // string, cada linha = um bullet
+  objetivos,
   desempenho,
+  versionLabel = '',
+  returnBlob = false,
 }) {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
   const pageW = doc.internal.pageSize.width
@@ -142,7 +146,7 @@ export async function generateRelatórioConvenioPDF({
   const subtitle = 'Relatório ao Convênio'
 
   const logoData = await loadLogo()
-  addHeader(doc, logoData, subtitle)
+  addHeader(doc, logoData, subtitle, versionLabel)
   let y = 28
 
   // Título centralizado
@@ -214,81 +218,64 @@ export async function generateRelatórioConvenioPDF({
   y = doc.lastAutoTable.finalY + 10
 
   // ── Encaminhamento ──
-  y = pageBreak(doc, y, 22, logoData, subtitle)
-  doc.setFontSize(11)
-  doc.setFont('helvetica', 'bold')
-  doc.setTextColor(...DARK)
+  y = pageBreak(doc, y, 22, logoData, subtitle, versionLabel)
+  doc.setFontSize(11); doc.setFont('helvetica', 'bold'); doc.setTextColor(...DARK)
   doc.text('Encaminhamento', margin, y)
   y += 7
-  doc.setFontSize(9.5)
-  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(9.5); doc.setFont('helvetica', 'normal')
   const encLines = doc.splitTextToSize(encaminhamento || '—', contentW)
   for (const line of encLines) {
-    y = pageBreak(doc, y, 6, logoData, subtitle)
-    doc.text(line, margin, y)
-    y += 5
+    y = pageBreak(doc, y, 6, logoData, subtitle, versionLabel)
+    doc.setFontSize(9.5); doc.setFont('helvetica', 'normal'); doc.setTextColor(...DARK)
+    doc.text(line, margin, y); y += 5
   }
   y += 6
 
   // ── Objetivos de Intervenção ──
-  y = pageBreak(doc, y, 22, logoData, subtitle)
-  doc.setFontSize(11)
-  doc.setFont('helvetica', 'bold')
-  doc.setTextColor(...DARK)
+  y = pageBreak(doc, y, 22, logoData, subtitle, versionLabel)
+  doc.setFontSize(11); doc.setFont('helvetica', 'bold'); doc.setTextColor(...DARK)
   doc.text('Objetivos de Intervenção', margin, y)
   y += 7
-  doc.setFontSize(9.5)
-  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(9.5); doc.setFont('helvetica', 'normal')
   const objLines = (objetivos || '').split('\n').map(l => l.trim()).filter(Boolean)
   if (objLines.length === 0) {
-    doc.text('—', margin, y)
-    y += 5
+    doc.text('—', margin, y); y += 5
   } else {
     for (const linha of objLines) {
-      y = pageBreak(doc, y, 6, logoData, subtitle)
+      y = pageBreak(doc, y, 6, logoData, subtitle, versionLabel)
+      doc.setFontSize(9.5); doc.setFont('helvetica', 'normal'); doc.setTextColor(...DARK)
       const wrapped = doc.splitTextToSize('• ' + linha, contentW - 6)
-      for (const bl of wrapped) {
-        doc.text(bl, margin + 4, y)
-        y += 5
-      }
+      for (const bl of wrapped) { doc.text(bl, margin + 4, y); y += 5 }
     }
   }
   y += 6
 
   // ── Desempenho e Conclusão ──
-  y = pageBreak(doc, y, 22, logoData, subtitle)
-  doc.setFontSize(11)
-  doc.setFont('helvetica', 'bold')
-  doc.setTextColor(...DARK)
+  y = pageBreak(doc, y, 22, logoData, subtitle, versionLabel)
+  doc.setFontSize(11); doc.setFont('helvetica', 'bold'); doc.setTextColor(...DARK)
   doc.text('Desempenho e Conclusão', margin, y)
   y += 7
-  doc.setFontSize(9.5)
-  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(9.5); doc.setFont('helvetica', 'normal')
   const desLines = doc.splitTextToSize(desempenho || '—', contentW)
   for (const line of desLines) {
-    y = pageBreak(doc, y, 6, logoData, subtitle)
-    doc.text(line, margin, y)
-    y += 5
+    y = pageBreak(doc, y, 6, logoData, subtitle, versionLabel)
+    doc.setFontSize(9.5); doc.setFont('helvetica', 'normal'); doc.setTextColor(...DARK)
+    doc.text(line, margin, y); y += 5
   }
   y += 8
 
   // "Sem mais..."
-  y = pageBreak(doc, y, 12, logoData, subtitle)
-  doc.setFontSize(9.5)
-  doc.setFont('helvetica', 'italic')
+  y = pageBreak(doc, y, 12, logoData, subtitle, versionLabel)
+  doc.setFontSize(9.5); doc.setFont('helvetica', 'italic'); doc.setTextColor(...DARK)
   doc.text('Sem mais, coloco-me à disposição para esclarecimentos.', margin, y)
   y += 18
 
   // ── Assinatura ──
-  y = pageBreak(doc, y, 28, logoData, subtitle)
-  const boxW = 80
-  const boxH = 24
-  const boxX = pageW - margin - boxW
+  y = pageBreak(doc, y, 28, logoData, subtitle, versionLabel)
+  const boxW = 80, boxH = 24, boxX = pageW - margin - boxW
   doc.setDrawColor(100, 100, 120)
   doc.rect(boxX, y, boxW, boxH)
-  doc.setFontSize(9.5)
-  doc.setFont('helvetica', 'bold')
-  doc.setTextColor(...DARK)
+  doc.setFontSize(9.5); doc.setFont('helvetica', 'bold'); doc.setTextColor(...DARK)
   doc.text(terapeutaNome, boxX + boxW / 2, y + 8, { align: 'center' })
   doc.setFont('helvetica', 'normal')
   doc.text(specialtyLabel, boxX + boxW / 2, y + 14, { align: 'center' })
@@ -299,11 +286,9 @@ export async function generateRelatórioConvenioPDF({
 
   // Footers
   const totalPages = doc.internal.getNumberOfPages()
-  for (let i = 1; i <= totalPages; i++) {
-    doc.setPage(i)
-    addFooter(doc, i, totalPages)
-  }
+  for (let i = 1; i <= totalPages; i++) { doc.setPage(i); addFooter(doc, i, totalPages) }
 
+  if (returnBlob) return doc.output('blob')
   const safe = patientName.replace(/[^\w]/g, '_')
   doc.save(`relatorio_convenio_${safe}_${mesLabel.replace('/', '_')}.pdf`)
 }
@@ -316,8 +301,10 @@ export async function generateListaPresencaPDF({
   terapeutaRegistro,
   specialtyLabel,
   mesLabel,
-  sessions,    // [{date, time, value}]
+  sessions,
   responsavel,
+  versionLabel = '',
+  returnBlob = false,
 }) {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
   const pageW = doc.internal.pageSize.width
@@ -326,7 +313,7 @@ export async function generateListaPresencaPDF({
   const subtitle = 'Lista de Presença'
 
   const logoData = await loadLogo()
-  addHeader(doc, logoData, subtitle)
+  addHeader(doc, logoData, subtitle, versionLabel)
   let y = 28
 
   // Info do paciente / profissional
@@ -404,6 +391,7 @@ export async function generateListaPresencaPDF({
   // Footer (1 página)
   addFooter(doc, 1, 1)
 
+  if (returnBlob) return doc.output('blob')
   const safe = patientName.replace(/[^\w]/g, '_')
   doc.save(`lista_presenca_${safe}_${mesLabel.replace('/', '_')}.pdf`)
 }
