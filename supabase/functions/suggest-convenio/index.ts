@@ -68,7 +68,8 @@ Retorne SOMENTE um objeto JSON válido com exatamente estes três campos:
 
     if (!response.ok) {
       const err = await response.text()
-      return new Response(JSON.stringify({ error: `OpenAI error: ${err}` }), {
+      console.error('OpenAI error status:', response.status, err)
+      return new Response(JSON.stringify({ error: `OpenAI error ${response.status}: ${err}` }), {
         status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
