@@ -1,6 +1,6 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { FiArrowLeft, FiDownload, FiFilter, FiX, FiSearch, FiUser, FiChevronRight } from 'react-icons/fi'
+import { FiArrowLeft, FiDownload, FiFilter, FiX, FiSearch, FiUser, FiChevronRight, FiChevronDown, FiCheck } from 'react-icons/fi'
 import { useData } from '../../../context/DataContext'
 import { useAuth } from '../../../context/AuthContext'
 import { ROUTES } from '../../../constants/routes'
@@ -8,6 +8,71 @@ import Badge from '../../../components/ui/Badge'
 import Button from '../../../components/ui/Button'
 import EmptyState from '../../../components/ui/EmptyState'
 import { calculateAge, calculateAgeYears, formatDateShort } from '../../../utils/dateUtils'
+
+// ─── MultiSelectFilter ────────────────────────────────────────────────────────
+
+function MultiSelectFilter({ label, options, value, onChange, placeholder = 'Todos' }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef(null)
+
+  useEffect(() => {
+    if (!open) return
+    function onMouseDown(e) {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false)
+    }
+    document.addEventListener('mousedown', onMouseDown)
+    return () => document.removeEventListener('mousedown', onMouseDown)
+  }, [open])
+
+  const trigger = value.length === 0
+    ? placeholder
+    : value.length === 1
+      ? (options.find(o => o.value === value[0])?.label ?? `1 selecionado`)
+      : `${value.length} selecionados`
+
+  function toggle(v) {
+    onChange(value.includes(v) ? value.filter(x => x !== v) : [...value, v])
+  }
+
+  return (
+    <div ref={ref} className="relative">
+      <label className="block text-xs text-gray-500 mb-1">{label}</label>
+      <button
+        type="button"
+        onClick={() => setOpen(v => !v)}
+        className="w-full flex items-center justify-between gap-2 px-3 py-2 text-sm border border-gray-200 rounded-xl bg-white focus:ring-2 focus:ring-brand-blue outline-none text-left"
+      >
+        <span className={value.length > 0 ? 'text-gray-900 truncate' : 'text-gray-400 truncate'}>{trigger}</span>
+        <FiChevronDown size={13} className={`text-gray-400 shrink-0 transition-transform duration-150 ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && (
+        <div className="absolute z-30 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-56 overflow-y-auto">
+          {options.length === 0 ? (
+            <p className="px-3 py-3 text-xs text-gray-400">Nenhuma opção</p>
+          ) : (
+            options.map(opt => {
+              const selected = value.includes(opt.value)
+              return (
+                <label
+                  key={opt.value}
+                  className="flex items-center gap-2.5 px-3 py-2.5 hover:bg-gray-50 cursor-pointer"
+                >
+                  <span className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors ${selected ? 'bg-brand-blue border-brand-blue' : 'border-gray-300'}`}>
+                    {selected && <FiCheck size={10} className="text-white" />}
+                  </span>
+                  <input type="checkbox" checked={selected} onChange={() => toggle(opt.value)} className="sr-only" />
+                  <span className="text-sm text-gray-700">{opt.label}</span>
+                </label>
+              )
+            })
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── CSV export ───────────────────────────────────────────────────────────────
 
 function exportCSV(patients, { therapists, patientStatuses, paymentMethods, diagnoses, specialtiesData }) {
   const headers = [
@@ -17,21 +82,11 @@ function exportCSV(patients, { therapists, patientStatuses, paymentMethods, diag
     'Cidade', 'Escola',
   ]
 
-  function therapistName(id) {
-    return therapists.find(t => t.id === id)?.name || ''
-  }
-  function statusName(id) {
-    return patientStatuses.find(s => s.id === id)?.name || ''
-  }
-  function paymentName(id) {
-    return paymentMethods.find(m => m.id === id)?.name || ''
-  }
-  function diagName(id) {
-    return diagnoses.find(d => d.id === id)?.name || id
-  }
-  function sexLabel(s) {
-    return s === 'M' ? 'Masculino' : s === 'F' ? 'Feminino' : s || ''
-  }
+  const therapistName = id => therapists.find(t => t.id === id)?.name || ''
+  const statusName    = id => patientStatuses.find(s => s.id === id)?.name || ''
+  const paymentName   = id => paymentMethods.find(m => m.id === id)?.name || ''
+  const diagName      = id => diagnoses.find(d => d.id === id)?.name || id
+  const sexLabel      = s  => s === 'M' ? 'Masculino' : s === 'F' ? 'Feminino' : s || ''
 
   const rows = patients.map(p => [
     p.fullName,
@@ -44,59 +99,52 @@ function exportCSV(patients, { therapists, patientStatuses, paymentMethods, diag
     paymentName(p.paymentMethodId),
     p.diagnosis || '',
     (p.conditionIds || []).map(diagName).join(' | '),
-    (p.specialties || []).map(s => {
-      const sp = specialtiesData.find(x => x.key === s.key)
-      return sp?.label || s.key
-    }).join(' | '),
+    (p.specialties || []).map(s => specialtiesData.find(x => x.key === s.key)?.label || s.key).join(' | '),
     therapistName(p.therapistId),
     (p.involvedTherapistIds || []).map(therapistName).filter(Boolean).join(' | '),
     p.city || '',
     p.schoolName || '',
   ])
 
-  const escape = (v) => {
+  const escape = v => {
     const str = String(v ?? '')
-    if (str.includes(';') || str.includes('"') || str.includes('\n')) {
-      return `"${str.replace(/"/g, '""')}"`
-    }
-    return str
+    return (str.includes(';') || str.includes('"') || str.includes('\n'))
+      ? `"${str.replace(/"/g, '""')}"`
+      : str
   }
 
-  const csvContent = [headers, ...rows]
-    .map(row => row.map(escape).join(';'))
-    .join('\n')
-
-  const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' })
+  const csv = [headers, ...rows].map(row => row.map(escape).join(';')).join('\n')
+  const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
-  a.href = url
-  a.download = `pacientes_${new Date().toISOString().split('T')[0]}.csv`
-  a.click()
+  a.href = url; a.download = `pacientes_${new Date().toISOString().split('T')[0]}.csv`; a.click()
   URL.revokeObjectURL(url)
 }
 
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
 export default function PatientAdvancedSearchPage() {
   const {
-    patients, therapists, specialtiesData, paymentMethods, diagnoses,
-    patientStatuses, ageRanges,
+    patients, therapists, specialtiesData, paymentMethods,
+    diagnoses, patientStatuses, ageRanges,
   } = useData()
   const { user } = useAuth()
   const navigate = useNavigate()
 
-  const [filterTherapist, setFilterTherapist] = useState('')
-  const [filterCaseManager, setFilterCaseManager] = useState('')
-  const [filterSpecialty, setFilterSpecialty] = useState('')
-  const [filterPayment, setFilterPayment] = useState('')
-  const [filterDiagnosis, setFilterDiagnosis] = useState('')
-  const [filterStatus, setFilterStatus] = useState('')
-  const [filterAgeRange, setFilterAgeRange] = useState('')
+  const [filterTherapists,    setFilterTherapists]    = useState([])
+  const [filterCaseManagers,  setFilterCaseManagers]  = useState([])
+  const [filterSpecialties,   setFilterSpecialties]   = useState([])
+  const [filterPayments,      setFilterPayments]      = useState([])
+  const [filterDiagnoses,     setFilterDiagnoses]     = useState([])
+  const [filterStatuses,      setFilterStatuses]      = useState([])
+  const [filterAgeRanges,     setFilterAgeRanges]     = useState([])
   const [search, setSearch] = useState('')
 
-  const activeTherapists = therapists.filter(t => t.active !== false)
+  const activeTherapists  = therapists.filter(t => t.active !== false)
   const activeSpecialties = specialtiesData.filter(s => s.active !== false)
-  const activePayments = paymentMethods.filter(m => m.active !== false)
-  const activeDiagnoses = diagnoses.filter(d => d.active !== false)
-  const activeStatuses = patientStatuses.filter(s => s.active !== false)
+  const activePayments    = paymentMethods.filter(m => m.active !== false)
+  const activeDiagnoses   = diagnoses.filter(d => d.active !== false)
+  const activeStatuses    = patientStatuses.filter(s => s.active !== false)
 
   const accessiblePatients = useMemo(() => {
     const base = patients.filter(p => !p.deleted)
@@ -111,57 +159,66 @@ export default function PatientAdvancedSearchPage() {
     return accessiblePatients.filter(p => {
       if (search) {
         const q = search.toLowerCase()
-        const matchSearch =
-          p.fullName?.toLowerCase().includes(q) ||
-          p.cpf?.includes(q) ||
-          p.diagnosis?.toLowerCase().includes(q)
-        if (!matchSearch) return false
+        if (
+          !p.fullName?.toLowerCase().includes(q) &&
+          !p.cpf?.includes(q) &&
+          !p.diagnosis?.toLowerCase().includes(q)
+        ) return false
       }
 
-      if (filterCaseManager && p.therapistId !== filterCaseManager) return false
+      if (filterCaseManagers.length > 0 && !filterCaseManagers.includes(p.therapistId)) return false
 
-      if (filterTherapist) {
-        const isManager = p.therapistId === filterTherapist
-        const isInvolved = (p.involvedTherapistIds || []).includes(filterTherapist)
+      if (filterTherapists.length > 0) {
+        const isManager  = filterTherapists.includes(p.therapistId)
+        const isInvolved = (p.involvedTherapistIds || []).some(id => filterTherapists.includes(id))
         if (!isManager && !isInvolved) return false
       }
 
-      if (filterSpecialty && !(p.specialties || []).some(s => s.key === filterSpecialty)) return false
-
-      if (filterPayment && p.paymentMethodId !== filterPayment) return false
-
-      if (filterDiagnosis) {
-        const diag = diagnoses.find(d => d.id === filterDiagnosis)
-        const inMain = diag && p.diagnosis === diag.name
-        const inComorbidity = (p.conditionIds || []).includes(filterDiagnosis)
-        if (!inMain && !inComorbidity) return false
+      if (filterSpecialties.length > 0) {
+        if (!filterSpecialties.some(key => (p.specialties || []).some(s => s.key === key))) return false
       }
 
-      if (filterStatus && p.statusId !== filterStatus) return false
+      if (filterPayments.length > 0 && !filterPayments.includes(p.paymentMethodId)) return false
 
-      if (filterAgeRange) {
-        const range = ageRanges.find(r => r.id === filterAgeRange)
-        if (range) {
-          const years = calculateAgeYears(p.dateOfBirth)
-          if (years === null || years < range.minAge || years >= range.maxAge) return false
-        }
+      if (filterDiagnoses.length > 0) {
+        const match = filterDiagnoses.some(id => {
+          const diag = diagnoses.find(d => d.id === id)
+          return (diag && p.diagnosis === diag.name) || (p.conditionIds || []).includes(id)
+        })
+        if (!match) return false
+      }
+
+      if (filterStatuses.length > 0 && !filterStatuses.includes(p.statusId)) return false
+
+      if (filterAgeRanges.length > 0) {
+        const years = calculateAgeYears(p.dateOfBirth)
+        const inRange = filterAgeRanges.some(id => {
+          const range = ageRanges.find(r => r.id === id)
+          return range && years !== null && years >= range.minAge && years < range.maxAge
+        })
+        if (!inRange) return false
       }
 
       return true
     })
-  }, [accessiblePatients, search, filterCaseManager, filterTherapist, filterSpecialty, filterPayment, filterDiagnosis, filterStatus, filterAgeRange, diagnoses, ageRanges])
+  }, [
+    accessiblePatients, search,
+    filterCaseManagers, filterTherapists, filterSpecialties,
+    filterPayments, filterDiagnoses, filterStatuses, filterAgeRanges,
+    diagnoses, ageRanges,
+  ])
 
-  const hasFilters = filterTherapist || filterCaseManager || filterSpecialty || filterPayment || filterDiagnosis || filterStatus || filterAgeRange || search
+  const hasFilters =
+    filterTherapists.length > 0 || filterCaseManagers.length > 0 ||
+    filterSpecialties.length > 0 || filterPayments.length > 0 ||
+    filterDiagnoses.length > 0 || filterStatuses.length > 0 ||
+    filterAgeRanges.length > 0 || search
 
   function clearFilters() {
-    setFilterTherapist('')
-    setFilterCaseManager('')
-    setFilterSpecialty('')
-    setFilterPayment('')
-    setFilterDiagnosis('')
-    setFilterStatus('')
-    setFilterAgeRange('')
-    setSearch('')
+    setFilterTherapists([]);   setFilterCaseManagers([])
+    setFilterSpecialties([]);  setFilterPayments([])
+    setFilterDiagnoses([]);    setFilterStatuses([])
+    setFilterAgeRanges([]);    setSearch('')
   }
 
   function getAgeRange(dateOfBirth) {
@@ -170,8 +227,6 @@ export default function PatientAdvancedSearchPage() {
     if (years === null) return null
     return ageRanges.find(r => years >= r.minAge && years < r.maxAge) || null
   }
-
-  const selectClass = 'px-3 py-2 text-sm border border-gray-200 rounded-xl bg-white focus:ring-2 focus:ring-brand-blue outline-none w-full'
 
   return (
     <div className="p-3 md:p-6 space-y-4">
@@ -216,7 +271,7 @@ export default function PatientAdvancedSearchPage() {
           <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Filtros</span>
         </div>
 
-        {/* Search */}
+        {/* Text search */}
         <div className="relative">
           <FiSearch size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
@@ -228,69 +283,54 @@ export default function PatientAdvancedSearchPage() {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {/* Gerente de Caso */}
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">Gerente de Caso</label>
-            <select value={filterCaseManager} onChange={e => setFilterCaseManager(e.target.value)} className={selectClass}>
-              <option value="">Todos</option>
-              {activeTherapists.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-            </select>
-          </div>
-
-          {/* Terapeuta (qualquer vínculo) */}
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">Terapeuta (qualquer vínculo)</label>
-            <select value={filterTherapist} onChange={e => setFilterTherapist(e.target.value)} className={selectClass}>
-              <option value="">Todos</option>
-              {activeTherapists.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-            </select>
-          </div>
-
-          {/* Especialidade */}
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">Especialidade</label>
-            <select value={filterSpecialty} onChange={e => setFilterSpecialty(e.target.value)} className={selectClass}>
-              <option value="">Todas</option>
-              {activeSpecialties.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
-            </select>
-          </div>
-
-          {/* Forma de Pagamento */}
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">Forma de Pagamento</label>
-            <select value={filterPayment} onChange={e => setFilterPayment(e.target.value)} className={selectClass}>
-              <option value="">Todas</option>
-              {activePayments.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-            </select>
-          </div>
-
-          {/* Diagnóstico */}
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">Diagnóstico</label>
-            <select value={filterDiagnosis} onChange={e => setFilterDiagnosis(e.target.value)} className={selectClass}>
-              <option value="">Todos</option>
-              {activeDiagnoses.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-            </select>
-          </div>
-
-          {/* Status do Paciente */}
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">Status do Paciente</label>
-            <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className={selectClass}>
-              <option value="">Todos</option>
-              {activeStatuses.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-            </select>
-          </div>
-
-          {/* Faixa Etária */}
+          <MultiSelectFilter
+            label="Gerente de Caso"
+            options={activeTherapists.map(t => ({ value: t.id, label: t.name }))}
+            value={filterCaseManagers}
+            onChange={setFilterCaseManagers}
+          />
+          <MultiSelectFilter
+            label="Terapeuta (qualquer vínculo)"
+            options={activeTherapists.map(t => ({ value: t.id, label: t.name }))}
+            value={filterTherapists}
+            onChange={setFilterTherapists}
+          />
+          <MultiSelectFilter
+            label="Especialidade"
+            options={activeSpecialties.map(s => ({ value: s.key, label: s.label }))}
+            value={filterSpecialties}
+            onChange={setFilterSpecialties}
+            placeholder="Todas"
+          />
+          <MultiSelectFilter
+            label="Forma de Pagamento"
+            options={activePayments.map(m => ({ value: m.id, label: m.name }))}
+            value={filterPayments}
+            onChange={setFilterPayments}
+            placeholder="Todas"
+          />
+          <MultiSelectFilter
+            label="Diagnóstico"
+            options={activeDiagnoses.map(d => ({ value: d.id, label: d.name }))}
+            value={filterDiagnoses}
+            onChange={setFilterDiagnoses}
+            placeholder="Todos"
+          />
+          <MultiSelectFilter
+            label="Status do Paciente"
+            options={activeStatuses.map(s => ({ value: s.id, label: s.name }))}
+            value={filterStatuses}
+            onChange={setFilterStatuses}
+            placeholder="Todos"
+          />
           {ageRanges.length > 0 && (
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">Faixa Etária</label>
-              <select value={filterAgeRange} onChange={e => setFilterAgeRange(e.target.value)} className={selectClass}>
-                <option value="">Todas</option>
-                {ageRanges.map(r => <option key={r.id} value={r.id}>{r.name} ({r.minAge}–{r.maxAge} anos)</option>)}
-              </select>
-            </div>
+            <MultiSelectFilter
+              label="Faixa Etária"
+              options={ageRanges.map(r => ({ value: r.id, label: `${r.name} (${r.minAge}–${r.maxAge} anos)` }))}
+              value={filterAgeRanges}
+              onChange={setFilterAgeRanges}
+              placeholder="Todas"
+            />
           )}
         </div>
       </div>
