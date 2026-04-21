@@ -268,21 +268,37 @@ export default function ConvenioReportPage() {
     const hasContent = encaminhamento || objetivos || desempenho
     if (hasContent && !confirm('Os campos de texto já têm conteúdo. Deseja sobrescrever com as sugestões da IA?')) return
 
-    // Coleta conteúdo real dos atendimentos selecionados
+    // Palavras genéricas que não contribuem para a IA
+    const GENERIC_TERMS = ['n/a', 'na', 'continuidade', 'continuidade no tratamento',
+      'continuidade do tratamento', 'sem alterações', 'sem alteracao', 'idem', '-', '—']
+
+    function isSubstantial(text) {
+      if (!text) return false
+      const normalized = text.trim().toLowerCase()
+      if (GENERIC_TERMS.includes(normalized)) return false
+      return normalized.length >= 15  // mínimo 15 chars após excluir genéricos
+    }
+
+    // Coleta apenas sessões com conteúdo real e substancial
     const sessionIds = new Set(validSessions.map(s => s.id))
     const sessionDetails = consultations
-      .filter(c => sessionIds.has(c.id) && (c.mainObjective || c.evolutionNotes || c.nextObjectives))
+      .filter(c => sessionIds.has(c.id) &&
+        (isSubstantial(c.mainObjective) || isSubstantial(c.evolutionNotes) || isSubstantial(c.nextObjectives)))
       .map((c, i) => {
         const parts = []
-        if (c.mainObjective) parts.push(`Objetivo: ${c.mainObjective}`)
-        if (c.evolutionNotes) parts.push(`Evolução: ${c.evolutionNotes}`)
-        if (c.nextObjectives) parts.push(`Próximo objetivo: ${c.nextObjectives}`)
+        if (isSubstantial(c.mainObjective)) parts.push(`Objetivo: ${c.mainObjective}`)
+        if (isSubstantial(c.evolutionNotes)) parts.push(`Evolução: ${c.evolutionNotes}`)
+        if (isSubstantial(c.nextObjectives)) parts.push(`Próximo objetivo: ${c.nextObjectives}`)
         return `Sessão ${i + 1} (${c.date}):\n${parts.join('\n')}`
       })
       .join('\n\n')
 
-    // Conteúdo é considerado substancial se tiver ao menos 100 caracteres no total
-    const sessionDetailsSubstantial = sessionDetails.length >= 100 ? sessionDetails : null
+    // Exige ao menos 2 sessões com conteúdo substancial OU 1 sessão com evolução detalhada (>80 chars)
+    const sessionsWithContent = consultations.filter(c => sessionIds.has(c.id) &&
+      (isSubstantial(c.mainObjective) || isSubstantial(c.evolutionNotes) || isSubstantial(c.nextObjectives)))
+    const hasRichContent = sessionsWithContent.length >= 2 ||
+      sessionsWithContent.some(c => (c.evolutionNotes || '').length > 80)
+    const sessionDetailsSubstantial = hasRichContent ? sessionDetails : null
 
     setLoadingAI(true)
     try {
