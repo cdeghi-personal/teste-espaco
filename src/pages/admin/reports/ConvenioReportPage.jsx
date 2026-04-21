@@ -60,7 +60,7 @@ function PreviewModal({ blob, title, filename, onClose, onDownload }) {
 }
 
 // ─── Histórico ────────────────────────────────────────────────────
-function HistorySection({ patientId, onRestore }) {
+function HistorySection({ patientId, onRestore, refreshKey }) {
   const [records, setRecords] = useState([])
   const [loading, setLoading] = useState(false)
 
@@ -77,7 +77,7 @@ function HistorySection({ patientId, onRestore }) {
     setLoading(false)
   }, [patientId])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => { load() }, [load, refreshKey])
 
   async function handleDelete(id) {
     if (!confirm('Excluir este registro do histórico?')) return
@@ -144,6 +144,9 @@ export default function ConvenioReportPage() {
   const [sessionValue, setSessionValue] = useState('')
   const [horario, setHorario] = useState('')
 
+  // ── Histórico refresh ─────────────────────────────────────────
+  const [historyRefreshKey, setHistoryRefreshKey] = useState(0)
+
   // ── Texto ────────────────────────────────────────────────────
   const [responsavel, setResponsavel] = useState('')
   const [diagnosticoText, setDiagnosticoText] = useState('')
@@ -209,8 +212,9 @@ export default function ConvenioReportPage() {
     const specEntry = (patient?.specialties || []).find(s => s.key === specialty)
     const defValue = specEntry?.therapistValue ? parseFloat(specEntry.therapistValue) : 0
 
-    setSessions(found.map(c => ({ id: c.id, date: c.date, value: defValue })))
+    setSessions(found.map(c => ({ id: c.id, date: c.date, value: defValue, time: c.time ? c.time.slice(0, 5) : '' })))
     setSessionValue(String(defValue || ''))
+    // Set default horario from first session (for apply-all convenience)
     if (found.length > 0 && found[0].time) setHorario(found[0].time.slice(0, 5))
 
     const mainDiag = patient?.diagnosis || ''
@@ -226,7 +230,7 @@ export default function ConvenioReportPage() {
 
   // ── Sessões ───────────────────────────────────────────────────
   function addSession() {
-    setSessions(s => [...s, { id: generateId(), date: '', value: parseFloat(sessionValue) || 0 }])
+    setSessions(s => [...s, { id: generateId(), date: '', value: parseFloat(sessionValue) || 0, time: horario }])
   }
   function updateSession(id, field, val) {
     setSessions(s => s.map(r => r.id === id ? { ...r, [field]: val } : r))
@@ -235,6 +239,10 @@ export default function ConvenioReportPage() {
   function applyValueToAll(val) {
     setSessionValue(val)
     setSessions(s => s.map(r => ({ ...r, value: parseFloat(val) || 0 })))
+  }
+  function applyTimeToAll(val) {
+    setHorario(val)
+    setSessions(s => s.map(r => ({ ...r, time: val })))
   }
 
   // ── Restaurar do histórico ────────────────────────────────────
@@ -269,7 +277,7 @@ export default function ConvenioReportPage() {
   // ── Salvar no histórico ───────────────────────────────────────
   async function saveHistory(ver) {
     const { data: { user: authUser } } = await supabase.auth.getUser()
-    await supabase.from('convenio_reports').insert({
+    const { error } = await supabase.from('convenio_reports').insert({
       patient_id: patientId,
       therapist_id: therapistId || null,
       specialty,
@@ -278,6 +286,8 @@ export default function ConvenioReportPage() {
       form_data: { sessions, sessionValue, horario, responsavel, diagnosticoText, encaminhamento, objetivos, desempenho },
       created_by: authUser?.id,
     })
+    if (error) console.error('Erro ao salvar histórico de convênio:', error)
+    return !error
   }
 
   // ── Download blob ─────────────────────────────────────────────
@@ -291,7 +301,8 @@ export default function ConvenioReportPage() {
   async function handleDownloadAndLog(blob, filename) {
     downloadBlob(blob, filename)
     const ver = versionLabel || getOrMakeVersion()
-    await saveHistory(ver)
+    const saved = await saveHistory(ver)
+    if (saved) setHistoryRefreshKey(k => k + 1)
   }
 
   // ── Preview Relatório ─────────────────────────────────────────
@@ -325,7 +336,7 @@ export default function ConvenioReportPage() {
       const blob = await generateListaPresencaPDF({
         patientName: patient.fullName, terapeutaNome: selectedTherapist.name,
         terapeutaRegistro: credential, specialtyLabel, mesLabel,
-        sessions: sessions.filter(s => s.date).map(s => ({ ...s, time: horario })),
+        sessions: sessions.filter(s => s.date),
         responsavel, versionLabel: ver, returnBlob: true, companySettings,
       })
       const safe = patient.fullName.replace(/[^\w]/g, '_')
@@ -431,8 +442,11 @@ export default function ConvenioReportPage() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className={labelClass}>Horário (exibido no relatório)</label>
-              <input type="text" value={horario} onChange={e => setHorario(e.target.value)} placeholder="Ex: 19h às 20h"
+              <label className={labelClass}>
+                Horário padrão
+                {sessions.length > 0 && <button onClick={() => applyTimeToAll(horario)} className="ml-2 text-brand-blue underline text-xs">aplicar a todas</button>}
+              </label>
+              <input type="text" value={horario} onChange={e => setHorario(e.target.value)} placeholder="Ex: 17h30 às 18h30"
                 className="px-3 py-2 text-sm border border-gray-200 rounded-xl bg-white focus:ring-2 focus:ring-brand-blue outline-none w-full" />
             </div>
             <div>
@@ -451,6 +465,7 @@ export default function ConvenioReportPage() {
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-100">
                     <th className="text-left px-3 py-2 text-xs font-semibold text-gray-500">Data</th>
+                    <th className="text-left px-3 py-2 text-xs font-semibold text-gray-500">Horário</th>
                     <th className="text-left px-3 py-2 text-xs font-semibold text-gray-500">Valor (R$)</th>
                     <th className="w-8" />
                   </tr>
@@ -461,6 +476,10 @@ export default function ConvenioReportPage() {
                       <td className="px-3 py-2">
                         <input type="date" value={s.date} onChange={e => updateSession(s.id, 'date', e.target.value)}
                           className="px-2 py-1 text-sm border border-gray-200 rounded-lg bg-white focus:ring-1 focus:ring-brand-blue outline-none w-36" />
+                      </td>
+                      <td className="px-3 py-2">
+                        <input type="text" value={s.time || ''} onChange={e => updateSession(s.id, 'time', e.target.value)}
+                          placeholder="Ex: 17h30" className="px-2 py-1 text-sm border border-gray-200 rounded-lg bg-white focus:ring-1 focus:ring-brand-blue outline-none w-28" />
                       </td>
                       <td className="px-3 py-2">
                         <input type="number" step="0.01" value={s.value} onChange={e => updateSession(s.id, 'value', parseFloat(e.target.value) || 0)}
@@ -545,7 +564,7 @@ export default function ConvenioReportPage() {
       )}
 
       {/* Histórico */}
-      <HistorySection patientId={patientId} onRestore={handleRestore} />
+      <HistorySection patientId={patientId} onRestore={handleRestore} refreshKey={historyRefreshKey} />
 
       {/* Modal de preview */}
       {previewBlob && (

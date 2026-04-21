@@ -28,6 +28,16 @@ function buildDatasStr(sessions) {
   return parts.slice(0, -1).join(', ') + ' e ' + parts[parts.length - 1]
 }
 
+function buildSessionTimeGroups(sessions, fallbackHorario) {
+  const groups = new Map()
+  for (const s of sessions) {
+    const key = (s.time || fallbackHorario || '').trim()
+    if (!groups.has(key)) groups.set(key, [])
+    groups.get(key).push(s)
+  }
+  return [...groups.entries()].map(([time, grp]) => ({ time, datasStr: buildDatasStr(grp) }))
+}
+
 // ─── Relatório ao Convênio ──────────────────────────────────────
 
 export async function generateRelatórioConvenioPDF({
@@ -75,15 +85,18 @@ export async function generateRelatórioConvenioPDF({
   // ── Atendimentos do Mês ──
   y = pageBreak(doc, y, 50, logoData, subtitle, versionLabel, companySettings)
   y = sectionBlock(doc, 'Atendimentos do Mês', y, { uppercase: false })
-  const datasStr = buildDatasStr(sessions)
-  const total = parseFloat(sessionValue) * sessions.length
+  const timeGroups = buildSessionTimeGroups(sessions, horario)
+  const total = sessions.reduce((sum, s) => sum + (parseFloat(s.value) || 0), 0)
+  const datasRows = timeGroups.map(({ time, datasStr }) => [
+    { content: 'Datas e Horários:', styles: { fontStyle: 'bold', fillColor: PDF_LIGHT } },
+    { content: time ? `${datasStr} às ${time}` : datasStr, colSpan: 3 },
+  ])
 
   autoTable(doc, {
     startY: y, margin: { left: margin, right: margin },
     body: [
       [{ content: 'Mês de referência:', styles: { fontStyle: 'bold', fillColor: PDF_LIGHT } }, { content: mesLabel, colSpan: 3 }],
-      [{ content: 'Datas:', styles: { fontStyle: 'bold', fillColor: PDF_LIGHT } }, { content: datasStr, colSpan: 3 }],
-      [{ content: 'Horário:', styles: { fontStyle: 'bold', fillColor: PDF_LIGHT } }, { content: horario || '—', colSpan: 3 }],
+      ...datasRows,
       [
         { content: 'Valor de sessão:', styles: { fontStyle: 'bold', fillColor: PDF_LIGHT } }, { content: fmtCurrencyPDF(sessionValue) },
         { content: 'Total:', styles: { fontStyle: 'bold', fillColor: PDF_LIGHT } }, { content: fmtCurrencyPDF(total) },

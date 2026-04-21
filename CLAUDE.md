@@ -39,6 +39,7 @@ src/
     storageUtils.js              # generateId (helpers locais)
     dateUtils.js                 # formatDateBR, formatDateShort, formatWeekDay, isoToday, calculateAge, calculateAgeYears, getWeekDays, formatMonthYear
     validators.js
+    pdfShared.js                 # Utilitários compartilhados por todos os PDFs (addPageHeader, addPageFooter, addAllPageFooters, sectionBlock, labelValue, loadLogo, fmtDatePDF, fmtCurrencyPDF + constantes)
     generateProntuarioPDF.js     # Gera PDF completo do prontuário (admin only)
     generateReportPDF.js         # Gera relatórios PDF: consultas por paciente ou terapeuta
   components/
@@ -73,8 +74,9 @@ src/
       ageranges/        AgeRangesPage, AgeRangeFormModal
       audit/            AuditPage
       contactleads/     ContactLeadsPage
-      reports/          ReportsPage
+      reports/          ReportsPage, ConvenioReportPage
       support/          SupportPage, SupportFormModal
+      company/          CompanySettingsPage
 supabase/
   01_schema.sql                  # Tabelas, enums, índices, trigger de criação de profile
   02_rls.sql                     # Row Level Security — admin vê tudo, terapeuta vê só os seus
@@ -105,6 +107,8 @@ supabase/
   39_support_tickets_all_users.sql # Adiciona created_by_id; abre INSERT p/ todos, SELECT por dono ou admin
   40_audit_resource_name_consultations.sql # fn_audit_log: consultations → "Paciente | Terapeuta | Data"; prontuário → "Paciente | Exames/Medicamentos/Conduta"
   41_age_ranges.sql              # Tabela age_ranges — RLS: SELECT p/ todos autenticados, INSERT/UPDATE/DELETE só admin
+  42_convenio_reports.sql        # Tabela convenio_reports — histórico de PDFs gerados; RLS: admin vê tudo, outros veem só próprios
+  43_company_settings.sql        # Tabela company_settings (linha única via CHECK id=1) — razao_social, cnpj; SELECT p/ autenticados, UPDATE só admin
   functions/
     invite-therapist/index.ts    # Edge Function — envia convite por e-mail ao criar terapeuta
 ```
@@ -154,6 +158,8 @@ Encontrar em: Supabase Dashboard → Project Settings → API.
 | `support_tickets` | Chamados de suporte — subject, type, author, description, solution, status, created_by_id |
 | `support_ticket_history` | Histórico de status dos chamados — ticket_id, status, changed_at, changed_by |
 | `age_ranges` | Faixas etárias — name, min_age, max_age, color; critério: min_age ≤ idade < max_age |
+| `convenio_reports` | Histórico de relatórios ao convênio gerados em PDF — patient_id, therapist_id, specialty, mes_label, version_label, created_by |
+| `company_settings` | Configurações da empresa — linha única (id=1, CHECK constraint); razao_social, cnpj, updated_at |
 
 ### Mappers (DB → App)
 
@@ -163,6 +169,7 @@ Todos em `src/lib/supabase.js`. Convertem snake_case do banco para camelCase do 
 - `mapSpecialty`, `mapPaymentMethod`, `mapDiagnosis`, `mapPatientStatus`, `mapRoom`
 - `mapConsultationStatus` (inclui `automatic`), `mapAppointmentType`, `mapExam`, `mapMedication`, `mapConduct`
 - `age_ranges` mapeado inline no DataContext: `{ id, name, minAge, maxAge, color }`
+- `company_settings` exposto como `companySettings` (`{ razaoSocial, cnpj }`) via `useData()`; função `updateCompanySettings({ razaoSocial, cnpj })` faz `.update().eq('id', 1)`
 - `syncPatientRelations(patientId, { specialties, conditionIds })` — specialties agora `[{ key, patientValue, therapistValue }]`
 - `syncGuardianPatients(guardianId, patientIds)`
 - `syncTherapistSpecialties(therapistId, [{ specialty, credential }])`
@@ -266,6 +273,8 @@ Authentication → URL Configuration:
 | medical_record_conducts | Hard delete | — |
 | support_tickets | Hard delete | — |
 | support_ticket_history | Hard delete | — |
+| company_settings | Upsert (linha única) | — |
+| convenio_reports | Hard delete | — |
 
 ## Rotas
 
@@ -284,8 +293,9 @@ Authentication → URL Configuration:
 '/admin/contatos'               // admin only
 '/admin/relatorios'             // todos autenticados (terapeuta vê só próprios dados)
 '/admin/suporte'                // todos os usuários autenticados
-'/admin/pacientes/avancado'     // busca avançada de pacientes — todos autenticados (filtros: terapeuta, gerente de caso, especialidade, forma de pagamento, diagnóstico, status, faixa etária); exporta CSV
+'/admin/pacientes/avancado'     // busca avançada de pacientes — todos autenticados; filtros multi-select (terapeuta, gerente de caso, especialidade, forma de pagamento, diagnóstico, status, faixa etária); exporta CSV
 '/admin/relatorios/convenio'    // relatório de convênio — todos autenticados; gera Relatório ao Convênio + Lista de Presença em PDF
+'/admin/empresa'                // dados da empresa (Razão Social + CNPJ) — admin only
 ```
 
 ## Padrões de código
@@ -318,7 +328,7 @@ Authentication → URL Configuration:
 - Item "Contatos" — visível apenas para admin, com badge vermelho mostrando contagem de `novo`
 - Item "Relatórios" — visível para **todos** os autenticados (terapeuta vê apenas próprios dados na página)
 - Item "Suporte" — visível para **todos** os usuários autenticados
-- Seção "Administração" — colapsável, visível a **todos** os autenticados; contém: Terapeutas, Especialidades, Formas de Pagamento, Diagnósticos, Status do Paciente, Status Atendimento, Tipos de Atendimento, Salas, Faixas Etárias (read-only para terapeutas) + Log de Auditoria (admin only)
+- Seção "Administração" — colapsável, visível a **todos** os autenticados; contém: Terapeutas, Especialidades, Formas de Pagamento, Diagnósticos, Status do Paciente, Status Atendimento, Tipos de Atendimento, Salas, Faixas Etárias (read-only para terapeutas) + Log de Auditoria (admin only) + **Dados da Empresa** (admin only, ícone `FiBriefcase`)
 - "Sair" sempre visível no rodapé
 
 ## Site Público
@@ -385,12 +395,38 @@ Authentication → URL Configuration:
 ## Relatório de Convênio (`/admin/relatorios/convenio`)
 
 - **Acesso:** todos os autenticados. Terapeutas veem seus próprios pacientes; admin seleciona qualquer terapeuta.
-- **Fluxo:** (1) Seleciona terapeuta (admin) + paciente + especialidade + período → Buscar Atendimentos; (2) Edita sessões (data + valor, add/remove); (3) Preenche Horário, Diagnóstico com CID, Encaminhamento, Objetivos, Desempenho; (4) Gera PDFs.
+- **Fluxo:** (1) Seleciona terapeuta (admin) + paciente + especialidade + período → Buscar Atendimentos; (2) Edita sessões (data + horário + valor por linha, add/remove); (3) Preenche Diagnóstico com CID, Encaminhamento, Objetivos, Desempenho; (4) Visualiza preview do nome do arquivo + histórico de versões; (5) Gera PDFs.
 - **Relatório ao Convênio (PDF):** seções Identificação, Atendimentos do Mês, Encaminhamento, Objetivos de Intervenção, Desempenho e Conclusão, assinatura em caixa. Rodapé com endereço/contato em todas as páginas.
 - **Lista de Presença (PDF):** tabela Data | Valor | Local | Horário | Assinatura Profissional | Assinatura Responsável + linhas de assinatura.
 - **Diagnóstico:** pré-preenchido com `patient.diagnosis` + nomes das comorbidades; editável (terapeuta acrescenta CID).
 - **Registro/credencial:** `therapist.specialties.find(s => s.specialty === selectedSpecialty)?.credential`.
+- **Nome do arquivo:** inclui especialidade — ex: `relatorio_convenio_nome_ESPECIALIDADE_Mes_Ano.pdf`.
+- **Versionamento:** `versionLabel` (ex: `v1`, `v2`) impresso no cabeçalho do PDF; histórico gravado em `convenio_reports`.
+- **companySettings:** passado para ambas as funções PDF; exibe Razão Social e CNPJ no cabeçalho.
+- **Horários por sessão:** cada sessão tem campo `time` individual (preenchido do banco ao buscar). Campo "Horário padrão" com botão "aplicar a todas" para o caso comum. O PDF agrupa sessões por horário e gera uma linha "Datas e Horários" por grupo — ex: `04, 10 às 17:30` e `05, 12 às 18h`. Internamente: `buildSessionTimeGroups(sessions, fallbackHorario)`.
+- **Auto-refresh do histórico:** após "Baixar e Registrar", a seção recarrega automaticamente via `historyRefreshKey` passado ao `HistorySection`.
 - Funções em `src/utils/generateConvenioPDF.js`: `generateRelatórioConvenioPDF()`, `generateListaPresencaPDF()`, `formatMesLabel()`, `MONTHS`.
+- `MONTHS` e `formatMesLabel` re-exportados de `pdfShared.js` via `export { MONTHS, formatMesLabel } from './pdfShared'`.
+
+## Dados da Empresa (`/admin/empresa`)
+
+- **Acesso:** admin only (terapeutas redirecionados para `/admin`).
+- **Campos:** Razão Social e CNPJ (com máscara automática `XX.XXX.XXX/XXXX-XX`).
+- **Armazenamento:** tabela `company_settings` — linha única (id=1, `CHECK (id = 1)`); UPDATE via `updateCompanySettings()`.
+- **Uso:** `companySettings` (do `useData()`) é passado como parâmetro opcional para todas as funções geradoras de PDF — `generateProntuarioPDF`, `generateConsultasPacientePDF`, `generateConsultasTerapeutaPDF`, `generateRelatórioConvenioPDF`, `generateListaPresencaPDF`.
+- **No cabeçalho PDF:** quando `companySettings` está preenchido, exibe Razão Social (y=8), CNPJ (y=13) e texto direito (y=18) dentro da barra azul do header.
+
+## Utilitários PDF Compartilhados (`src/utils/pdfShared.js`)
+
+- Centraliza header/footer/helpers usados por todos os 3 geradores de PDF.
+- **Constantes:** `PDF_BLUE`, `PDF_GRAY`, `PDF_DARK`, `PDF_LIGHT`, `CLINIC_NAME`, `CLINIC_ADDRESS`, `CLINIC_ADDRESS_SHORT`, `CLINIC_CONTACT`, `CLINIC_LOCAL`, `MONTHS`.
+- **`addPageHeader(doc, logoData, subtitle, companySettings, rightText)`** — barra azul 22mm, logo, nome/subtítulo da clínica; se `companySettings` presente → Razão Social + CNPJ na barra.
+- **`addPageFooter(doc, pageNum, totalPages, { full })`** — `full: false` (compacto, linha + "Espaço Casa Amarela — Documento confidencial" + página); `full: true` (3 linhas: nome bold + endereço + contato + página).
+- **`addAllPageFooters(doc, options)`** — itera todas as páginas e aplica `addPageFooter`.
+- **`sectionBlock(doc, text, y, { uppercase })`** — bloco de seção com fundo azul e texto branco.
+- **`labelValue(doc, label, value, x, y, maxWidth)`** — renderiza par label/valor em linha, retorna novo y.
+- **`loadLogo()`** — carrega `/logo.png` como base64 via `fetch`.
+- **`fmtDatePDF(str)`**, **`fmtCurrencyPDF(val)`**, **`formatMesLabel(yearMonth)`**.
 
 ## Suporte (`/admin/suporte`)
 
