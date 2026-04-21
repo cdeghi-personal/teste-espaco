@@ -111,6 +111,7 @@ supabase/
   43_company_settings.sql        # Tabela company_settings (linha única via CHECK id=1) — razao_social, cnpj; SELECT p/ autenticados, UPDATE só admin
   functions/
     invite-therapist/index.ts    # Edge Function — envia convite por e-mail ao criar terapeuta
+    suggest-convenio/index.ts    # Edge Function — gera sugestões de texto para relatório de convênio via OpenAI gpt-4o-mini
 ```
 
 ## Supabase — Banco de Dados
@@ -405,6 +406,7 @@ Authentication → URL Configuration:
 - **companySettings:** passado para ambas as funções PDF; exibe Razão Social e CNPJ no cabeçalho.
 - **Horários por sessão:** cada sessão tem campo `time` individual (preenchido do banco ao buscar). Campo "Horário padrão" com botão "aplicar a todas" para o caso comum. O PDF agrupa sessões por horário e gera uma linha "Datas e Horários" por grupo — ex: `04, 10 às 17:30` e `05, 12 às 18h`. Internamente: `buildSessionTimeGroups(sessions, fallbackHorario)`.
 - **Auto-refresh do histórico:** após "Baixar e Registrar", a seção recarrega automaticamente via `historyRefreshKey` passado ao `HistorySection`.
+- **Sugestão com IA:** botão "Sugerir com IA" (⚡ violeta) no topo da seção 3. Chama a Edge Function `suggest-convenio` via `supabase.functions.invoke`. Preenche automaticamente Encaminhamento, Objetivos e Desempenho com base em especialidade, diagnóstico, nº de sessões e terapeuta. Requer secret `OPENAI_API_KEY` no Supabase + JWT Verification ATIVADO.
 - Funções em `src/utils/generateConvenioPDF.js`: `generateRelatórioConvenioPDF()`, `generateListaPresencaPDF()`, `formatMesLabel()`, `MONTHS`.
 - `MONTHS` e `formatMesLabel` re-exportados de `pdfShared.js` via `export { MONTHS, formatMesLabel } from './pdfShared'`.
 

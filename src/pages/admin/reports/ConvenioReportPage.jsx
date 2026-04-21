@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useCallback } from 'react'
 import { useNavigate, Navigate } from 'react-router-dom'
-import { FiArrowLeft, FiPlus, FiTrash2, FiFileText, FiDownload, FiEye, FiClock, FiRotateCcw, FiX } from 'react-icons/fi'
+import { FiArrowLeft, FiPlus, FiTrash2, FiFileText, FiDownload, FiEye, FiClock, FiRotateCcw, FiX, FiZap } from 'react-icons/fi'
 import { useData } from '../../../context/DataContext'
 import { useAuth } from '../../../context/AuthContext'
 import { ROUTES } from '../../../constants/routes'
@@ -160,6 +160,8 @@ export default function ConvenioReportPage() {
   const [previewTitle, setPreviewTitle] = useState('')
   const [previewFilename, setPreviewFilename] = useState('')
   const [loadingPDF, setLoadingPDF] = useState('')
+  const [loadingAI, setLoadingAI] = useState(false)
+  const [aiError, setAiError] = useState('')
   const [error, setError] = useState('')
 
   // ── Dados derivados ──────────────────────────────────────────
@@ -257,6 +259,35 @@ export default function ConvenioReportPage() {
     if (formData.objetivos != null) setObjetivos(formData.objetivos)
     if (formData.desempenho != null) setDesempenho(formData.desempenho)
     setSearched(true)
+  }
+
+  // ── Sugestão com IA ──────────────────────────────────────────
+  async function handleSuggestAI() {
+    setAiError('')
+    const specialtyLabel = specialtiesData.find(s => s.key === specialty)?.label || specialty
+    const hasContent = encaminhamento || objetivos || desempenho
+    if (hasContent && !confirm('Os campos de texto já têm conteúdo. Deseja sobrescrever com as sugestões da IA?')) return
+
+    setLoadingAI(true)
+    try {
+      const { data, error: fnError } = await supabase.functions.invoke('suggest-convenio', {
+        body: {
+          especialidade: specialtyLabel,
+          diagnostico: diagnosticoText,
+          numSessoes: validSessions.length,
+          terapeutaNome: selectedTherapist?.name || '',
+        },
+      })
+      if (fnError) throw new Error(fnError.message)
+      if (data?.error) throw new Error(data.error)
+      if (data?.encaminhamento) setEncaminhamento(data.encaminhamento)
+      if (data?.objetivos) setObjetivos(data.objetivos)
+      if (data?.desempenho) setDesempenho(data.desempenho)
+    } catch (err) {
+      setAiError(err.message || 'Erro ao gerar sugestões.')
+    } finally {
+      setLoadingAI(false)
+    }
   }
 
   // ── Parâmetros comuns ─────────────────────────────────────────
@@ -503,7 +534,20 @@ export default function ConvenioReportPage() {
       {/* Texto */}
       {searched && (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-4">
-          <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">3. Texto do Relatório</h2>
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">3. Texto do Relatório</h2>
+            <button
+              onClick={handleSuggestAI}
+              disabled={loadingAI || !specialty || !selectedTherapist}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-violet-600 hover:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl transition-colors shrink-0"
+            >
+              <FiZap size={13} />
+              {loadingAI ? 'Gerando...' : 'Sugerir com IA'}
+            </button>
+          </div>
+          {aiError && (
+            <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{aiError}</p>
+          )}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className={labelClass}>Responsável legal (Lista de Presença)</label>
