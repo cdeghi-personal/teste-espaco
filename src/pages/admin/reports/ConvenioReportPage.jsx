@@ -162,6 +162,7 @@ export default function ConvenioReportPage() {
   const [loadingPDF, setLoadingPDF] = useState('')
   const [loadingAI, setLoadingAI] = useState(false)
   const [aiError, setAiError] = useState('')
+  const [aiWarning, setAiWarning] = useState('')
   const [error, setError] = useState('')
 
   // ── Dados derivados ──────────────────────────────────────────
@@ -264,6 +265,7 @@ export default function ConvenioReportPage() {
   // ── Sugestão com IA ──────────────────────────────────────────
   async function handleSuggestAI() {
     setAiError('')
+    setAiWarning('')
     const specialtyLabel = specialtiesData.find(s => s.key === specialty)?.label || specialty
     const hasContent = encaminhamento || objetivos || desempenho
     if (hasContent && !confirm('Os campos de texto já têm conteúdo. Deseja sobrescrever com as sugestões da IA?')) return
@@ -300,6 +302,12 @@ export default function ConvenioReportPage() {
       sessionsWithContent.some(c => (c.evolutionNotes || '').length > 80)
     const sessionDetailsSubstantial = hasRichContent ? sessionDetails : null
 
+    // Bloqueia chamada à IA se não há conteúdo substancial nos atendimentos
+    if (!sessionDetailsSubstantial) {
+      setAiWarning('Os atendimentos deste período não têm relatos detalhados suficientes. Preencha o Objetivo da Sessão, Relato de Evolução e Objetivo da Próxima Sessão nos atendimentos para que a IA possa gerar sugestões úteis.')
+      return
+    }
+
     setLoadingAI(true)
     try {
       const { data, error: fnError } = await supabase.functions.invoke('suggest-convenio', {
@@ -316,9 +324,6 @@ export default function ConvenioReportPage() {
       if (data?.encaminhamento) setEncaminhamento(data.encaminhamento)
       if (data?.objetivos) setObjetivos(data.objetivos)
       if (data?.desempenho) setDesempenho(data.desempenho)
-      if (!data?.baseadoEmAtendimentos) {
-        setAiError('Atenção: os atendimentos deste período não têm relatos registrados. O texto gerado é genérico — revise antes de usar.')
-      }
     } catch (err) {
       setAiError(err.message || 'Erro ao gerar sugestões.')
     } finally {
@@ -570,8 +575,11 @@ export default function ConvenioReportPage() {
       {/* Texto */}
       {searched && (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-4">
-          <div className="flex items-center justify-between gap-3">
-            <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">3. Texto do Relatório</h2>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">3. Texto do Relatório</h2>
+              <p className="text-xs text-gray-400 mt-1">A qualidade da sugestão da IA depende diretamente do que foi registrado nos atendimentos — Objetivo da Sessão, Relato de Evolução e Objetivo da Próxima Sessão.</p>
+            </div>
             <button
               onClick={handleSuggestAI}
               disabled={loadingAI || !specialty || !selectedTherapist}
@@ -581,6 +589,9 @@ export default function ConvenioReportPage() {
               {loadingAI ? 'Gerando...' : 'Sugerir com IA'}
             </button>
           </div>
+          {aiWarning && (
+            <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">{aiWarning}</p>
+          )}
           {aiError && (
             <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{aiError}</p>
           )}
