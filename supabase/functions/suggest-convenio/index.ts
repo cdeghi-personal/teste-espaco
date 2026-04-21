@@ -1,6 +1,6 @@
 // Supabase Edge Function — suggest-convenio
-// Recebe contexto do relatório de convênio e retorna sugestões de texto via OpenAI.
-// JWT Verification deve estar ATIVADO (usuário precisa estar logado).
+// Recebe conteúdo real dos atendimentos e gera sugestões baseadas neles via OpenAI.
+// JWT Verification deve estar DESATIVADO (autenticação via anon key do cliente Supabase).
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -21,7 +21,7 @@ Deno.serve(async (req) => {
       })
     }
 
-    const { especialidade, diagnostico, numSessoes, terapeutaNome, condutasExistentes } = await req.json()
+    const { especialidade, diagnostico, numSessoes, terapeutaNome, sessionDetails } = await req.json()
 
     if (!especialidade || !numSessoes) {
       return new Response(JSON.stringify({ error: 'Especialidade e número de sessões são obrigatórios.' }), {
@@ -29,23 +29,44 @@ Deno.serve(async (req) => {
       })
     }
 
+    const temConteudo = !!sessionDetails
+
     const systemPrompt = `Você é um assistente especializado em elaboração de relatórios clínicos para convênios de saúde de uma clínica de terapias infantis multidisciplinares no Brasil chamada Espaço Casa Amarela.
 Redija em português brasileiro, estilo formal e clínico, com frases completas e fluidas.
-Não use markdown, bullets, numeração, negrito nem qualquer formatação — apenas texto corrido ou itens separados por quebra de linha quando solicitado.
-Seja objetivo, profissional e não repita as mesmas expressões no mesmo parágrafo.`
+Não use markdown, bullets, numeração, negrito nem qualquer formatação especial — apenas texto corrido ou itens separados por quebra de linha quando solicitado.
+IMPORTANTE: Baseie os textos EXCLUSIVAMENTE nas informações fornecidas dos atendimentos. Não invente objetivos, comportamentos, avanços ou situações que não estejam descritos nos relatos. Se alguma informação não estiver disponível, omita esse aspecto do texto.`
 
-    const userPrompt = `Gere os textos para um relatório ao convênio com o seguinte contexto:
+    const userPrompt = temConteudo
+      ? `Gere os textos para um relatório ao convênio baseado nos atendimentos abaixo.
+
+Contexto geral:
 - Especialidade: ${especialidade}
 - Diagnóstico: ${diagnostico || 'não informado'}
-- Sessões realizadas no período: ${numSessoes}
+- Total de sessões no período: ${numSessoes}
 - Terapeuta: ${terapeutaNome || 'não informado'}
-${condutasExistentes ? `- Condutas e objetivos registrados no prontuário: ${condutasExistentes}` : ''}
+
+Conteúdo real dos atendimentos registrados no sistema:
+${sessionDetails}
+
+Com base APENAS nas informações acima, retorne SOMENTE um objeto JSON válido com exatamente estes três campos:
+{
+  "encaminhamento": "parágrafo descrevendo o motivo do encaminhamento e os objetivos gerais do acompanhamento, fundamentado no diagnóstico e nas necessidades identificadas nos atendimentos",
+  "objetivos": "lista dos objetivos trabalhados nas sessões, um por linha separado por \\n, sem bullets nem numeração — extraídos dos objetivos registrados nos atendimentos",
+  "desempenho": "parágrafo avaliando o desempenho e evolução do paciente no período, baseado nos relatos de evolução registrados, e recomendando continuidade"
+}`
+      : `Gere os textos para um relatório ao convênio. Atenção: os atendimentos deste período não possuem relatos detalhados registrados no sistema, portanto os textos devem ser genéricos e cautelosos, sem afirmar avanços ou comportamentos específicos.
+
+Contexto disponível:
+- Especialidade: ${especialidade}
+- Diagnóstico: ${diagnostico || 'não informado'}
+- Total de sessões no período: ${numSessoes}
+- Terapeuta: ${terapeutaNome || 'não informado'}
 
 Retorne SOMENTE um objeto JSON válido com exatamente estes três campos:
 {
-  "encaminhamento": "parágrafo descrevendo o histórico e motivo do encaminhamento para esta especialidade e os objetivos gerais do acompanhamento",
-  "objetivos": "cada objetivo em uma linha separada por \\n, sem bullets nem numeração (ex: Modulação Sensorial\\nControle Postural)",
-  "desempenho": "parágrafo avaliando o desempenho no período, os avanços observados e recomendando a continuidade do atendimento"
+  "encaminhamento": "parágrafo descrevendo o motivo geral do encaminhamento para esta especialidade considerando o diagnóstico",
+  "objetivos": "objetivos típicos desta especialidade para o diagnóstico informado, um por linha separado por \\n, sem bullets nem numeração",
+  "desempenho": "parágrafo genérico de acompanhamento sem afirmar avanços específicos não documentados, recomendando continuidade"
 }`
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -60,8 +81,8 @@ Retorne SOMENTE um objeto JSON válido com exatamente estes três campos:
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt },
         ],
-        temperature: 0.7,
-        max_tokens: 1200,
+        temperature: 0.3,
+        max_tokens: 1500,
         response_format: { type: 'json_object' },
       }),
     })
@@ -82,6 +103,7 @@ Retorne SOMENTE um objeto JSON válido com exatamente estes três campos:
       encaminhamento: parsed.encaminhamento || '',
       objetivos: parsed.objetivos || '',
       desempenho: parsed.desempenho || '',
+      baseadoEmAtendimentos: temConteudo,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })

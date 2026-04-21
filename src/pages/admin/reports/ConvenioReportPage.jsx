@@ -268,6 +268,19 @@ export default function ConvenioReportPage() {
     const hasContent = encaminhamento || objetivos || desempenho
     if (hasContent && !confirm('Os campos de texto já têm conteúdo. Deseja sobrescrever com as sugestões da IA?')) return
 
+    // Coleta conteúdo real dos atendimentos selecionados
+    const sessionIds = new Set(validSessions.map(s => s.id))
+    const sessionDetails = consultations
+      .filter(c => sessionIds.has(c.id) && (c.mainObjective || c.evolutionNotes || c.nextObjectives))
+      .map((c, i) => {
+        const parts = []
+        if (c.mainObjective) parts.push(`Objetivo: ${c.mainObjective}`)
+        if (c.evolutionNotes) parts.push(`Evolução: ${c.evolutionNotes}`)
+        if (c.nextObjectives) parts.push(`Próximo objetivo: ${c.nextObjectives}`)
+        return `Sessão ${i + 1} (${c.date}):\n${parts.join('\n')}`
+      })
+      .join('\n\n')
+
     setLoadingAI(true)
     try {
       const { data, error: fnError } = await supabase.functions.invoke('suggest-convenio', {
@@ -276,6 +289,7 @@ export default function ConvenioReportPage() {
           diagnostico: diagnosticoText,
           numSessoes: validSessions.length,
           terapeutaNome: selectedTherapist?.name || '',
+          sessionDetails: sessionDetails || null,
         },
       })
       if (fnError) throw new Error(fnError.message)
@@ -283,6 +297,9 @@ export default function ConvenioReportPage() {
       if (data?.encaminhamento) setEncaminhamento(data.encaminhamento)
       if (data?.objetivos) setObjetivos(data.objetivos)
       if (data?.desempenho) setDesempenho(data.desempenho)
+      if (!data?.baseadoEmAtendimentos) {
+        setAiError('Atenção: os atendimentos deste período não têm relatos registrados. O texto gerado é genérico — revise antes de usar.')
+      }
     } catch (err) {
       setAiError(err.message || 'Erro ao gerar sugestões.')
     } finally {
