@@ -79,7 +79,7 @@ export function DataProvider({ children }) {
   const [consultationStatuses, setConsultationStatuses] = useState([])
   const [appointmentTypes, setAppointmentTypes] = useState([])
   const [ageRanges, setAgeRanges] = useState([])
-  const [companySettings, setCompanySettings] = useState({ razaoSocial: '', cnpj: '' })
+  const [companySettings, setCompanySettings] = useState({ razaoSocial: '', cnpj: '', aiSystemPrompt: '' })
   const [isLoading, setIsLoading] = useState(true)
 
   const fetchAll = useCallback(async () => {
@@ -108,7 +108,7 @@ export function DataProvider({ children }) {
       supabase.from('consultation_statuses').select('*').order('name'),
       supabase.from('appointment_types').select('*').order('name'),
       supabase.from('age_ranges').select('*').order('min_age'),
-      supabase.from('company_settings').select('razao_social, cnpj').eq('id', 1).maybeSingle(),
+      supabase.from('company_settings').select('razao_social, cnpj, ai_system_prompt').eq('id', 1).maybeSingle(),
     ])
 
     setPatients((patientsRes.data || []).map(mapPatient))
@@ -127,7 +127,7 @@ export function DataProvider({ children }) {
       id: r.id, name: r.name, minAge: r.min_age, maxAge: r.max_age, color: r.color,
     })))
     if (companyRes.data) {
-      setCompanySettings({ razaoSocial: companyRes.data.razao_social || '', cnpj: companyRes.data.cnpj || '' })
+      setCompanySettings({ razaoSocial: companyRes.data.razao_social || '', cnpj: companyRes.data.cnpj || '', aiSystemPrompt: companyRes.data.ai_system_prompt || '' })
     }
     setIsLoading(false)
   }, [])
@@ -932,10 +932,10 @@ export function DataProvider({ children }) {
   async function updateCompanySettings(data) {
     const { error } = await supabase
       .from('company_settings')
-      .update({ razao_social: data.razaoSocial || null, cnpj: data.cnpj || null, updated_at: new Date().toISOString() })
+      .update({ razao_social: data.razaoSocial || null, cnpj: data.cnpj || null, ai_system_prompt: data.aiSystemPrompt || null, updated_at: new Date().toISOString() })
       .eq('id', 1)
     if (error) return dbError(error, toast)
-    setCompanySettings({ razaoSocial: data.razaoSocial || '', cnpj: data.cnpj || '' })
+    setCompanySettings({ razaoSocial: data.razaoSocial || '', cnpj: data.cnpj || '', aiSystemPrompt: data.aiSystemPrompt || '' })
     return {}
   }
 

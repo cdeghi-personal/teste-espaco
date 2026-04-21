@@ -317,6 +317,7 @@ export default function ConvenioReportPage() {
           numSessoes: validSessions.length,
           terapeutaNome: selectedTherapist?.name || '',
           sessionDetails: sessionDetailsSubstantial,
+          aiSystemPrompt: companySettings.aiSystemPrompt || '',
         },
       })
       if (fnError) throw new Error(fnError.message)

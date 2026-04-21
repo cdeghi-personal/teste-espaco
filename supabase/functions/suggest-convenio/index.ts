@@ -9,6 +9,18 @@ const corsHeaders = {
 
 const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY')
 
+const DEFAULT_SYSTEM_PROMPT = `Você é um assistente especializado em relatórios clínicos para convênios de saúde de uma clínica de terapias infantis no Brasil.
+
+Sua tarefa é SINTETIZAR os relatos de múltiplas sessões em três textos coerentes.
+
+INSTRUÇÕES:
+- Leia todos os relatos e identifique os temas recorrentes e pontos principais do período
+- Escreva uma síntese — não copie frases, não liste sessão por sessão, não concatene os textos
+- Agrupe objetivos similares das diferentes sessões em um único item consolidado
+- Para o desempenho, destaque padrões de evolução observados ao longo do período, não sessão a sessão
+- Mencione apenas o que está presente nos relatos; não use conhecimento externo para preencher lacunas
+- Use português brasileiro formal e clínico, sem markdown nem formatação especial`
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -21,7 +33,7 @@ Deno.serve(async (req) => {
       })
     }
 
-    const { especialidade, diagnostico, numSessoes, terapeutaNome, sessionDetails } = await req.json()
+    const { especialidade, diagnostico, numSessoes, terapeutaNome, sessionDetails, aiSystemPrompt } = await req.json()
 
     if (!especialidade || !numSessoes) {
       return new Response(JSON.stringify({ error: 'Especialidade e número de sessões são obrigatórios.' }), {
@@ -31,17 +43,10 @@ Deno.serve(async (req) => {
 
     const temConteudo = !!sessionDetails
 
-    const systemPrompt = `Você é um assistente que ajuda a redigir relatórios clínicos para convênios de saúde no Brasil.
-
-REGRAS ABSOLUTAS — leia com atenção:
-1. Use APENAS as informações fornecidas nos relatos dos atendimentos. Nada mais.
-2. Não adicione comportamentos, avanços, dificuldades ou características do paciente que não estejam explicitamente escritos nos relatos.
-3. Não use seu conhecimento sobre a especialidade ou o diagnóstico para preencher lacunas — se não está nos relatos, não coloque no texto.
-4. Se um relato de sessão mencionar "trabalhou modulação sensorial", você pode escrever "foram trabalhadas estratégias de modulação sensorial". Não expanda além disso.
-5. Redija em português brasileiro formal e clínico, sem markdown, sem bullets, sem numeração.`
+    const systemPrompt = (aiSystemPrompt && aiSystemPrompt.trim()) ? aiSystemPrompt.trim() : DEFAULT_SYSTEM_PROMPT
 
     const userPrompt = temConteudo
-      ? `Redija os três textos abaixo para um relatório ao convênio, usando SOMENTE o conteúdo dos relatos das sessões fornecidos.
+      ? `Redija os três textos abaixo para um relatório ao convênio, sintetizando os relatos das sessões.
 
 Dados do atendimento:
 - Especialidade: ${especialidade}
@@ -49,14 +54,14 @@ Dados do atendimento:
 - Total de sessões: ${numSessoes}
 - Terapeuta: ${terapeutaNome || 'não informado'}
 
-Relatos das sessões registrados no sistema (USE APENAS ESTES DADOS):
+Relatos das sessões registrados no sistema:
 ${sessionDetails}
 
 Retorne SOMENTE um objeto JSON com os três campos:
 {
-  "encaminhamento": "Um parágrafo sobre o motivo do encaminhamento e os objetivos do acompanhamento, derivado do diagnóstico informado e dos objetivos mencionados nos relatos acima.",
-  "objetivos": "Lista dos objetivos mencionados nos relatos acima, um por linha separado por \\n. Copie os objetivos como estão escritos, apenas adequando a linguagem ao relatório formal.",
-  "desempenho": "Um parágrafo sobre o desempenho do paciente, construído a partir dos relatos de evolução registrados. Use apenas o que está escrito — não adicione avaliações ou conclusões que não estejam nos relatos."
+  "encaminhamento": "Um parágrafo sobre o motivo do encaminhamento e os objetivos do acompanhamento, derivado do diagnóstico informado e dos temas recorrentes nos relatos.",
+  "objetivos": "Síntese dos objetivos trabalhados nas sessões, agrupando objetivos similares em itens consolidados — um por linha separado por \\n.",
+  "desempenho": "Um parágrafo sobre o desempenho do paciente ao longo do período, destacando padrões de evolução observados nos relatos."
 }`
       : `Os atendimentos deste período não têm relatos detalhados registrados no sistema. Gere textos genéricos e conservadores, deixando claro que são sugestões que o terapeuta deve adaptar.
 
