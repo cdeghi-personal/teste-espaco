@@ -1,6 +1,6 @@
 // Supabase Edge Function — suggest-convenio
-// Recebe conteúdo real dos atendimentos e gera sugestões baseadas neles via OpenAI.
-// JWT Verification deve estar DESATIVADO (autenticação via anon key do cliente Supabase).
+// Gera sugestões de texto para o relatório de convênio baseadas nos relatos reais dos atendimentos.
+// JWT Verification deve estar DESATIVADO.
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -31,42 +31,46 @@ Deno.serve(async (req) => {
 
     const temConteudo = !!sessionDetails
 
-    const systemPrompt = `Você é um assistente especializado em elaboração de relatórios clínicos para convênios de saúde de uma clínica de terapias infantis multidisciplinares no Brasil chamada Espaço Casa Amarela.
-Redija em português brasileiro, estilo formal e clínico, com frases completas e fluidas.
-Não use markdown, bullets, numeração, negrito nem qualquer formatação especial — apenas texto corrido ou itens separados por quebra de linha quando solicitado.
-IMPORTANTE: Baseie os textos EXCLUSIVAMENTE nas informações fornecidas dos atendimentos. Não invente objetivos, comportamentos, avanços ou situações que não estejam descritos nos relatos. Se alguma informação não estiver disponível, omita esse aspecto do texto.`
+    const systemPrompt = `Você é um assistente que ajuda a redigir relatórios clínicos para convênios de saúde no Brasil.
+
+REGRAS ABSOLUTAS — leia com atenção:
+1. Use APENAS as informações fornecidas nos relatos dos atendimentos. Nada mais.
+2. Não adicione comportamentos, avanços, dificuldades ou características do paciente que não estejam explicitamente escritos nos relatos.
+3. Não use seu conhecimento sobre a especialidade ou o diagnóstico para preencher lacunas — se não está nos relatos, não coloque no texto.
+4. Se um relato de sessão mencionar "trabalhou modulação sensorial", você pode escrever "foram trabalhadas estratégias de modulação sensorial". Não expanda além disso.
+5. Redija em português brasileiro formal e clínico, sem markdown, sem bullets, sem numeração.`
 
     const userPrompt = temConteudo
-      ? `Gere os textos para um relatório ao convênio baseado nos atendimentos abaixo.
+      ? `Redija os três textos abaixo para um relatório ao convênio, usando SOMENTE o conteúdo dos relatos das sessões fornecidos.
 
-Contexto geral:
+Dados do atendimento:
 - Especialidade: ${especialidade}
 - Diagnóstico: ${diagnostico || 'não informado'}
-- Total de sessões no período: ${numSessoes}
+- Total de sessões: ${numSessoes}
 - Terapeuta: ${terapeutaNome || 'não informado'}
 
-Conteúdo real dos atendimentos registrados no sistema:
+Relatos das sessões registrados no sistema (USE APENAS ESTES DADOS):
 ${sessionDetails}
 
-Com base APENAS nas informações acima, retorne SOMENTE um objeto JSON válido com exatamente estes três campos:
+Retorne SOMENTE um objeto JSON com os três campos:
 {
-  "encaminhamento": "parágrafo descrevendo o motivo do encaminhamento e os objetivos gerais do acompanhamento, fundamentado no diagnóstico e nas necessidades identificadas nos atendimentos",
-  "objetivos": "lista dos objetivos trabalhados nas sessões, um por linha separado por \\n, sem bullets nem numeração — extraídos dos objetivos registrados nos atendimentos",
-  "desempenho": "parágrafo avaliando o desempenho e evolução do paciente no período, baseado nos relatos de evolução registrados, e recomendando continuidade"
+  "encaminhamento": "Um parágrafo sobre o motivo do encaminhamento e os objetivos do acompanhamento, derivado do diagnóstico informado e dos objetivos mencionados nos relatos acima.",
+  "objetivos": "Lista dos objetivos mencionados nos relatos acima, um por linha separado por \\n. Copie os objetivos como estão escritos, apenas adequando a linguagem ao relatório formal.",
+  "desempenho": "Um parágrafo sobre o desempenho do paciente, construído a partir dos relatos de evolução registrados. Use apenas o que está escrito — não adicione avaliações ou conclusões que não estejam nos relatos."
 }`
-      : `Gere os textos para um relatório ao convênio. Atenção: os atendimentos deste período não possuem relatos detalhados registrados no sistema, portanto os textos devem ser genéricos e cautelosos, sem afirmar avanços ou comportamentos específicos.
+      : `Os atendimentos deste período não têm relatos detalhados registrados no sistema. Gere textos genéricos e conservadores, deixando claro que são sugestões que o terapeuta deve adaptar.
 
-Contexto disponível:
+Dados disponíveis:
 - Especialidade: ${especialidade}
 - Diagnóstico: ${diagnostico || 'não informado'}
-- Total de sessões no período: ${numSessoes}
+- Total de sessões: ${numSessoes}
 - Terapeuta: ${terapeutaNome || 'não informado'}
 
-Retorne SOMENTE um objeto JSON válido com exatamente estes três campos:
+Retorne SOMENTE um objeto JSON com os três campos:
 {
-  "encaminhamento": "parágrafo descrevendo o motivo geral do encaminhamento para esta especialidade considerando o diagnóstico",
-  "objetivos": "objetivos típicos desta especialidade para o diagnóstico informado, um por linha separado por \\n, sem bullets nem numeração",
-  "desempenho": "parágrafo genérico de acompanhamento sem afirmar avanços específicos não documentados, recomendando continuidade"
+  "encaminhamento": "Parágrafo genérico sobre o motivo do encaminhamento considerando apenas o diagnóstico informado. Não invente características do paciente.",
+  "objetivos": "Objetivos típicos e genéricos para esta especialidade com este diagnóstico, um por linha separado por \\n. Deixe claro que são sugestões.",
+  "desempenho": "Parágrafo genérico e cauteloso sem afirmar avanços específicos. Use termos como 'de forma geral' e 'conforme o plano terapêutico'. Não invente dados."
 }`
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -81,7 +85,7 @@ Retorne SOMENTE um objeto JSON válido com exatamente estes três campos:
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt },
         ],
-        temperature: 0.3,
+        temperature: 0.1,
         max_tokens: 1500,
         response_format: { type: 'json_object' },
       }),

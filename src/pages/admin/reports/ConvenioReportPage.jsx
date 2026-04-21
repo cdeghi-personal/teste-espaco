@@ -281,6 +281,9 @@ export default function ConvenioReportPage() {
       })
       .join('\n\n')
 
+    // Conteúdo é considerado substancial se tiver ao menos 100 caracteres no total
+    const sessionDetailsSubstantial = sessionDetails.length >= 100 ? sessionDetails : null
+
     setLoadingAI(true)
     try {
       const { data, error: fnError } = await supabase.functions.invoke('suggest-convenio', {
@@ -289,7 +292,7 @@ export default function ConvenioReportPage() {
           diagnostico: diagnosticoText,
           numSessoes: validSessions.length,
           terapeutaNome: selectedTherapist?.name || '',
-          sessionDetails: sessionDetails || null,
+          sessionDetails: sessionDetailsSubstantial,
         },
       })
       if (fnError) throw new Error(fnError.message)
