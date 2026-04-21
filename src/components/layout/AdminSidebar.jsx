@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
-import { FiGrid, FiCalendar, FiUsers, FiUserCheck, FiClipboard, FiLogOut, FiUserPlus, FiLayers, FiCreditCard, FiActivity, FiFlag, FiHome, FiChevronDown, FiChevronUp, FiBookOpen, FiTag, FiShield, FiMessageSquare, FiBarChart2, FiLifeBuoy, FiUserX } from 'react-icons/fi'
+import { FiGrid, FiCalendar, FiUsers, FiUserCheck, FiClipboard, FiLogOut, FiUserPlus, FiLayers, FiCreditCard, FiActivity, FiFlag, FiHome, FiChevronDown, FiChevronUp, FiBookOpen, FiTag, FiShield, FiMessageSquare, FiBarChart2, FiLifeBuoy, FiUserX, FiBriefcase } from 'react-icons/fi'
 import { ROUTES } from '../../constants/routes'
 import { useAuth } from '../../context/AuthContext'
 import { SPECIALTIES } from '../../constants/specialties'
@@ -136,6 +136,9 @@ export default function AdminSidebar({ open, onClose }) {
             {configNavItems.map(item => <NavItem key={item.to} {...item} onClick={onClose} />)}
             {isAdmin && (
               <NavItem to={ROUTES.AUDIT} icon={FiShield} label="Log de Auditoria" onClick={onClose} />
+            )}
+            {isAdmin && (
+              <NavItem to={ROUTES.COMPANY_SETTINGS} icon={FiBriefcase} label="Dados da Empresa" onClick={onClose} />
             )}
           </div>
         )}

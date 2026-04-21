@@ -79,13 +79,14 @@ export function DataProvider({ children }) {
   const [consultationStatuses, setConsultationStatuses] = useState([])
   const [appointmentTypes, setAppointmentTypes] = useState([])
   const [ageRanges, setAgeRanges] = useState([])
+  const [companySettings, setCompanySettings] = useState({ razaoSocial: '', cnpj: '' })
   const [isLoading, setIsLoading] = useState(true)
 
   const fetchAll = useCallback(async () => {
     setIsLoading(true)
     const [
       patientsRes, guardiansRes, appointmentsRes, consultationsRes,
-      therapistsRes, specialtiesRes, paymentRes, diagnosesRes, statusesRes, roomsRes, consultStatusRes, apptTypesRes, ageRangesRes,
+      therapistsRes, specialtiesRes, paymentRes, diagnosesRes, statusesRes, roomsRes, consultStatusRes, apptTypesRes, ageRangesRes, companyRes,
     ] = await Promise.all([
       supabase.from('patients').select(PATIENT_SELECT).eq('deleted', false).then(res => {
         // Se a query falhar (ex: tabela patient_involved_therapists ainda não existe),
@@ -107,6 +108,7 @@ export function DataProvider({ children }) {
       supabase.from('consultation_statuses').select('*').order('name'),
       supabase.from('appointment_types').select('*').order('name'),
       supabase.from('age_ranges').select('*').order('min_age'),
+      supabase.from('company_settings').select('razao_social, cnpj').eq('id', 1).maybeSingle(),
     ])
 
     setPatients((patientsRes.data || []).map(mapPatient))
@@ -124,6 +126,9 @@ export function DataProvider({ children }) {
     setAgeRanges((ageRangesRes.data || []).map(r => ({
       id: r.id, name: r.name, minAge: r.min_age, maxAge: r.max_age, color: r.color,
     })))
+    if (companyRes.data) {
+      setCompanySettings({ razaoSocial: companyRes.data.razao_social || '', cnpj: companyRes.data.cnpj || '' })
+    }
     setIsLoading(false)
   }, [])
 
@@ -922,6 +927,18 @@ export function DataProvider({ children }) {
     setAgeRanges(prev => prev.filter(r => r.id !== id))
   }
 
+  // ─── Company Settings ────────────────────────────────────────────────────────
+
+  async function updateCompanySettings(data) {
+    const { error } = await supabase
+      .from('company_settings')
+      .update({ razao_social: data.razaoSocial || null, cnpj: data.cnpj || null, updated_at: new Date().toISOString() })
+      .eq('id', 1)
+    if (error) return dbError(error, toast)
+    setCompanySettings({ razaoSocial: data.razaoSocial || '', cnpj: data.cnpj || '' })
+    return {}
+  }
+
   // ─── Audit Log ───────────────────────────────────────────────────────────────
 
   async function logAudit(action, resourceType, resourceId, resourceName = '') {
@@ -959,6 +976,7 @@ export function DataProvider({ children }) {
     getMedications, addMedication, updateMedication, deleteMedication,
     getConducts, addConduct, updateConduct, deleteConduct,
     logAudit,
+    companySettings, updateCompanySettings,
   }
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>

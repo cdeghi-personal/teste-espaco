@@ -31,4 +31,5 @@ export const ROUTES = {
   REPORTS:              '/admin/relatorios',
   CONVENIO_REPORT:      '/admin/relatorios/convenio',
   SUPPORT:              '/admin/suporte',
+  COMPANY_SETTINGS:     '/admin/empresa',
 }

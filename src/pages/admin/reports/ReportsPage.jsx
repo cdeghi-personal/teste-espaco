@@ -21,6 +21,7 @@ export default function ReportsPage() {
     appointmentTypes,
     specialtiesData,
     getGuardiansForPatient,
+    companySettings,
   } = useData()
 
   const isAdmin = user?.role === 'admin'
@@ -127,6 +128,7 @@ export default function ReportsPage() {
           appointmentTypes: appointmentTypes || [],
           specialtiesData: specialtiesArr,
           filter,
+          companySettings,
         })
       } else {
         const therapistConsultations = filterConsultations(
@@ -141,6 +143,7 @@ export default function ReportsPage() {
           appointmentTypes: appointmentTypes || [],
           specialtiesData: specialtiesArr,
           filter,
+          companySettings,
         })
       }
     } catch (err) {

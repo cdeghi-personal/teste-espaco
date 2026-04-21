@@ -222,6 +222,7 @@ export default function MedicalRecordsPage() {
     getConducts, addConduct, updateConduct, deleteConduct,
     getGuardiansForPatient,
     logAudit,
+    companySettings,
   } = useData()
   const { user } = useAuth()
 
@@ -416,6 +417,7 @@ export default function MedicalRecordsPage() {
         appointmentTypes,
         rooms,
         specialtiesData,
+        companySettings,
       })
     } finally {
       setPdfLoading(false)

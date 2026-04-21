@@ -120,7 +120,7 @@ function HistorySection({ patientId, onRestore }) {
 
 // ─── Page ─────────────────────────────────────────────────────────
 export default function ConvenioReportPage() {
-  const { patients, therapists, consultations, guardians, specialtiesData, diagnoses } = useData()
+  const { patients, therapists, consultations, guardians, specialtiesData, diagnoses, companySettings } = useData()
   const { user } = useAuth()
   const navigate = useNavigate()
   const isAdmin = user?.role === 'admin'
@@ -306,12 +306,13 @@ export default function ConvenioReportPage() {
         mesLabel, sessions: sessions.filter(s => s.date),
         sessionValue: parseFloat(sessionValue) || 0, horario,
         encaminhamento, objetivos, desempenho,
-        versionLabel: ver, returnBlob: true,
+        versionLabel: ver, returnBlob: true, companySettings,
       })
       const safe = patient.fullName.replace(/[^\w]/g, '_')
+      const safeSpec = specialtyLabel.replace(/[^\w]/g, '_')
       setPreviewBlob(blob)
       setPreviewTitle('Relatório ao Convênio')
-      setPreviewFilename(`relatorio_convenio_${safe}_${mesLabel.replace('/', '_')}.pdf`)
+      setPreviewFilename(`relatorio_convenio_${safe}_${safeSpec}_${mesLabel.replace('/', '_')}.pdf`)
     } finally { setLoadingPDF('') }
   }
 
@@ -325,12 +326,13 @@ export default function ConvenioReportPage() {
         patientName: patient.fullName, terapeutaNome: selectedTherapist.name,
         terapeutaRegistro: credential, specialtyLabel, mesLabel,
         sessions: sessions.filter(s => s.date).map(s => ({ ...s, time: horario })),
-        responsavel, versionLabel: ver, returnBlob: true,
+        responsavel, versionLabel: ver, returnBlob: true, companySettings,
       })
       const safe = patient.fullName.replace(/[^\w]/g, '_')
+      const safeSpec = specialtyLabel.replace(/[^\w]/g, '_')
       setPreviewBlob(blob)
       setPreviewTitle('Lista de Presença')
-      setPreviewFilename(`lista_presenca_${safe}_${mesLabel.replace('/', '_')}.pdf`)
+      setPreviewFilename(`lista_presenca_${safe}_${safeSpec}_${mesLabel.replace('/', '_')}.pdf`)
     } finally { setLoadingPDF('') }
   }
 

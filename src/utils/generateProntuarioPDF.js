@@ -57,6 +57,7 @@ export async function generateProntuarioPDF({
   appointmentTypes,
   rooms,
   specialtiesData,
+  companySettings = null,
 }) {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
   const pageW = doc.internal.pageSize.width
@@ -91,11 +92,17 @@ export async function generateProntuarioPDF({
   doc.setFont('helvetica', 'normal')
   doc.text('Prontuário Clínico', margin + 21, 16)
 
-  // Data de geração
+  // Data de geração + dados da empresa
   const now = new Date()
   const geradoEm = `Gerado em ${now.toLocaleDateString('pt-BR')} às ${now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
   doc.setFontSize(7)
   doc.setTextColor(200, 210, 255)
+  if (companySettings?.razaoSocial) {
+    doc.text(companySettings.razaoSocial, pageW - margin, 8, { align: 'right' })
+    if (companySettings.cnpj) {
+      doc.text(`CNPJ: ${companySettings.cnpj}`, pageW - margin, 13, { align: 'right' })
+    }
+  }
   doc.text(geradoEm, pageW - margin, 18, { align: 'right' })
 
   let y = 30

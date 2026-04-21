@@ -21,7 +21,7 @@ function formatPeriod(filter) {
   return `${formatDate(filter.from)} a ${formatDate(filter.to)}`
 }
 
-async function buildHeader(doc, subtitle, period) {
+async function buildHeader(doc, subtitle, period, companySettings) {
   const pageW = doc.internal.pageSize.width
   const margin = 14
 
@@ -48,12 +48,18 @@ async function buildHeader(doc, subtitle, period) {
   doc.text(subtitle, margin + 21, 16)
 
   const now = new Date()
+  const geradoEm = `Gerado em ${now.toLocaleDateString('pt-BR')} às ${now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
   doc.setFontSize(7)
   doc.setTextColor(200, 210, 255)
-  doc.text(
-    `Gerado em ${now.toLocaleDateString('pt-BR')} às ${now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`,
-    pageW - margin, 18, { align: 'right' }
-  )
+  if (companySettings?.razaoSocial) {
+    doc.text(companySettings.razaoSocial, pageW - margin, 8, { align: 'right' })
+    if (companySettings.cnpj) {
+      doc.text(`CNPJ: ${companySettings.cnpj}`, pageW - margin, 13, { align: 'right' })
+    }
+    doc.text(geradoEm, pageW - margin, 18, { align: 'right' })
+  } else {
+    doc.text(geradoEm, pageW - margin, 18, { align: 'right' })
+  }
 
   // Período em destaque
   doc.setFillColor(245, 247, 255)
@@ -126,13 +132,14 @@ export async function generateConsultasPacientePDF({
   appointmentTypes,
   specialtiesData,
   filter,
+  companySettings = null,
 }) {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
   const pageW = doc.internal.pageSize.width
   const margin = 14
   const period = formatPeriod(filter)
 
-  let y = await buildHeader(doc, 'Relatório de Consultas por Paciente', period)
+  let y = await buildHeader(doc, 'Relatório de Consultas por Paciente', period, companySettings)
 
   // ── Dados do Paciente ──
   y = sectionTitle(doc, 'Dados do Paciente', y)
@@ -243,13 +250,14 @@ export async function generateConsultasTerapeutaPDF({
   appointmentTypes,
   specialtiesData,
   filter,
+  companySettings = null,
 }) {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
   const pageW = doc.internal.pageSize.width
   const margin = 14
   const period = formatPeriod(filter)
 
-  let y = await buildHeader(doc, 'Relatório de Consultas por Terapeuta', period)
+  let y = await buildHeader(doc, 'Relatório de Consultas por Terapeuta', period, companySettings)
 
   // ── Dados do Terapeuta ──
   y = sectionTitle(doc, 'Dados do Terapeuta', y)
