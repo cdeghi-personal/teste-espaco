@@ -38,6 +38,7 @@ export default function DashboardPage() {
   const weekEndIso = format(weekEnd, 'yyyy-MM-dd')
 
   const isAdmin = user?.role === 'admin'
+  const isSupportAdmin = isAdmin && !user?.id
 
   const [newLeadsCount, setNewLeadsCount] = useState(0)
   useEffect(() => {
@@ -49,21 +50,23 @@ export default function DashboardPage() {
       .then(({ count }) => setNewLeadsCount(count || 0))
   }, [isAdmin])
 
+  // Card âmbar: para terapeutas E admin que também são terapeutas
   const [unreadSupportCount, setUnreadSupportCount] = useState(0)
   useEffect(() => {
-    if (isAdmin || !user?.authId) return
+    if (isSupportAdmin || !user?.authId) return
     supabase
       .from('support_tickets')
       .select('id', { count: 'exact', head: true })
       .eq('nova_resposta', true)
       .eq('created_by_id', user.authId)
       .then(({ count }) => setUnreadSupportCount(count || 0))
-  }, [isAdmin, user?.authId])
+  }, [isSupportAdmin, user?.authId])
 
+  // Banners de gestão: apenas para admin puro
   const [novoSupportCount, setNovoSupportCount] = useState(0)
   const [reprovadoSupportCount, setReprovadoSupportCount] = useState(0)
   useEffect(() => {
-    if (!isAdmin) return
+    if (!isSupportAdmin) return
     supabase
       .from('support_tickets')
       .select('id', { count: 'exact', head: true })
@@ -74,7 +77,7 @@ export default function DashboardPage() {
       .select('id', { count: 'exact', head: true })
       .eq('status', 'reprovado_usuario')
       .then(({ count }) => setReprovadoSupportCount(count || 0))
-  }, [isAdmin])
+  }, [isSupportAdmin])
 
   const visiblePatients = isAdmin || user?.belongsToTeam
     ? patients.filter(p => !p.deleted)
@@ -153,8 +156,8 @@ export default function DashboardPage() {
         </Link>
       )}
 
-      {/* Alerta de chamados novos de suporte — apenas admin */}
-      {isAdmin && novoSupportCount > 0 && (
+      {/* Alerta de chamados novos de suporte — apenas admin puro */}
+      {isSupportAdmin && novoSupportCount > 0 && (
         <Link
           to={ROUTES.SUPPORT}
           className="flex items-center gap-3 bg-red-500 text-white px-4 py-3.5 rounded-2xl shadow-sm hover:bg-red-600 transition-colors"
@@ -172,8 +175,8 @@ export default function DashboardPage() {
         </Link>
       )}
 
-      {/* Alerta de chamados reprovados — apenas admin */}
-      {isAdmin && reprovadoSupportCount > 0 && (
+      {/* Alerta de chamados reprovados — apenas admin puro */}
+      {isSupportAdmin && reprovadoSupportCount > 0 && (
         <Link
           to={ROUTES.SUPPORT}
           className="flex items-center gap-3 bg-orange-500 text-white px-4 py-3.5 rounded-2xl shadow-sm hover:bg-orange-600 transition-colors"
@@ -191,8 +194,8 @@ export default function DashboardPage() {
         </Link>
       )}
 
-      {/* Alerta de respostas de suporte — apenas não-admin */}
-      {!isAdmin && unreadSupportCount > 0 && (
+      {/* Alerta de respostas de suporte — terapeuta e admin+terapeuta */}
+      {!isSupportAdmin && unreadSupportCount > 0 && (
         <Link
           to={ROUTES.SUPPORT}
           className="flex items-center gap-3 bg-amber-500 text-white px-4 py-3.5 rounded-2xl shadow-sm hover:bg-amber-600 transition-colors"
