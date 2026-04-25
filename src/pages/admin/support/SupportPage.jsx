@@ -13,6 +13,8 @@ function formatDate(iso) {
 export default function SupportPage() {
   const { user } = useAuth()
   const isAdmin = user?.role === 'admin'
+  // Admin que também é terapeuta tem acesso de terapeuta no suporte
+  const isSupportAdmin = isAdmin && !user?.id
 
   const [tickets, setTickets] = useState([])
   const [loading, setLoading] = useState(true)
@@ -25,16 +27,22 @@ export default function SupportPage() {
 
   const load = useCallback(async () => {
     setLoading(true)
-    const { data } = await supabase
+    let query = supabase
       .from('support_tickets')
       .select('*, support_ticket_history(*)')
       .order('created_at', { ascending: false })
+    // Admin+terapeuta vê apenas os próprios chamados (RLS já filtra para não-admin;
+    // adicionamos filtro explícito para admin que também é terapeuta)
+    if (isAdmin && !isSupportAdmin) {
+      query = query.eq('created_by_id', user.authId)
+    }
+    const { data } = await query
     setTickets((data || []).map(t => ({
       ...t,
       history: (t.support_ticket_history || []).sort((a, b) => a.changed_at.localeCompare(b.changed_at)),
     })))
     setLoading(false)
-  }, [])
+  }, [isAdmin, isSupportAdmin, user?.authId])
 
   useEffect(() => { load() }, [load])
 
@@ -60,7 +68,7 @@ export default function SupportPage() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Suporte</h1>
           <p className="text-sm text-gray-500 mt-0.5">
-            {isAdmin ? 'Todos os chamados abertos no sistema.' : 'Seus chamados de suporte.'}
+            {isSupportAdmin ? 'Todos os chamados abertos no sistema.' : 'Seus chamados de suporte.'}
           </p>
         </div>
         <div className="flex items-center gap-2">

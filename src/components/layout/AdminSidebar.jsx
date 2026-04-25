@@ -68,7 +68,7 @@ export default function AdminSidebar({ open, onClose }) {
     supabase
       .from('support_tickets')
       .select('id', { count: 'exact', head: true })
-      .eq('status', 'reprovado_usuario')
+      .in('status', ['novo', 'reprovado_usuario'])
       .then(({ count }) => setReprovadoCount(count || 0))
   }, [user?.role])
 

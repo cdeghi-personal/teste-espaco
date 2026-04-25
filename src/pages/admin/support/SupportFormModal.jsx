@@ -58,11 +58,13 @@ export default function SupportFormModal({ onClose, initial = null, onSaved }) {
   const { user } = useAuth()
   const { show: showToast } = useToast()
   const isAdmin = user?.role === 'admin'
+  // Admin que também é terapeuta tem acesso de terapeuta no suporte
+  const isSupportAdmin = isAdmin && !user?.id
   const isEdit = !!initial?.id
-  const readOnly = isEdit && !isAdmin
+  const readOnly = isEdit && !isSupportAdmin
 
-  // Non-admin with a pending response from admin
-  const pendingResponse = isEdit && !isAdmin && !!initial?.nova_resposta
+  // Usuário sem acesso de admin-suporte com resposta pendente
+  const pendingResponse = isEdit && !isSupportAdmin && !!initial?.nova_resposta
 
   const [form, setForm] = useState(isEdit ? { ...initial, nova_resposta: initial.nova_resposta || false } : { ...EMPTY })
   const [history, setHistory] = useState(initial?.history || [])
@@ -250,7 +252,7 @@ export default function SupportFormModal({ onClose, initial = null, onSaved }) {
           readOnly={readOnly}
         />
 
-        {isEdit && (isAdmin || form.solution) && (
+        {isEdit && (isSupportAdmin || form.solution) && (
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Solução</label>
             {readOnly
@@ -260,7 +262,7 @@ export default function SupportFormModal({ onClose, initial = null, onSaved }) {
           </div>
         )}
 
-        {isEdit && isAdmin && (
+        {isEdit && isSupportAdmin && (
           <Select label="Status" value={form.status} onChange={e => set('status', e.target.value)}>
             {Object.entries(TICKET_STATUS).filter(([, v]) => !v.historyOnly).map(([k, v]) => (
               <option key={k} value={k}>{v.label}</option>
@@ -268,8 +270,8 @@ export default function SupportFormModal({ onClose, initial = null, onSaved }) {
           </Select>
         )}
 
-        {/* Notificação ao usuário — apenas admin em edição */}
-        {isEdit && isAdmin && (
+        {/* Notificação ao usuário — apenas admin-suporte em edição */}
+        {isEdit && isSupportAdmin && (
           <label className="flex items-center gap-3 p-3 rounded-xl border border-gray-200 cursor-pointer hover:bg-gray-50 transition-colors">
             <input
               type="checkbox"
@@ -287,7 +289,7 @@ export default function SupportFormModal({ onClose, initial = null, onSaved }) {
           </label>
         )}
 
-        {isEdit && !isAdmin && (
+        {isEdit && !isSupportAdmin && (
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
             {(() => { const st = TICKET_STATUS[form.status]; return (

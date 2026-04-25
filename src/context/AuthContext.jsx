@@ -50,16 +50,13 @@ export function AuthProvider({ children }) {
 
       const role = profile?.role || 'admin' // fallback seguro: se não tem profile, trata como admin
 
-      // Se for terapeuta, busca o registro de terapeuta para pegar o ID
-      let therapist = null
-      if (role === 'therapist') {
-        const { data } = await supabase
-          .from('therapists')
-          .select('id, name, specialty, belongs_to_team')
-          .eq('user_id', authUser.id)
-          .maybeSingle()
-        therapist = data
-      }
+      // Busca registro de terapeuta para qualquer role — admins que também são
+      // terapeutas precisam do therapist.id para controle de acesso em alguns módulos
+      const { data: therapist } = await supabase
+        .from('therapists')
+        .select('id, name, specialty, belongs_to_team')
+        .eq('user_id', authUser.id)
+        .maybeSingle()
 
       setUser({
         authId: authUser.id,
