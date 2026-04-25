@@ -6,6 +6,7 @@ import Input from '../../../components/ui/Input'
 import Select from '../../../components/ui/Select'
 import Textarea from '../../../components/ui/Textarea'
 import { useAuth } from '../../../context/AuthContext'
+import { useToast } from '../../../components/ui/Toast'
 import { supabase } from '../../../lib/supabase'
 
 export const TICKET_TYPES = {
@@ -34,6 +35,7 @@ const EMPTY = { subject: '', type: '', author: '', description: '', solution: ''
 
 export default function SupportFormModal({ onClose, initial = null, onSaved }) {
   const { user } = useAuth()
+  const { show: showToast } = useToast()
   const isAdmin = user?.role === 'admin'
   const isEdit = !!initial?.id
   const readOnly = isEdit && !isAdmin
@@ -138,7 +140,8 @@ export default function SupportFormModal({ onClose, initial = null, onSaved }) {
       onSaved?.()
       onClose()
     } catch (err) {
-      console.error(err)
+      console.error('approve_support_ticket:', err)
+      showToast('Erro ao aprovar: ' + (err?.message || JSON.stringify(err)), 'error')
     } finally {
       setActing(false)
     }
@@ -155,7 +158,8 @@ export default function SupportFormModal({ onClose, initial = null, onSaved }) {
       onSaved?.()
       onClose()
     } catch (err) {
-      console.error(err)
+      console.error('reject_support_ticket:', err)
+      showToast('Erro ao reprovar: ' + (err?.message || JSON.stringify(err)), 'error')
     } finally {
       setActing(false)
     }
