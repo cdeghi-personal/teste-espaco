@@ -52,11 +52,19 @@ export default function AuditPage() {
   useEffect(() => {
     supabase
       .from('audit_logs')
-      .select('user_email')
+      .select('user_email, user_name')
       .neq('user_email', '')
       .then(({ data }) => {
         if (data) {
-          const unique = [...new Set(data.map(r => r.user_email))].sort()
+          const seen = new Set()
+          const unique = []
+          data.forEach(r => {
+            if (!seen.has(r.user_email)) {
+              seen.add(r.user_email)
+              unique.push({ email: r.user_email, name: r.user_name || r.user_email })
+            }
+          })
+          unique.sort((a, b) => a.name.localeCompare(b.name))
           setUsers(unique)
         }
       })
@@ -139,8 +147,8 @@ export default function AuditPage() {
           className="px-3 py-2 text-sm border border-gray-200 rounded-xl bg-white focus:ring-2 focus:ring-brand-blue outline-none"
         >
           <option value="">Todos os Usuários</option>
-          {users.map(email => (
-            <option key={email} value={email}>{email}</option>
+          {users.map(u => (
+            <option key={u.email} value={u.email}>{u.name}</option>
           ))}
         </select>
         <select
@@ -196,7 +204,7 @@ export default function AuditPage() {
                   return (
                     <tr key={log.id} className="hover:bg-gray-50/50 transition-colors">
                       <td className="px-3 py-3 text-gray-600 whitespace-nowrap text-xs">{formatDate(log.created_at)}</td>
-                      <td className="px-3 py-3 text-gray-700 text-xs truncate max-w-0" style={{ maxWidth: '140px' }}>{log.user_email || '—'}</td>
+                      <td className="px-3 py-3 text-gray-700 text-xs truncate max-w-0" style={{ maxWidth: '140px' }}>{log.user_name || log.user_email || '—'}</td>
                       <td className="px-3 py-3">
                         <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${action.color}`}>
                           {action.label}
