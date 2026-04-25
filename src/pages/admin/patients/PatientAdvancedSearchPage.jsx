@@ -7,6 +7,7 @@ import { ROUTES } from '../../../constants/routes'
 import Badge from '../../../components/ui/Badge'
 import Button from '../../../components/ui/Button'
 import EmptyState from '../../../components/ui/EmptyState'
+import HelpButton from '../../../components/ui/HelpButton'
 import { calculateAge, calculateAgeYears, formatDateShort } from '../../../utils/dateUtils'
 import { hexTextColor } from '../../../utils/colorUtils'
 
@@ -246,6 +247,12 @@ export default function PatientAdvancedSearchPage() {
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          <HelpButton title="Como usar a Busca Avançada">
+            <p><strong>Filtros:</strong> combine múltiplos critérios — terapeuta (gerente de caso), terapeutas envolvidos, especialidade, forma de pagamento, diagnóstico, status do paciente e faixa etária.</p>
+            <p><strong>Múltipla seleção:</strong> cada filtro aceita vários valores ao mesmo tempo (ex: selecionar dois terapeutas retorna pacientes de ambos).</p>
+            <p><strong>Limpar:</strong> clique em <em>Limpar</em> para remover todos os filtros aplicados de uma vez.</p>
+            <p><strong>Exportar CSV:</strong> clique em <em>Exportar CSV</em> para baixar a lista filtrada com dados clínicos, demográficos e de vínculo terapêutico.</p>
+          </HelpButton>
           {hasFilters && (
             <button
               onClick={clearFilters}

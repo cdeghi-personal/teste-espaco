@@ -88,10 +88,19 @@ export default function AdminSidebar({ open, onClose }) {
       ${open ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
     `}>
       {/* Logo */}
-      <div className="px-4 py-3 border-b border-gray-100 shrink-0">
+      <div className="px-4 py-3 border-b border-gray-100 shrink-0 flex items-center justify-between">
         <NavLink to="/" className="flex items-center" onClick={onClose}>
           <img src="/logo.jpg" alt="Casa Amarela" className="h-10 w-auto" />
         </NavLink>
+        <a
+          href="/guia-sistema.html"
+          target="_blank"
+          rel="noopener noreferrer"
+          title="Guia do Sistema"
+          className="p-1.5 rounded-lg text-gray-400 hover:text-brand-blue hover:bg-gray-50 transition-colors"
+        >
+          <FiBookOpen size={15} />
+        </a>
       </div>
 
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto md:overflow-y-auto">

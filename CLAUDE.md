@@ -1,4 +1,4 @@
-# Espaço Casa Amarela — Contexto do Projeto
+﻿# Espaço Casa Amarela — Contexto do Projeto
 
 ## O que é este projeto
 
@@ -110,6 +110,18 @@ supabase/
   42_convenio_reports.sql        # Tabela convenio_reports — histórico de PDFs gerados; RLS: admin vê tudo, outros veem só próprios
   43_company_settings.sql        # Tabela company_settings (linha única via CHECK id=1) — razao_social, cnpj; SELECT p/ autenticados, UPDATE só admin
   44_ai_prompt.sql               # Adiciona coluna ai_system_prompt (TEXT) em company_settings — prompt customizável para a Edge Function suggest-convenio
+  45_audit_consultation_full_name.sql # fn_audit_log: consultations → "Paciente | DD/MM/YYYY HH:MM | Especialidade | Terapeuta"
+  46_audit_config_tables.sql     # fn_audit_log: fallback full_name → name → label → date; triggers nas tabelas de configuração (therapists, specialties, payment_methods, diagnoses, patient_statuses, consultation_statuses, appointment_types, rooms, age_ranges)
+  47_support_nova_resposta.sql   # Coluna nova_resposta (BOOLEAN) em support_tickets + RPC mark_support_ticket_read
+  48_support_reprovado.sql       # RPCs approve_support_ticket / reject_support_ticket + coluna note em support_ticket_history
+  49_support_rls_fix.sql         # Recria RPCs com SET row_security = off (parcialmente efetivo — complementado por 50)
+  50_support_update_owner.sql    # RLS UPDATE policy para dono do ticket — fix real que permite RPCs SECURITY DEFINER atualizarem o registro
+  51_support_fix_therapist_name.sql  # Fix: RPCs usavam t.full_name → corrigido para t.name (therapists usa name)
+  52_support_status_reprovado.sql    # Recria CHECK constraint de status incluindo reprovado_usuario
+  53_audit_user_name.sql         # Adiciona user_name em audit_logs; recria fn_audit_log e log_view_audit com resolução de nome (terapeuta → display name → email)
+  54_audit_backfill_user_name.sql    # Popula user_name nos registros existentes de audit_logs
+  55_audit_cleanup_cron.sql      # Substituído por 56 — agendava DELETE simples de >90 dias sem histórico
+  56_audit_history_table.sql     # Retenção em dois níveis: audit_logs (90 dias ativos) + audit_logs_history (arquivo até 1 ano); pg_cron diário 03:00 UTC via maintain_audit_logs()
   functions/
     invite-therapist/index.ts    # Edge Function — envia convite por e-mail ao criar terapeuta
     suggest-convenio/index.ts    # Edge Function — gera sugestões de texto para relatório de convênio via OpenAI gpt-4o-mini
@@ -155,10 +167,11 @@ Encontrar em: Supabase Dashboard → Project Settings → API.
 | `medical_record_medications` | Medicamentos do paciente — N por prontuário |
 | `medical_record_conducts` | Conduta & objetivo terapêutico — N por prontuário, vinculado ao terapeuta/especialidade |
 | `patient_involved_therapists` | Terapeutas envolvidos no atendimento do paciente (N:N) — complementa o Gerente do Caso |
-| `audit_logs` | Log de auditoria — registra VIEW/INSERT/UPDATE/DELETE com user_id, user_email, action, resource_type, resource_id, resource_name |
+| `audit_logs` | Log de auditoria — registra VIEW/INSERT/UPDATE/DELETE com user_id, user_email, user_name, action, resource_type, resource_id, resource_name; retém apenas 90 dias |
+| `audit_logs_history` | Arquivo do log de auditoria — mesmo schema + coluna archived_at; retém de 90 dias a 1 ano; manutenção via pg_cron (maintain_audit_logs) |
 | `contact_leads` | Contatos do site público — name, phone, email, specialty, how_found, message, status, internal_note, assigned_to, last_contact_at |
-| `support_tickets` | Chamados de suporte — subject, type, author, description, solution, status, created_by_id |
-| `support_ticket_history` | Histórico de status dos chamados — ticket_id, status, changed_at, changed_by |
+| `support_tickets` | Chamados de suporte — subject, type, author, description, solution, status, nova_resposta (BOOLEAN), created_by_id |
+| `support_ticket_history` | Histórico de status dos chamados — ticket_id, status, changed_at, changed_by, note (TEXT) |
 | `age_ranges` | Faixas etárias — name, min_age, max_age, color; critério: min_age ≤ idade < max_age |
 | `convenio_reports` | Histórico de relatórios ao convênio gerados em PDF — patient_id, therapist_id, specialty, mes_label, version_label, created_by |
 | `company_settings` | Configurações da empresa — linha única (id=1, CHECK constraint); razao_social, cnpj, ai_system_prompt, updated_at |
@@ -214,6 +227,7 @@ Após salvar, o admin faz logout e login para atualizar a sessão.
 - `user.id` no contexto = ID da tabela `therapists` (não o UUID do auth)
 - `user.authId` = UUID do `auth.users`
 - `user.name` = `therapist.name` para terapeutas; para admins: `user_metadata.full_name` → `user_metadata.name` → prefixo do e-mail
+- **AuthContext sempre busca registro de terapeuta** independente do role. Admin que também é terapeuta terá `user.id` preenchido; admin puro terá `user.id = null`. Use `isSupportAdmin = isAdmin && !user?.id` para detectar "admin puro" onde a distinção importa (ex.: suporte, dashboard).
 
 ### Fluxo de convite de terapeuta
 
@@ -323,15 +337,15 @@ Authentication → URL Configuration:
 - Componente em `src/components/ui/HelpButton.jsx`
 - Uso: `<HelpButton title="Título"><p>Conteúdo JSX...</p></HelpButton>`
 - Renderiza botão "Ajuda" com ícone `FiHelpCircle`; abre modal com as instruções
-- Adicionado nas páginas: Agenda, Pacientes, Responsáveis, Atendimentos, Prontuário, Relatórios, Suporte
+- Adicionado nas páginas: Agenda, Pacientes, Busca Avançada de Pacientes, Responsáveis, Atendimentos, Prontuário, Terapeutas, Relatórios, Relatório de Convênio, Contatos, Suporte
 
 ## Sidebar Admin
 
 - Item "Contatos" — visível apenas para admin, com badge vermelho mostrando contagem de `novo`
 - Item "Relatórios" — visível para **todos** os autenticados (terapeuta vê apenas próprios dados na página)
-- Item "Suporte" — visível para **todos** os usuários autenticados
+- Item "Suporte" — visível para **todos** os usuários autenticados; badge laranja para admin puro mostrando contagem de tickets com status `novo` ou `reprovado_usuario`
 - Seção "Administração" — colapsável, visível a **todos** os autenticados; contém: Terapeutas, Especialidades, Formas de Pagamento, Diagnósticos, Status do Paciente, Status Atendimento, Tipos de Atendimento, Salas, Faixas Etárias (read-only para terapeutas) + Log de Auditoria (admin only) + **Dados da Empresa** (admin only, ícone `FiBriefcase`)
-- "Sair" sempre visível no rodapé
+- "Sair" sempre visível no rodapé — redireciona para `/login` (não para a home pública)
 
 ## Site Público
 
@@ -433,14 +447,20 @@ Authentication → URL Configuration:
 
 ## Suporte (`/admin/suporte`)
 
-- **Acesso:** todos os usuários autenticados. Admin vê todos os chamados; usuário vê apenas os próprios.
-- **Criar chamado:** Assunto, Tipo (Erro/Dúvida/Melhoria), Autor, Descrição. Status inicia sempre como "Novo".
-- **Editar (admin):** todos os campos + Solução + Status + tabela de Histórico de Mudanças de Status.
-- **Visualizar (não-admin):** apenas leitura; vê status como badge e solução se preenchida.
+- **Acesso:** todos os usuários autenticados. Admin puro vê todos os chamados; admin que também é terapeuta (`isSupportAdmin = false`) e terapeutas veem apenas os próprios.
+- **Criar chamado:** Assunto, Tipo (Erro/Dúvida/Melhoria), Autor, Descrição. Status inicia sempre como `novo`.
+- **Editar (admin puro):** todos os campos + Solução + Status + tabela de Histórico de Mudanças de Status.
+- **Visualizar (não-admin puro):** apenas leitura; vê status como badge, solução se preenchida e botões de aprovação/reprovação se há resposta pendente.
 - `support_tickets.created_by_id` = `auth.uid()` do criador — base do RLS por usuário.
-- `support_ticket_history`: cada mudança de status registra `status`, `changed_at`, `changed_by` (nome do usuário).
-- Status: `novo` → `em_analise` → `em_desenvolvimento` → `resolvido` → `fechado`
-
+- `support_ticket_history`: cada mudança de status registra `status`, `changed_at`, `changed_by`, `note` (texto opcional).
+- **Status:** `novo` → `em_analise` → `em_desenvolvimento` → `resolvido` → `fechado`; também `reprovado_usuario` (reprovado pelo usuário) e status apenas de histórico (`resposta_admin`, `visualizado`).
+- **nova_resposta flag:** admin marca `nova_resposta = true` ao registrar solução → usuário vê linha âmbar no SupportPage.
+- **Fluxo de aprovação/reprovação (não-admin puro com `nova_resposta = true`):**
+  - "OK com a Resposta" → RPC `approve_support_ticket(ticket_id)` → status = `fechado`, nova_resposta = false.
+  - "Não OK" → textarea de comentário → RPC `reject_support_ticket(ticket_id, comment)` → status = `reprovado_usuario`, nova_resposta = false, salva comment em `support_ticket_history.note`.
+- **Histórico de soluções:** quando admin altera o campo Solução, o frontend insere entrada com `status = 'resposta_admin'` e `note = nova_solução` no histórico. Texto longo exibido com truncamento + "ver mais".
+- **Dashboard:** banner vermelho (admin puro) para tickets `novo`; banner laranja (admin puro) para `reprovado_usuario`; banner âmbar (não-admin puro) para `nova_resposta = true` do próprio usuário.
+- **isSupportAdmin pattern:** `const isSupportAdmin = isAdmin && !user?.id` — admin puro tem `user.id = null`; admin+terapeuta tem `user.id` preenchido.
 ## Status Atendimento (`/admin/statusconsulta`)
 
 - Flag `automatic = true` → não aparece no Select do `ConsultationFormModal`, mas **aparece** nos filtros de relatório e no prontuário
@@ -470,17 +490,23 @@ Authentication → URL Configuration:
 
 ## Auditoria de Acesso (`/admin/auditoria`)
 
-- Triggers AFTER em todas as tabelas principais → `fn_audit_log` SECURITY DEFINER, SET row_security = off
+- Triggers AFTER em todas as tabelas principais + tabelas de configuração → `fn_audit_log` SECURITY DEFINER
 - **resource_name por tabela:**
   - `patients`, `guardians`, `therapists` → `full_name`
-  - `consultations` → `"Paciente | Terapeuta | YYYY-MM-DD"` (JOIN em patients + therapists)
+  - `consultations` → `"Paciente | DD/MM/YYYY HH:MM | Especialidade | Terapeuta"` (JOIN em patients + therapists)
   - `medical_record_exams` → `"Paciente | Exames"`
   - `medical_record_medications` → `"Paciente | Medicamentos"`
   - `medical_record_conducts` → `"Paciente | Conduta"`
-  - demais tabelas → `date::TEXT` ou vazio
+  - tabelas de config (specialties, payment_methods, diagnoses, etc.) → `name` ou `label`
+  - demais → `date::TEXT` ou vazio
+- **user_name:** coluna `user_name TEXT` em `audit_logs` — resolvida por `fn_audit_log` com prioridade: nome do terapeuta (via `therapists.name`) → `user_metadata.full_name` → `user_metadata.name` → email
 - **VIEW** registrado via RPC `log_view_audit(resource_type, resource_id, resource_name)`
-- `AuditPage`: só admin; filtros por ação, recurso, usuário (select dinâmico), data e texto (busca em resource_name)
-
+- `AuditPage`: só admin; filtros por ação, recurso, usuário (select dinâmico mostra nomes, filtra por email), data e texto (busca em resource_name)
+- **Retenção em dois níveis:**
+  - `audit_logs` → 90 dias (acesso pelo painel)
+  - `audit_logs_history` → de 90 dias a 1 ano (arquivo; mesmo schema + `archived_at`)
+  - Cron diário 03:00 UTC: `maintain_audit_logs()` SECURITY DEFINER move registros >90 dias para history e purga history >1 ano
+  - pg_cron job: `maintain-audit-logs` (substitui `cleanup-audit-logs`)
 ## Contadores nas páginas de configuração
 
 - **Especialidades:** `N paciente(s)` — conta `patients` onde `patient.specialties.some(s => s.key === specialtyKey)`

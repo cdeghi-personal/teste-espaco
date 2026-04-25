@@ -75,9 +75,10 @@ export default function SupportPage() {
           <HelpButton title="Como usar o Suporte">
             <p><strong>Abrir chamado:</strong> clique em <em>Novo Suporte</em>, preencha assunto, tipo (Erro, Dúvida ou Melhoria), autor e uma descrição detalhada.</p>
             <p><strong>Tipos:</strong> <em>Erro</em> para problemas no sistema, <em>Dúvida</em> para perguntas de uso, <em>Melhoria</em> para sugestões.</p>
-            <p><strong>Acompanhar:</strong> clique em qualquer chamado para ver o status atual e o histórico de mudanças.</p>
+            <p><strong>Acompanhar:</strong> clique em qualquer chamado para ver o status atual, a solução registrada e o histórico de mudanças.</p>
             <p><strong>Status do chamado:</strong> Novo → Em Análise → Em Desenvolvimento → Resolvido → Fechado. Somente administradores podem alterar o status e registrar a solução.</p>
-            <p><strong>Visibilidade:</strong> cada usuário vê apenas seus próprios chamados. Administradores veem todos.</p>
+            <p><strong>Resposta do administrador:</strong> quando o administrador registrar uma solução, seu chamado ficará destacado em âmbar. Abra-o e clique em <em>OK com a Resposta</em> para fechar o chamado, ou em <em>Não OK</em> para devolvê-lo com um comentário.</p>
+            <p><strong>Visibilidade:</strong> cada usuário vê apenas seus próprios chamados. Somente o administrador responsável pelo suporte vê todos.</p>
           </HelpButton>
           <button
             onClick={openCreate}

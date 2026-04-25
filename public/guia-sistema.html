@@ -1,0 +1,800 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Guia do Sistema — Espaço Casa Amarela</title>
+<style>
+  :root {
+    --blue: #2563eb;
+    --blue-dark: #1d4ed8;
+    --blue-light: #eff6ff;
+    --blue-mid: #dbeafe;
+    --violet: #7c3aed;
+    --green: #059669;
+    --orange: #d97706;
+    --red: #dc2626;
+    --teal: #0d9488;
+    --gray-50: #f9fafb;
+    --gray-100: #f3f4f6;
+    --gray-200: #e5e7eb;
+    --gray-400: #9ca3af;
+    --gray-600: #4b5563;
+    --gray-700: #374151;
+    --gray-900: #111827;
+    --shadow: 0 1px 3px rgba(0,0,0,.08), 0 4px 16px rgba(0,0,0,.06);
+    --shadow-lg: 0 4px 6px rgba(0,0,0,.07), 0 16px 48px rgba(0,0,0,.1);
+    --radius: 16px;
+    --radius-sm: 10px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: var(--gray-900); background: #fff; }
+
+  /* ─── NAV ─── */
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(255,255,255,.92);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--gray-200);
+    padding: 0 24px;
+    display: flex; align-items: center; justify-content: space-between;
+    height: 60px;
+  }
+  .nav-brand { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+  .nav-logo {
+    width: 34px; height: 34px; border-radius: 10px;
+    background: linear-gradient(135deg, var(--blue), var(--violet));
+    display: flex; align-items: center; justify-content: center;
+    color: white; font-size: 18px; font-weight: 800;
+  }
+  .nav-title { font-size: 15px; font-weight: 700; color: var(--gray-900); }
+  .nav-links { display: flex; gap: 4px; }
+  .nav-links a {
+    font-size: 13px; font-weight: 500; color: var(--gray-600);
+    text-decoration: none; padding: 6px 12px; border-radius: 8px;
+    transition: all .15s;
+  }
+  .nav-links a:hover { background: var(--gray-100); color: var(--gray-900); }
+  @media (max-width: 640px) { .nav-links { display: none; } }
+
+  /* ─── HERO ─── */
+  .hero {
+    background: linear-gradient(135deg, #f0f7ff 0%, #faf5ff 50%, #f0fdf4 100%);
+    padding: 72px 24px 64px;
+    text-align: center;
+    position: relative; overflow: hidden;
+  }
+  .hero::before {
+    content: '';
+    position: absolute; top: -80px; left: 50%; transform: translateX(-50%);
+    width: 600px; height: 600px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(37,99,235,.06) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .hero-badge {
+    display: inline-flex; align-items: center; gap-6px;
+    background: var(--blue-light); border: 1px solid var(--blue-mid);
+    color: var(--blue); font-size: 12px; font-weight: 600;
+    padding: 5px 14px; border-radius: 99px; margin-bottom: 20px;
+    letter-spacing: .3px;
+  }
+  .hero h1 {
+    font-size: clamp(28px, 5vw, 48px); font-weight: 800;
+    color: var(--gray-900); line-height: 1.15; margin-bottom: 16px;
+    letter-spacing: -.5px;
+  }
+  .hero h1 span { color: var(--blue); }
+  .hero p {
+    font-size: 17px; color: var(--gray-600); max-width: 560px; margin: 0 auto 36px;
+    line-height: 1.65;
+  }
+  .hero-stats {
+    display: flex; gap: 16px; justify-content: center; flex-wrap: wrap;
+  }
+  .stat-chip {
+    background: white; border: 1px solid var(--gray-200);
+    border-radius: 12px; padding: 12px 20px;
+    display: flex; align-items: center; gap: 10px;
+    box-shadow: var(--shadow);
+  }
+  .stat-chip .num { font-size: 22px; font-weight: 800; color: var(--blue); }
+  .stat-chip .lbl { font-size: 12px; color: var(--gray-600); line-height: 1.3; text-align: left; }
+
+  /* ─── TABS ─── */
+  .tabs-wrap { padding: 48px 24px 0; max-width: 1100px; margin: 0 auto; }
+  .tabs-header {
+    display: flex; gap: 0; background: var(--gray-100);
+    border-radius: 12px; padding: 4px; width: fit-content; margin: 0 auto 40px;
+  }
+  .tab-btn {
+    padding: 9px 24px; border-radius: 9px; font-size: 14px; font-weight: 600;
+    cursor: pointer; border: none; background: transparent;
+    color: var(--gray-600); transition: all .2s;
+  }
+  .tab-btn.active {
+    background: white; color: var(--blue);
+    box-shadow: 0 1px 4px rgba(0,0,0,.12);
+  }
+
+  /* ─── SECTION TITLE ─── */
+  .section { padding: 0 24px 64px; max-width: 1100px; margin: 0 auto; }
+  .section-title {
+    font-size: 22px; font-weight: 800; color: var(--gray-900);
+    margin-bottom: 6px; display: flex; align-items: center; gap: 10px;
+  }
+  .section-sub { font-size: 14px; color: var(--gray-600); margin-bottom: 28px; }
+
+  /* ─── FEATURE GRID ─── */
+  .features-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 20px;
+  }
+  .feature-card {
+    background: white; border: 1px solid var(--gray-200);
+    border-radius: var(--radius); padding: 24px;
+    box-shadow: var(--shadow); transition: all .2s;
+    cursor: default;
+    opacity: 0; transform: translateY(16px);
+    animation: fadeUp .4s forwards;
+  }
+  .feature-card:hover {
+    box-shadow: var(--shadow-lg); transform: translateY(-2px);
+    border-color: var(--blue-mid);
+  }
+  @keyframes fadeUp {
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .card-icon {
+    width: 44px; height: 44px; border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px; margin-bottom: 14px;
+    flex-shrink: 0;
+  }
+  .card-title { font-size: 15px; font-weight: 700; color: var(--gray-900); margin-bottom: 6px; }
+  .card-desc { font-size: 13px; color: var(--gray-600); line-height: 1.6; }
+  .card-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 14px; }
+  .tag {
+    font-size: 11px; font-weight: 500; padding: 3px 9px; border-radius: 99px;
+    background: var(--gray-100); color: var(--gray-700);
+  }
+  .tag.blue { background: var(--blue-light); color: var(--blue); }
+  .tag.green { background: #d1fae5; color: var(--green); }
+  .tag.violet { background: #ede9fe; color: var(--violet); }
+  .tag.orange { background: #fef3c7; color: var(--orange); }
+
+  /* ─── HIGHLIGHT STRIP ─── */
+  .highlight {
+    background: linear-gradient(135deg, var(--blue), #4f46e5);
+    color: white; border-radius: var(--radius);
+    padding: 32px 36px; margin: 40px 0;
+    display: flex; align-items: flex-start; gap: 20px;
+  }
+  .highlight-icon {
+    font-size: 36px; flex-shrink: 0; margin-top: 2px;
+  }
+  .highlight h3 { font-size: 18px; font-weight: 700; margin-bottom: 6px; }
+  .highlight p { font-size: 14px; opacity: .85; line-height: 1.65; }
+  .highlight ul { margin-top: 10px; padding-left: 18px; font-size: 13px; opacity: .9; }
+  .highlight ul li { margin-bottom: 4px; }
+
+  /* ─── FLOW STEPS ─── */
+  .flow { display: flex; flex-direction: column; gap: 0; margin: 20px 0; }
+  .flow-step {
+    display: flex; gap: 16px; align-items: flex-start; padding: 16px 0;
+    border-bottom: 1px solid var(--gray-100);
+  }
+  .flow-step:last-child { border-bottom: none; }
+  .step-num {
+    width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0;
+    background: var(--blue); color: white; font-size: 13px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    margin-top: 2px;
+  }
+  .step-body {}
+  .step-title { font-size: 14px; font-weight: 700; color: var(--gray-900); margin-bottom: 3px; }
+  .step-desc { font-size: 13px; color: var(--gray-600); line-height: 1.55; }
+
+  /* ─── STATUS PILLS ─── */
+  .status-flow {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+    padding: 16px; background: var(--gray-50); border-radius: 12px; margin: 12px 0;
+  }
+  .sp {
+    padding: 4px 12px; border-radius: 99px; font-size: 12px; font-weight: 600;
+  }
+  .sp-arrow { color: var(--gray-400); font-size: 14px; }
+  .sp.red { background: #fee2e2; color: var(--red); }
+  .sp.yellow { background: #fef3c7; color: var(--orange); }
+  .sp.blue { background: var(--blue-mid); color: var(--blue); }
+  .sp.indigo { background: #e0e7ff; color: #4338ca; }
+  .sp.green { background: #d1fae5; color: var(--green); }
+  .sp.gray { background: var(--gray-100); color: var(--gray-600); }
+  .sp.orange { background: #ffedd5; color: #c2410c; }
+
+  /* ─── MOCKUP ─── */
+  .mockup {
+    background: var(--gray-50); border: 1px solid var(--gray-200);
+    border-radius: var(--radius); padding: 20px; margin: 16px 0;
+    font-size: 13px;
+  }
+  .mockup-bar {
+    display: flex; align-items: center; gap: 8px;
+    background: white; border: 1px solid var(--gray-200);
+    border-radius: 8px; padding: 10px 14px; margin-bottom: 12px;
+  }
+  .mock-dot { width: 8px; height: 8px; border-radius: 50%; }
+  .mockup-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 10px 14px; background: white; border-radius: 8px;
+    border: 1px solid var(--gray-100); margin-bottom: 6px;
+    font-size: 12px; color: var(--gray-700);
+  }
+  .mockup-row:hover { background: #f0f7ff; }
+
+  /* ─── DIVIDER ─── */
+  .divider { height: 1px; background: var(--gray-100); margin: 48px 0; }
+
+  /* ─── ADMIN SECTION ─── */
+  .admin-banner {
+    background: linear-gradient(135deg, #1e1b4b, #312e81);
+    color: white; border-radius: var(--radius);
+    padding: 32px 36px; margin: 40px 0;
+    display: flex; gap: 20px; align-items: flex-start;
+  }
+  .admin-banner-icon { font-size: 36px; flex-shrink: 0; }
+  .admin-banner h3 { font-size: 18px; font-weight: 700; margin-bottom: 6px; }
+  .admin-banner p { font-size: 14px; opacity: .8; line-height: 1.6; }
+
+  /* ─── FOOTER ─── */
+  footer {
+    background: var(--gray-900); color: var(--gray-400);
+    padding: 40px 24px; text-align: center;
+    font-size: 13px; line-height: 1.8;
+  }
+  footer strong { color: white; }
+
+  /* ─── PANEL TOGGLE ─── */
+  .panel { display: none; }
+  .panel.active { display: block; }
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <a class="nav-brand" href="#">
+    <div class="nav-logo">E</div>
+    <span class="nav-title">Espaço Casa Amarela</span>
+  </a>
+  <div class="nav-links">
+    <a href="#agenda">Agenda</a>
+    <a href="#pacientes">Pacientes</a>
+    <a href="#prontuario">Prontuário</a>
+    <a href="#relatorios">Relatórios</a>
+    <a href="#admin">Admin</a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-badge">✦ Sistema de Gestão Clínica</div>
+  <h1>Tudo que você precisa<br>para <span>cuidar melhor</span></h1>
+  <p>Do agendamento ao relatório de convênio — uma plataforma completa criada especialmente para a equipe do Espaço Casa Amarela.</p>
+  <div class="hero-stats">
+    <div class="stat-chip">
+      <div class="num">11</div>
+      <div class="lbl">módulos<br>integrados</div>
+    </div>
+    <div class="stat-chip">
+      <div class="num">IA</div>
+      <div class="lbl">sugestão de texto<br>para convênio</div>
+    </div>
+    <div class="stat-chip">
+      <div class="num">PDF</div>
+      <div class="lbl">relatórios prontos<br>para download</div>
+    </div>
+    <div class="stat-chip">
+      <div class="num">1 ano</div>
+      <div class="lbl">histórico de<br>auditoria</div>
+    </div>
+  </div>
+</section>
+
+<!-- TABS -->
+<div class="tabs-wrap">
+  <div class="tabs-header">
+    <button class="tab-btn active" onclick="switchTab('terapeuta', this)">🩺 Para Terapeutas</button>
+    <button class="tab-btn" onclick="switchTab('admin', this)">🛡️ Para Administradores</button>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════ -->
+<!-- PAINEL TERAPEUTA -->
+<!-- ════════════════════════════════════════════════════════ -->
+<div id="panel-terapeuta" class="panel active">
+
+  <!-- AGENDA -->
+  <section class="section" id="agenda" style="padding-top:40px">
+    <p class="section-title">📅 Agenda Semanal</p>
+    <p class="section-sub">Visualize e gerencie todos os atendimentos da semana em uma tela só.</p>
+    <div class="features-grid">
+      <div class="feature-card" style="animation-delay:.05s">
+        <div class="card-icon" style="background:#eff6ff">📅</div>
+        <div class="card-title">Visão semanal completa</div>
+        <div class="card-desc">Seis colunas (Seg–Sex + Sáb/Dom) com todos os atendimentos organizados por dia e horário. No celular, abas por dia para fácil navegação.</div>
+        <div class="card-tags"><span class="tag blue">Desktop e mobile</span></div>
+      </div>
+      <div class="feature-card" style="animation-delay:.1s">
+        <div class="card-icon" style="background:#f0fdf4">✏️</div>
+        <div class="card-title">Crie e edite na hora</div>
+        <div class="card-desc">Novo atendimento ou edição com um clique direto na agenda. Campos de paciente, terapeuta, especialidade, horário e sala todos integrados.</div>
+        <div class="card-tags"><span class="tag green">Rápido</span></div>
+      </div>
+      <div class="feature-card" style="animation-delay:.15s">
+        <div class="card-icon" style="background:#faf5ff">🎨</div>
+        <div class="card-title">Legenda por terapeuta</div>
+        <div class="card-desc">Cada terapeuta tem uma cor própria na agenda. A legenda na parte inferior mostra o nome completo de cada profissional.</div>
+        <div class="card-tags"><span class="tag">Visual intuitivo</span></div>
+      </div>
+      <div class="feature-card" style="animation-delay:.2s">
+        <div class="card-icon" style="background:#fff7ed">🔍</div>
+        <div class="card-title">Filtro "Minha Agenda"</div>
+        <div class="card-desc">Terapeutas veem automaticamente apenas seus próprios atendimentos. Administradores têm visão de toda a equipe.</div>
+        <div class="card-tags"><span class="tag orange">Personalizado</span></div>
+      </div>
+    </div>
+  </section>
+
+  <div class="divider" style="max-width:1100px;margin:0 auto 48px"></div>
+
+  <!-- PACIENTES -->
+  <section class="section" id="pacientes">
+    <p class="section-title">👥 Gestão de Pacientes</p>
+    <p class="section-sub">Ficha clínica e pessoal completa — tudo em um só lugar.</p>
+    <div class="features-grid">
+      <div class="feature-card" style="animation-delay:.05s">
+        <div class="card-icon" style="background:#eff6ff">🗂️</div>
+        <div class="card-title">Ficha completa do paciente</div>
+        <div class="card-desc">Dados pessoais, escola, médico responsável, diagnóstico principal, comorbidades, forma de pagamento, responsáveis e terapeutas externos — tudo centralizado.</div>
+        <div class="card-tags"><span class="tag blue">360°</span></div>
+      </div>
+      <div class="feature-card" style="animation-delay:.1s">
+        <div class="card-icon" style="background:#f0fdf4">👨‍👩‍👧</div>
+        <div class="card-title">Gerente do Caso + Equipe</div>
+        <div class="card-desc">Cada paciente tem um terapeuta como Gerente do Caso e pode ter múltiplos terapeutas envolvidos. Todos têm acesso ao paciente.</div>
+        <div class="card-tags"><span class="tag green">Multidisciplinar</span></div>
+      </div>
+      <div class="feature-card" style="animation-delay:.15s">
+        <div class="card-icon" style="background:#faf5ff">💰</div>
+        <div class="card-title">Especialidades com valores</div>
+        <div class="card-desc">Cada especialidade em atendimento tem valor separado para o paciente e para o repasse ao terapeuta. Usado automaticamente nos relatórios.</div>
+        <div class="card-tags"><span class="tag violet">Financeiro integrado</span></div>
+      </div>
+      <div class="feature-card" style="animation-delay:.2s">
+        <div class="card-icon" style="background:#fff7ed">🔍</div>
+        <div class="card-title">Busca Avançada + CSV</div>
+        <div class="card-desc">Filtre por terapeuta, especialidade, diagnóstico, status, forma de pagamento e faixa etária — com múltipla seleção. Exporte o resultado em CSV com um clique.</div>
+        <div class="card-tags"><span class="tag orange">Exportação</span></div>
+      </div>
+      <div class="feature-card" style="animation-delay:.25s">
+        <div class="card-icon" style="background:#f0fdf4">🎂</div>
+        <div class="card-title">Faixas Etárias automáticas</div>
+        <div class="card-desc">Tags coloridas calculadas em tempo real a partir da data de nascimento. Configuráveis pelo administrador com faixas e cores personalizadas.</div>
+        <div class="card-tags"><span class="tag green">Automático</span></div>
+      </div>
+      <div class="feature-card" style="animation-delay:.3s">
+        <div class="card-icon" style="background:#eff6ff">⏱️</div>
+        <div class="card-title">Últimos 10 atendimentos</div>
+        <div class="card-desc">A ficha do paciente exibe diretamente os 10 atendimentos mais recentes, com data, especialidade, terapeuta e status — sem precisar mudar de tela.</div>
+        <div class="card-tags"><span class="tag blue">Tudo na mesma tela</span></div>
+      </div>
+    </div>
+  </section>
+
+  <div class="divider" style="max-width:1100px;margin:0 auto 48px"></div>
+
+  <!-- ATENDIMENTOS -->
+  <section class="section" id="atendimentos">
+    <p class="section-title">📋 Registro de Atendimentos</p>
+    <p class="section-sub">Registre, acompanhe e evolua cada sessão com rigor clínico.</p>
+    <div class="features-grid">
+      <div class="feature-card" style="animation-delay:.05s">
+        <div class="card-icon" style="background:#eff6ff">📝</div>
+        <div class="card-title">Evolução clínica estruturada</div>
+        <div class="card-desc">Ao marcar o status "Realizada", os campos Objetivo da Sessão, Relato de Evolução e Objetivo da Próxima Sessão tornam-se obrigatórios — garantindo registros completos.</div>
+        <div class="card-tags"><span class="tag blue">Rigor clínico</span></div>
+      </div>
+      <div class="feature-card" style="animation-delay:.1s">
+        <div class="card-icon" style="background:#f0fdf4">🏷️</div>
+        <div class="card-title">Status configuráveis</div>
+        <div class="card-desc">Realizada, Cancelada, Falta… os status são definidos pela clínica. Status automáticos podem ser atribuídos pelo sistema sem aparecer no formulário manual.</div>
+        <div class="card-tags"><span class="tag green">Flexível</span></div>
+      </div>
+      <div class="feature-card" style="animation-delay:.15s">
+        <div class="card-icon" style="background:#fff7ed">🏢</div>
+        <div class="card-title">Sala + Horário</div>
+        <div class="card-desc">Cada atendimento registra a sala utilizada e o horário exato — essenciais para o relatório de convênio e para a organização da agenda.</div>
+        <div class="card-tags"><span class="tag orange">Gestão de espaço</span></div>
+      </div>
+      <div class="feature-card" style="animation-delay:.2s">
+        <div class="card-icon" style="background:#faf5ff">🔒</div>
+        <div class="card-title">Controle de acesso</div>
+        <div class="card-desc">Cada terapeuta edita e exclui apenas os próprios atendimentos. O administrador tem acesso completo a todos os registros.</div>
+        <div class="card-tags"><span class="tag violet">Seguro</span></div>
+      </div>
+    </div>
+  </section>
+
+  <div class="divider" style="max-width:1100px;margin:0 auto 48px"></div>
+
+  <!-- PRONTUÁRIO -->
+  <section class="section" id="prontuario">
+    <p class="section-title">🏥 Prontuário Clínico</p>
+    <p class="section-sub">O histórico clínico completo do paciente em quatro seções organizadas.</p>
+
+    <div class="features-grid">
+      <div class="feature-card" style="animation-delay:.05s">
+        <div class="card-icon" style="background:#eff6ff">🧪</div>
+        <div class="card-title">Exames Complementares</div>
+        <div class="card-desc">Registre exames com data, link/anexo e observações. Histórico cronológico completo, editável a qualquer momento.</div>
+      </div>
+      <div class="feature-card" style="animation-delay:.1s">
+        <div class="card-icon" style="background:#fff7ed">💊</div>
+        <div class="card-title">Medicamentos</div>
+        <div class="card-desc">Controle de medicamentos em uso ou interrompidos, com data de início/fim e observações clínicas.</div>
+      </div>
+      <div class="feature-card" style="animation-delay:.15s">
+        <div class="card-icon" style="background:#f0fdf4">🎯</div>
+        <div class="card-title">Conduta & Objetivo Terapêutico</div>
+        <div class="card-desc">Registre a conduta de cada terapeuta com objetivos, datas e status de andamento (Não iniciada → Em Andamento → Encerrada). Vinculado por especialidade.</div>
+        <div class="card-tags"><span class="tag green">Por terapeuta</span></div>
+      </div>
+      <div class="feature-card" style="animation-delay:.2s">
+        <div class="card-icon" style="background:#faf5ff">📅</div>
+        <div class="card-title">Histórico de Atendimentos</div>
+        <div class="card-desc">Navegue pelo histórico com filtros de período (Mês -2, Anterior, Corrente, Seguinte ou intervalo personalizado) e filtre por status com chips de seleção múltipla.</div>
+        <div class="card-tags"><span class="tag violet">Filtros avançados</span></div>
+      </div>
+    </div>
+
+    <div class="highlight">
+      <div class="highlight-icon">⚡</div>
+      <div>
+        <h3>Ações em lote (admin)</h3>
+        <p>Selecione múltiplos atendimentos no histórico e altere o status de todos de uma vez — ideal para encerramento de mês ou atualização em massa após confirmação de agenda.</p>
+        <ul>
+          <li>Checkboxes por atendimento</li>
+          <li>Botões de status dinâmicos (todos os status ativos disponíveis)</li>
+          <li>Operação em massa com confirmação</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="feature-card" style="animation-delay:.25s;margin-top:0">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
+        <div class="card-icon" style="background:#eff6ff;margin:0">📄</div>
+        <div class="card-title" style="margin:0">PDF do Prontuário (admin)</div>
+      </div>
+      <div class="card-desc">Gere o prontuário clínico completo em PDF com um clique — exames, medicamentos, conduta e histórico de atendimentos, com cabeçalho da clínica e dados da empresa.</div>
+    </div>
+  </section>
+
+  <div class="divider" style="max-width:1100px;margin:0 auto 48px"></div>
+
+  <!-- RELATÓRIOS -->
+  <section class="section" id="relatorios">
+    <p class="section-title">📊 Relatórios em PDF</p>
+    <p class="section-sub">Relatórios prontos para download, com valores e totalizadores automáticos.</p>
+
+    <div class="features-grid">
+      <div class="feature-card" style="animation-delay:.05s">
+        <div class="card-icon" style="background:#eff6ff">👤</div>
+        <div class="card-title">Consultas por Paciente</div>
+        <div class="card-desc">Lista todos os atendimentos do paciente no período com data, especialidade, terapeuta e valor cobrado (admin). Totalizadores automáticos no rodapé.</div>
+        <div class="card-tags"><span class="tag blue">Somente admin</span></div>
+      </div>
+      <div class="feature-card" style="animation-delay:.1s">
+        <div class="card-icon" style="background:#f0fdf4">👩‍⚕️</div>
+        <div class="card-title">Consultas por Terapeuta</div>
+        <div class="card-desc">Lista os atendimentos realizados pelo terapeuta com valor de repasse por especialidade. Terapeutas veem apenas o próprio relatório — pré-preenchido automaticamente.</div>
+        <div class="card-tags"><span class="tag green">Disponível para terapeutas</span></div>
+      </div>
+      <div class="feature-card" style="animation-delay:.15s">
+        <div class="card-icon" style="background:#faf5ff">🗓️</div>
+        <div class="card-title">Filtros de período</div>
+        <div class="card-desc">Escolha um mês específico ou defina um intervalo personalizado de datas. Combine com filtro de status (múltipla seleção, inclui status automáticos).</div>
+        <div class="card-tags"><span class="tag violet">Flexível</span></div>
+      </div>
+    </div>
+
+    <div style="margin-top:32px">
+      <p class="section-title" style="font-size:18px">📄 Relatório de Convênio</p>
+      <p class="section-sub">O documento mais completo — Relatório ao Convênio e Lista de Presença, prontos para envio ao plano de saúde.</p>
+
+      <div class="mockup">
+        <div class="mockup-bar">
+          <div class="mock-dot" style="background:#ef4444"></div>
+          <div class="mock-dot" style="background:#f59e0b"></div>
+          <div class="mock-dot" style="background:#22c55e"></div>
+          <span style="color:var(--gray-400);font-size:12px;margin-left:8px">Relatório de Convênio — Espaço Casa Amarela</span>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+          <div class="mockup-row"><span>👤 Paciente</span><span style="color:var(--blue)">Maria Silva</span></div>
+          <div class="mockup-row"><span>🏷️ Especialidade</span><span style="color:var(--blue)">Psicologia</span></div>
+          <div class="mockup-row"><span>📅 Período</span><span>Abril/2025</span></div>
+          <div class="mockup-row"><span>💰 Total</span><span style="color:var(--green)">R$ 1.200,00</span></div>
+        </div>
+        <div class="mockup-row">
+          <span>⚡ Sugestão com IA</span>
+          <span style="background:#ede9fe;color:#7c3aed;padding:2px 8px;border-radius:6px;font-size:11px">Gerar texto automaticamente</span>
+        </div>
+      </div>
+
+      <div class="flow" style="background:var(--gray-50);border-radius:var(--radius);padding:20px 24px">
+        <div class="flow-step">
+          <div class="step-num">1</div>
+          <div class="step-body">
+            <div class="step-title">Seleção</div>
+            <div class="step-desc">Escolha paciente, especialidade e período. Clique em "Buscar Atendimentos" — as sessões são carregadas automaticamente do histórico.</div>
+          </div>
+        </div>
+        <div class="flow-step">
+          <div class="step-num">2</div>
+          <div class="step-body">
+            <div class="step-title">Revisão das sessões</div>
+            <div class="step-desc">Adicione, remova ou ajuste datas, horários e valores individualmente. Use "aplicar a todas" para padronizar rapidamente.</div>
+          </div>
+        </div>
+        <div class="flow-step">
+          <div class="step-num">3</div>
+          <div class="step-body">
+            <div class="step-title">Texto do Relatório</div>
+            <div class="step-desc">Preencha diagnóstico (com CID), encaminhamento, objetivos e desempenho. Ou clique em <strong>⚡ Sugerir com IA</strong> para gerar um texto baseado nos relatos reais das sessões.</div>
+          </div>
+        </div>
+        <div class="flow-step">
+          <div class="step-num">4</div>
+          <div class="step-body">
+            <div class="step-title">Pré-visualizar e Baixar</div>
+            <div class="step-desc">Visualize o PDF completo antes de baixar. Ao confirmar, o relatório é registrado no histórico com versionamento automático.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="features-grid" style="margin-top:20px">
+        <div class="feature-card" style="animation-delay:.05s">
+          <div class="card-icon" style="background:#ede9fe">🤖</div>
+          <div class="card-title">Sugestão com IA (GPT-4o)</div>
+          <div class="card-desc">O botão "Sugerir com IA" analisa os relatos reais de evolução das sessões e gera um texto coeso para o campo de desempenho e objetivos — sem copiar e colar.</div>
+          <div class="card-tags"><span class="tag violet">Inteligência Artificial</span></div>
+        </div>
+        <div class="feature-card" style="animation-delay:.1s">
+          <div class="card-icon" style="background:#f0fdf4">📜</div>
+          <div class="card-title">Versionamento automático</div>
+          <div class="card-desc">Cada PDF gerado é registrado com data, hora e versão. Se precisar re-gerar, os dados anteriores ficam salvos e podem ser restaurados.</div>
+          <div class="card-tags"><span class="tag green">Histórico completo</span></div>
+        </div>
+        <div class="feature-card" style="animation-delay:.15s">
+          <div class="card-icon" style="background:#fff7ed">🖋️</div>
+          <div class="card-title">Lista de Presença</div>
+          <div class="card-desc">Além do relatório, gera a Lista de Presença com colunas para data, valor, local, horário e assinatura — pronto para apresentação ao convênio.</div>
+          <div class="card-tags"><span class="tag orange">Dois PDFs</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="divider" style="max-width:1100px;margin:0 auto 48px"></div>
+
+  <!-- SUPORTE -->
+  <section class="section" id="suporte">
+    <p class="section-title">🎫 Suporte ao Usuário</p>
+    <p class="section-sub">Canal direto com a equipe de administração — dentro do próprio sistema.</p>
+
+    <div class="features-grid">
+      <div class="feature-card" style="animation-delay:.05s">
+        <div class="card-icon" style="background:#eff6ff">✉️</div>
+        <div class="card-title">Abra chamados facilmente</div>
+        <div class="card-desc">Registre Erros, Dúvidas ou sugestões de Melhoria diretamente no sistema. Acompanhe o andamento sem precisar de e-mail ou WhatsApp.</div>
+      </div>
+      <div class="feature-card" style="animation-delay:.1s">
+        <div class="card-icon" style="background:#fef3c7">🔔</div>
+        <div class="card-title">Notificação de resposta</div>
+        <div class="card-desc">Quando o administrador registrar uma solução, seu chamado fica destacado em âmbar. Um banner no dashboard avisa para você verificar.</div>
+        <div class="card-tags"><span class="tag orange">Notificação visual</span></div>
+      </div>
+      <div class="feature-card" style="animation-delay:.15s">
+        <div class="card-icon" style="background:#f0fdf4">✅</div>
+        <div class="card-title">Aprovação ou reprovação</div>
+        <div class="card-desc">Ao receber uma resposta, você decide: <strong>OK com a Resposta</strong> (fecha o chamado) ou <strong>Não OK</strong> (devolve com comentário para nova análise).</div>
+        <div class="card-tags"><span class="tag green">Feedback fechado</span></div>
+      </div>
+    </div>
+
+    <div style="margin-top:20px">
+      <p style="font-size:13px;font-weight:600;color:var(--gray-700);margin-bottom:8px">Fluxo do chamado:</p>
+      <div class="status-flow">
+        <span class="sp red">Novo</span>
+        <span class="sp-arrow">→</span>
+        <span class="sp yellow">Em Análise</span>
+        <span class="sp-arrow">→</span>
+        <span class="sp indigo">Em Desenvolvimento</span>
+        <span class="sp-arrow">→</span>
+        <span class="sp blue">Resolvido</span>
+        <span class="sp-arrow">→</span>
+        <span class="sp green">Fechado</span>
+      </div>
+      <p style="font-size:12px;color:var(--gray-400);margin-top:8px">Se a solução não atender: o chamado volta como <span style="background:#ffedd5;color:#c2410c;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:600">Reprovado pelo Usuário</span> para nova análise.</p>
+    </div>
+  </section>
+
+</div><!-- /panel-terapeuta -->
+
+
+<!-- ════════════════════════════════════════════════════════ -->
+<!-- PAINEL ADMIN -->
+<!-- ════════════════════════════════════════════════════════ -->
+<div id="panel-admin" class="panel">
+
+  <section class="section" id="admin" style="padding-top:40px">
+
+    <div class="admin-banner">
+      <div class="admin-banner-icon">🛡️</div>
+      <div>
+        <h3>Visão completa do sistema</h3>
+        <p>Além de todas as funcionalidades disponíveis para terapeutas, administradores têm acesso a ferramentas de gestão, auditoria, CRM e configuração do sistema. Cada módulo abaixo é exclusivo ou expandido para o perfil admin.</p>
+      </div>
+    </div>
+
+    <p class="section-title" style="margin-top:32px">📬 CRM de Contatos</p>
+    <p class="section-sub">Gerencie todos os leads que chegam pelo formulário do site público.</p>
+    <div class="features-grid">
+      <div class="feature-card" style="animation-delay:.05s">
+        <div class="card-icon" style="background:#eff6ff">📥</div>
+        <div class="card-title">Captação automática</div>
+        <div class="card-desc">Todo contato enviado pelo site público aparece automaticamente neste painel. Um banner vermelho no dashboard avisa quando há novos contatos aguardando.</div>
+        <div class="card-tags"><span class="tag blue">Integrado ao site</span></div>
+      </div>
+      <div class="feature-card" style="animation-delay:.1s">
+        <div class="card-icon" style="background:#f0fdf4">🔄</div>
+        <div class="card-title">Workflow de status</div>
+        <div class="card-desc">Acompanhe cada lead em sua etapa: Novo → Em Contato → Agendado → Convertido ou Sem Interesse. Registre notas internas e responsável pelo atendimento.</div>
+        <div class="card-tags"><span class="tag green">Pipeline</span></div>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <p class="section-title">🔐 Log de Auditoria</p>
+    <p class="section-sub">Rastreabilidade completa de todas as ações no sistema.</p>
+    <div class="features-grid">
+      <div class="feature-card" style="animation-delay:.05s">
+        <div class="card-icon" style="background:#faf5ff">👁️</div>
+        <div class="card-title">Registro de toda ação</div>
+        <div class="card-desc">Inserções, alterações, exclusões e visualizações de prontuários são registradas com usuário, data/hora, recurso e nome do registro afetado.</div>
+        <div class="card-tags"><span class="tag violet">Conformidade</span></div>
+      </div>
+      <div class="feature-card" style="animation-delay:.1s">
+        <div class="card-icon" style="background:#f0fdf4">📁</div>
+        <div class="card-title">Retenção em dois níveis</div>
+        <div class="card-desc">Log ativo dos últimos 90 dias no painel. Arquivo de 90 dias a 1 ano no banco. Manutenção automática via rotina diária agendada — zero manutenção manual.</div>
+        <div class="card-tags"><span class="tag green">1 ano de histórico</span></div>
+      </div>
+      <div class="feature-card" style="animation-delay:.15s">
+        <div class="card-icon" style="background:#eff6ff">🔍</div>
+        <div class="card-title">Filtros avançados</div>
+        <div class="card-desc">Filtre por usuário (por nome), tipo de ação, recurso, data e texto livre. Paginação de 50 registros por página para navegação rápida.</div>
+        <div class="card-tags"><span class="tag blue">Investigação fácil</span></div>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <p class="section-title">⚙️ Configurações do Sistema</p>
+    <p class="section-sub">Personalize o sistema para a realidade da clínica — sem código.</p>
+    <div class="features-grid">
+      <div class="feature-card" style="animation-delay:.05s">
+        <div class="card-icon" style="background:#eff6ff">🩺</div>
+        <div class="card-title">Especialidades</div>
+        <div class="card-desc">Gerencie as especialidades oferecidas (Psicologia, Fonoaudiologia, etc.). Cada especialidade tem key, label e pode ser ativada ou desativada.</div>
+      </div>
+      <div class="feature-card" style="animation-delay:.1s">
+        <div class="card-icon" style="background:#f0fdf4">🏷️</div>
+        <div class="card-title">Status de Atendimento</div>
+        <div class="card-desc">Crie e edite os status (Realizada, Cancelada, Falta…) com cores personalizadas. Marque como "automático" para uso pelo sistema sem aparecer no formulário.</div>
+      </div>
+      <div class="feature-card" style="animation-delay:.15s">
+        <div class="card-icon" style="background:#fff7ed">🏢</div>
+        <div class="card-title">Salas, Tipos e Faixas Etárias</div>
+        <div class="card-desc">Configure salas de atendimento, tipos de sessão (Individual, Grupo…) e faixas etárias coloridas calculadas automaticamente a partir da data de nascimento.</div>
+      </div>
+      <div class="feature-card" style="animation-delay:.2s">
+        <div class="card-icon" style="background:#faf5ff">🏭</div>
+        <div class="card-title">Dados da Empresa + Prompt da IA</div>
+        <div class="card-desc">Configure Razão Social e CNPJ exibidos nos PDFs. Customize o prompt enviado à IA para a geração de sugestões de texto no relatório de convênio.</div>
+        <div class="card-tags"><span class="tag violet">IA customizável</span></div>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <p class="section-title">👩‍⚕️ Gestão de Terapeutas</p>
+    <p class="section-sub">Cadastro completo com fluxo de convite automático por e-mail.</p>
+    <div class="flow" style="background:var(--gray-50);border-radius:var(--radius);padding:20px 24px;margin-bottom:20px">
+      <div class="flow-step">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <div class="step-title">Cadastro pelo admin</div>
+          <div class="step-desc">Admin cadastra o terapeuta com nome, e-mail e especialidades. Nenhuma senha é definida nesse momento.</div>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <div class="step-title">Convite automático</div>
+          <div class="step-desc">O sistema envia automaticamente um e-mail de convite para o terapeuta criar sua própria senha.</div>
+        </div>
+      </div>
+      <div class="flow-step">
+        <div class="step-num">3</div>
+        <div class="step-body">
+          <div class="step-title">Primeiro acesso</div>
+          <div class="step-desc">O terapeuta clica no link, define a senha e já entra no sistema com acesso aos próprios pacientes e agenda.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="highlight">
+      <div class="highlight-icon">🔑</div>
+      <div>
+        <h3>Segurança por design</h3>
+        <p>O sistema usa Row Level Security no banco de dados — cada terapeuta só consegue acessar os próprios dados mesmo que tente contornar a interface. Nenhuma regra de negócio depende apenas do frontend.</p>
+        <ul>
+          <li>Terapeutas veem apenas seus pacientes, agendamentos e atendimentos</li>
+          <li>Prontuários respeitam o vínculo terapeuta ↔ paciente</li>
+          <li>Administradores têm visão completa do sistema</li>
+          <li>Toda ação fica registrada no log de auditoria</li>
+        </ul>
+      </div>
+    </div>
+
+  </section>
+</div><!-- /panel-admin -->
+
+<!-- FOOTER -->
+<footer>
+  <strong>Espaço Casa Amarela</strong> — Sistema de Gestão Clínica<br>
+  Desenvolvido especialmente para a equipe de terapias infantis multidisciplinares.<br>
+  <span style="font-size:12px;opacity:.6">Todos os dados são armazenados com segurança no Supabase com Row Level Security.</span>
+</footer>
+
+<script>
+  function switchTab(panel, btn) {
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('panel-' + panel).classList.add('active');
+    btn.classList.add('active');
+    // re-trigger animations
+    document.querySelectorAll('#panel-' + panel + ' .feature-card').forEach((c, i) => {
+      c.style.animation = 'none';
+      c.offsetHeight; // reflow
+      c.style.animation = '';
+      c.style.animationDelay = (i * 0.05) + 's';
+    });
+  }
+
+  // Intersection Observer: trigger fade-in when scrolled into view
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) e.target.style.animationPlayState = 'running';
+    });
+  }, { threshold: 0.1 });
+
+  document.querySelectorAll('.feature-card').forEach(card => {
+    card.style.animationPlayState = 'paused';
+    observer.observe(card);
+  });
+</script>
+</body>
+</html>

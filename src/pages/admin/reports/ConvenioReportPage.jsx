@@ -495,8 +495,8 @@ export default function ConvenioReportPage() {
         </div>
         <HelpButton title="Como gerar o Relatório de Convênio">
           <p><strong>1. Seleção:</strong> escolha o paciente, a especialidade e o período (mês ou De/Até) e clique em <em>Buscar Atendimentos</em>. O sistema carregará automaticamente as sessões registradas no período.</p>
-          <p><strong>2. Sessões:</strong> revise as sessões encontradas. Você pode adicionar, remover ou alterar datas e valores individualmente. Use <em>"aplicar a todas"</em> para padronizar o valor. Preencha o campo <em>Horário</em> (ex: 19h às 20h).</p>
-          <p><strong>3. Texto do Relatório:</strong> preencha o campo <em>Diagnóstico</em> incluindo os códigos CID (o sistema pré-preenche com o diagnóstico do cadastro). Escreva o Encaminhamento, os Objetivos (um por linha — cada linha vira um bullet) e o Desempenho e Conclusão.</p>
+          <p><strong>2. Sessões:</strong> revise as sessões encontradas. Você pode adicionar, remover ou alterar datas e valores individualmente. Use <em>"aplicar a todas"</em> para padronizar o valor e o <em>Horário padrão</em> + botão "aplicar a todas" para padronizar o horário.</p>
+          <p><strong>3. Texto do Relatório:</strong> preencha o campo <em>Diagnóstico</em> incluindo os códigos CID (pré-preenchido com o diagnóstico do cadastro). Escreva o Encaminhamento, os Objetivos (um por linha — cada linha vira um bullet) e o Desempenho e Conclusão. Use o botão <em>⚡ Sugerir com IA</em> para gerar sugestões de texto baseadas nos relatos reais dos atendimentos.</p>
           <p><strong>4. Pré-visualizar:</strong> clique em <em>Pré-visualizar</em> para ver o documento antes de baixar. Na pré-visualização, clique em <em>Baixar e Registrar</em> para baixar o PDF e gravar no histórico.</p>
           <p><strong>Histórico:</strong> os relatórios gerados ficam registrados abaixo. Clique em <em>Restaurar</em> para recuperar os dados de um relatório anterior e gerar uma nova versão.</p>
         </HelpButton>

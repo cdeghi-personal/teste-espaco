@@ -4,6 +4,7 @@ import { supabase } from '../../../lib/supabase'
 import { format, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { SPECIALTIES } from '../../../constants/specialties'
+import HelpButton from '../../../components/ui/HelpButton'
 
 const STATUSES = {
   novo:          { label: 'Novo',            color: 'bg-red-100 text-red-700',     dot: 'bg-red-500' },
@@ -206,12 +207,21 @@ export default function ContactLeadsPage() {
             <p className="text-xs text-gray-500 mt-0.5">{filtered.length} exibido(s)</p>
           </div>
         </div>
-        <button
-          onClick={fetchLeads}
-          className="p-2 rounded-xl border border-gray-200 bg-white text-gray-500 hover:bg-gray-50 transition-colors"
-        >
-          <FiRefreshCw size={16} className={loading ? 'animate-spin' : ''} />
-        </button>
+        <div className="flex items-center gap-2">
+          <HelpButton title="Como usar Contatos">
+            <p><strong>Origem:</strong> este painel exibe mensagens enviadas pelo formulário de contato do site público.</p>
+            <p><strong>Status:</strong> avance o status conforme o andamento — <em>Novo</em> (vermelho) → <em>Em Contato</em> → <em>Agendado</em> → <em>Convertido</em> ou <em>Sem Interesse</em>.</p>
+            <p><strong>Notas internas:</strong> use o campo de nota interna para registrar informações do atendimento (não visível pelo contato).</p>
+            <p><strong>Responsável:</strong> preencha o campo <em>Responsável</em> para indicar quem está tratando o contato.</p>
+            <p><strong>Dashboard:</strong> um banner vermelho aparece no painel principal enquanto houver contatos com status <em>Novo</em>.</p>
+          </HelpButton>
+          <button
+            onClick={fetchLeads}
+            className="p-2 rounded-xl border border-gray-200 bg-white text-gray-500 hover:bg-gray-50 transition-colors"
+          >
+            <FiRefreshCw size={16} className={loading ? 'animate-spin' : ''} />
+          </button>
+        </div>
       </div>
 
       {/* Filtros */}

@@ -60,9 +60,9 @@ export default function ConsultationsPage() {
           <HelpButton title="Como usar Atendimentos">
             <p><strong>Registrar atendimento:</strong> clique em <em>Novo Registro</em> e preencha paciente, terapeuta, especialidade, data, horário, status e tipo.</p>
             <p><strong>Filtros:</strong> use os filtros de especialidade, status, tipo e terapeuta para localizar atendimentos específicos.</p>
-            <p><strong>Editar:</strong> clique no lápis (✏) ou olhinho (👁) na linha para editar ou visualizar o atendimento.</p>
-            <p><strong>Status:</strong> os status disponíveis são configurados em Administração → Status Atendimento. Status marcados como automáticos são atribuídos pelo sistema.</p>
-            <p><strong>Atividades:</strong> dentro do formulário é possível registrar atividades realizadas durante o atendimento.</p>
+            <p><strong>Editar:</strong> clique no lápis (✏) ou olhinho (👁) na linha para editar ou visualizar o atendimento. Terapeutas só podem editar ou excluir seus próprios atendimentos.</p>
+            <p><strong>Status "Realizada":</strong> ao selecionar esse status, os campos Objetivo da Sessão, Relato de Evolução e Objetivo da Próxima Sessão tornam-se obrigatórios.</p>
+            <p><strong>Status automáticos:</strong> configurados em Administração → Status Atendimento; aparecem nos filtros e no prontuário, mas não no formulário de registro.</p>
           </HelpButton>
           <Button variant="primary" onClick={() => { setEditConsultation(null); setShowModal(true) }}>
             <FiPlus size={16} />

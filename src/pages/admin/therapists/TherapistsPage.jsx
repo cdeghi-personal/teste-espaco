@@ -5,6 +5,7 @@ import { useAuth } from '../../../context/AuthContext'
 import Badge from '../../../components/ui/Badge'
 import Button from '../../../components/ui/Button'
 import EmptyState from '../../../components/ui/EmptyState'
+import HelpButton from '../../../components/ui/HelpButton'
 import TherapistFormModal from './TherapistFormModal'
 
 export default function TherapistsPage() {
@@ -46,6 +47,13 @@ export default function TherapistsPage() {
           <p className="text-xs text-gray-500 mt-0.5">{filtered.length} exibido(s)</p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          <HelpButton title="Como usar Terapeutas">
+            <p><strong>Cadastrar:</strong> clique em <em>Novo Terapeuta</em> e preencha nome, especialidades e e-mail. Ao salvar, um convite é enviado por e-mail para o terapeuta definir sua senha.</p>
+            <p><strong>Convite:</strong> o terapeuta recebe um e-mail com link para criar a senha. Após o primeiro acesso, ele já aparece como usuário ativo no sistema.</p>
+            <p><strong>Editar:</strong> clique no lápis (✏) para editar dados, especialidades e credenciais (nº do conselho regional).</p>
+            <p><strong>Ativar/Desativar:</strong> use o botão de toggle para desativar terapeutas que saíram da clínica sem perder o histórico de atendimentos.</p>
+            <p><strong>Visibilidade:</strong> terapeutas têm acesso somente leitura a esta seção; alterações são exclusivas de administradores.</p>
+          </HelpButton>
           <button
             onClick={() => setShowInactive(v => !v)}
             className={`px-3 py-2 rounded-xl text-xs font-medium border transition-all ${showInactive ? 'bg-red-50 text-red-700 border-red-200' : 'bg-white text-gray-600 border-gray-200'}`}
