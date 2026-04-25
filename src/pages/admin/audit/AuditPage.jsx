@@ -9,6 +9,7 @@ const ACTION_LABELS = {
   INSERT:    { label: 'Inclusão',     color: 'bg-green-100 text-green-700' },
   UPDATE:    { label: 'Alteração',    color: 'bg-yellow-100 text-yellow-700' },
   DELETE:    { label: 'Exclusão',     color: 'bg-red-100 text-red-700' },
+  CONSULTA:  { label: 'Consulta',     color: 'bg-cyan-100 text-cyan-700' },
   SOLICITAR: { label: 'Solicitação',  color: 'bg-violet-100 text-violet-700' },
   GERAR:     { label: 'Geração',      color: 'bg-indigo-100 text-indigo-700' },
 }
@@ -22,6 +23,15 @@ const RESOURCE_LABELS = {
   medical_record_medications: 'Medicamento',
   medical_record_conducts:  'Conduta',
   convenio_report:          'Rel. Convênio',
+  therapists:               'Terapeuta',
+  specialties:              'Especialidade',
+  payment_methods:          'Forma de Pagamento',
+  diagnoses:                'Diagnóstico',
+  patient_statuses:         'Status Paciente',
+  consultation_statuses:    'Status Atendimento',
+  appointment_types:        'Tipo de Atendimento',
+  rooms:                    'Sala',
+  age_ranges:               'Faixa Etária',
 }
 
 const PAGE_SIZE = 50

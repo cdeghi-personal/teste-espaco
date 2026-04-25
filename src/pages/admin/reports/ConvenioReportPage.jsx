@@ -248,7 +248,7 @@ export default function ConvenioReportPage() {
     setResponsavel(patGuardians[0]?.fullName || '')
     setVersionLabel('')  // reset version on new search
     setSearched(true)
-    logConvenioAudit('SOLICITAR')
+    logConvenioAudit('CONSULTA')
   }
 
   // ── Sessões ───────────────────────────────────────────────────
