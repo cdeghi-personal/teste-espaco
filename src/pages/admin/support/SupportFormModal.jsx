@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { FiClock, FiBell } from 'react-icons/fi'
+import { useState } from 'react'
+import { FiClock, FiBell, FiCheckCircle, FiXCircle } from 'react-icons/fi'
 import Modal from '../../../components/ui/Modal'
 import Button from '../../../components/ui/Button'
 import Input from '../../../components/ui/Input'
@@ -15,12 +15,13 @@ export const TICKET_TYPES = {
 }
 
 export const TICKET_STATUS = {
-  novo:               { label: 'Novo',                 color: 'bg-red-100 text-red-700' },
-  em_analise:         { label: 'Em Análise',           color: 'bg-amber-100 text-amber-700' },
-  em_desenvolvimento: { label: 'Em Desenvolvimento',   color: 'bg-blue-100 text-blue-700' },
-  resolvido:          { label: 'Resolvido',            color: 'bg-green-100 text-green-700' },
-  fechado:            { label: 'Fechado',              color: 'bg-gray-100 text-gray-600' },
-  visualizado:        { label: 'Resposta visualizada', color: 'bg-teal-100 text-teal-700', historyOnly: true },
+  novo:               { label: 'Novo',                   color: 'bg-red-100 text-red-700' },
+  em_analise:         { label: 'Em Análise',             color: 'bg-amber-100 text-amber-700' },
+  em_desenvolvimento: { label: 'Em Desenvolvimento',     color: 'bg-blue-100 text-blue-700' },
+  resolvido:          { label: 'Resolvido',              color: 'bg-green-100 text-green-700' },
+  fechado:            { label: 'Fechado',                color: 'bg-gray-100 text-gray-600' },
+  reprovado_usuario:  { label: 'Reprovado pelo Usuário', color: 'bg-orange-100 text-orange-700' },
+  visualizado:        { label: 'Resposta visualizada',   color: 'bg-teal-100 text-teal-700', historyOnly: true },
 }
 
 function formatDateTime(iso) {
@@ -37,24 +38,18 @@ export default function SupportFormModal({ onClose, initial = null, onSaved }) {
   const isEdit = !!initial?.id
   const readOnly = isEdit && !isAdmin
 
+  // Non-admin with a pending response from admin
+  const pendingResponse = isEdit && !isAdmin && !!initial?.nova_resposta
+
   const [form, setForm] = useState(isEdit ? { ...initial, nova_resposta: initial.nova_resposta || false } : { ...EMPTY })
   const [history, setHistory] = useState(initial?.history || [])
   const [errors, setErrors] = useState({})
   const [saving, setSaving] = useState(false)
 
-  // Não-admin: ao abrir ticket com nova_resposta = true, desmarca via RPC e atualiza histórico
-  useEffect(() => {
-    if (!readOnly || !initial?.nova_resposta) return
-    supabase.rpc('mark_support_ticket_read', { p_ticket_id: initial.id }).then(() => {
-      // Recarrega o histórico para mostrar a entrada de visualização
-      supabase
-        .from('support_ticket_history')
-        .select('*')
-        .eq('ticket_id', initial.id)
-        .order('changed_at', { ascending: true })
-        .then(({ data }) => { if (data) setHistory(data) })
-    })
-  }, [readOnly, initial?.id, initial?.nova_resposta])
+  // Reject flow state
+  const [showRejectInput, setShowRejectInput] = useState(false)
+  const [rejectComment, setRejectComment] = useState('')
+  const [acting, setActing] = useState(false)
 
   function set(field, value) {
     setForm(f => ({ ...f, [field]: value }))
@@ -135,11 +130,54 @@ export default function SupportFormModal({ onClose, initial = null, onSaved }) {
     }
   }
 
+  async function handleApprove() {
+    setActing(true)
+    try {
+      const { error } = await supabase.rpc('approve_support_ticket', { p_ticket_id: initial.id })
+      if (error) throw error
+      onSaved?.()
+      onClose()
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setActing(false)
+    }
+  }
+
+  async function handleReject() {
+    setActing(true)
+    try {
+      const { error } = await supabase.rpc('reject_support_ticket', {
+        p_ticket_id: initial.id,
+        p_comment: rejectComment,
+      })
+      if (error) throw error
+      onSaved?.()
+      onClose()
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setActing(false)
+    }
+  }
+
   const title = isEdit ? `#${initial.id.slice(0, 8).toUpperCase()} — ${initial.subject}` : 'Novo Suporte'
+  const hasNotes = history.some(h => h.note)
 
   return (
     <Modal title={title} onClose={onClose} size="lg">
       <div className="space-y-4">
+
+        {/* Banner de resposta pendente */}
+        {pendingResponse && (
+          <div className="flex items-center gap-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+            <FiBell size={16} className="text-amber-500 shrink-0" />
+            <div>
+              <div className="text-sm font-semibold text-amber-800">Nova resposta disponível</div>
+              <div className="text-xs text-amber-600">Avalie a solução abaixo e confirme se está OK ou não.</div>
+            </div>
+          </div>
+        )}
 
         <Input
           label="Assunto *"
@@ -147,10 +185,11 @@ export default function SupportFormModal({ onClose, initial = null, onSaved }) {
           onChange={e => set('subject', e.target.value)}
           error={errors.subject}
           placeholder="Descreva brevemente o assunto..."
+          readOnly={readOnly}
         />
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <Select label="Tipo *" value={form.type} onChange={e => set('type', e.target.value)} error={errors.type}>
+          <Select label="Tipo *" value={form.type} onChange={e => set('type', e.target.value)} error={errors.type} disabled={readOnly}>
             <option value="">Selecione</option>
             {Object.entries(TICKET_TYPES).map(([k, v]) => (
               <option key={k} value={k}>{v.label}</option>
@@ -162,6 +201,7 @@ export default function SupportFormModal({ onClose, initial = null, onSaved }) {
             onChange={e => set('author', e.target.value)}
             error={errors.author}
             placeholder="Nome do solicitante"
+            readOnly={readOnly}
           />
         </div>
 
@@ -172,6 +212,7 @@ export default function SupportFormModal({ onClose, initial = null, onSaved }) {
           error={errors.description}
           placeholder="Descreva com detalhes o erro, dúvida ou melhoria..."
           rows={4}
+          readOnly={readOnly}
         />
 
         {isEdit && (isAdmin || form.solution) && (
@@ -232,6 +273,7 @@ export default function SupportFormModal({ onClose, initial = null, onSaved }) {
                     <th className="text-left px-3 py-2 font-semibold text-gray-500">Evento</th>
                     <th className="text-left px-3 py-2 font-semibold text-gray-500">Data / Hora</th>
                     <th className="text-left px-3 py-2 font-semibold text-gray-500">Responsável</th>
+                    {hasNotes && <th className="text-left px-3 py-2 font-semibold text-gray-500">Observação</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -246,6 +288,7 @@ export default function SupportFormModal({ onClose, initial = null, onSaved }) {
                         </td>
                         <td className="px-3 py-2 text-gray-600">{formatDateTime(h.changed_at)}</td>
                         <td className="px-3 py-2 text-gray-700 font-medium">{h.changed_by}</td>
+                        {hasNotes && <td className="px-3 py-2 text-gray-500 italic">{h.note || '—'}</td>}
                       </tr>
                     )
                   })}
@@ -255,14 +298,53 @@ export default function SupportFormModal({ onClose, initial = null, onSaved }) {
           </div>
         )}
 
-        <div className="flex justify-end gap-2 pt-2">
-          <Button variant="outline" onClick={onClose}>{readOnly ? 'Fechar' : 'Cancelar'}</Button>
-          {!readOnly && (
-            <Button onClick={handleSave} disabled={saving}>
-              {saving ? 'Salvando...' : isEdit ? 'Salvar Alterações' : 'Abrir Chamado'}
-            </Button>
-          )}
-        </div>
+        {/* Botões de ação */}
+        {pendingResponse ? (
+          showRejectInput ? (
+            <div className="space-y-3 pt-2">
+              <Textarea
+                label="O que não foi resolvido? *"
+                value={rejectComment}
+                onChange={e => setRejectComment(e.target.value)}
+                placeholder="Descreva o que ainda precisa ser resolvido ou o motivo da reprovação..."
+                rows={3}
+              />
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setShowRejectInput(false)} disabled={acting}>Voltar</Button>
+                <Button
+                  variant="danger"
+                  onClick={handleReject}
+                  disabled={acting || !rejectComment.trim()}
+                >
+                  {acting ? 'Enviando...' : 'Confirmar Reprovação'}
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={onClose}>Fechar</Button>
+              <Button
+                variant="outline"
+                onClick={() => setShowRejectInput(true)}
+                className="border-red-300 text-red-600 hover:bg-red-50 hover:border-red-400 focus:ring-red-300"
+              >
+                <FiXCircle size={15} /> Não OK
+              </Button>
+              <Button variant="success" onClick={handleApprove} disabled={acting}>
+                <FiCheckCircle size={15} /> {acting ? 'Aguarde...' : 'OK com a Resposta'}
+              </Button>
+            </div>
+          )
+        ) : (
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={onClose}>{readOnly ? 'Fechar' : 'Cancelar'}</Button>
+            {!readOnly && (
+              <Button onClick={handleSave} disabled={saving}>
+                {saving ? 'Salvando...' : isEdit ? 'Salvar Alterações' : 'Abrir Chamado'}
+              </Button>
+            )}
+          </div>
+        )}
       </div>
     </Modal>
   )
