@@ -1,4 +1,4 @@
-import { FiUsers, FiCalendar, FiClipboard, FiTrendingUp, FiMessageSquare, FiArrowRight, FiBell } from 'react-icons/fi'
+import { FiUsers, FiCalendar, FiClipboard, FiTrendingUp, FiMessageSquare, FiArrowRight, FiBell, FiLifeBuoy } from 'react-icons/fi'
 import { useState, useEffect } from 'react'
 import { format } from 'date-fns'
 import { Link } from 'react-router-dom'
@@ -60,9 +60,15 @@ export default function DashboardPage() {
       .then(({ count }) => setUnreadSupportCount(count || 0))
   }, [isAdmin, user?.authId])
 
+  const [novoSupportCount, setNovoSupportCount] = useState(0)
   const [reprovadoSupportCount, setReprovadoSupportCount] = useState(0)
   useEffect(() => {
     if (!isAdmin) return
+    supabase
+      .from('support_tickets')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'novo')
+      .then(({ count }) => setNovoSupportCount(count || 0))
     supabase
       .from('support_tickets')
       .select('id', { count: 'exact', head: true })
@@ -142,6 +148,25 @@ export default function DashboardPage() {
               {newLeadsCount} {newLeadsCount === 1 ? 'nova mensagem de contato' : 'novas mensagens de contato'}
             </div>
             <div className="text-xs text-red-100">Clique para visualizar e tratar</div>
+          </div>
+          <FiArrowRight size={18} className="opacity-70 shrink-0" />
+        </Link>
+      )}
+
+      {/* Alerta de chamados novos de suporte — apenas admin */}
+      {isAdmin && novoSupportCount > 0 && (
+        <Link
+          to={ROUTES.SUPPORT}
+          className="flex items-center gap-3 bg-red-500 text-white px-4 py-3.5 rounded-2xl shadow-sm hover:bg-red-600 transition-colors"
+        >
+          <div className="w-9 h-9 bg-white/20 rounded-xl flex items-center justify-center shrink-0">
+            <FiLifeBuoy size={18} />
+          </div>
+          <div className="flex-1">
+            <div className="font-bold text-sm">
+              {novoSupportCount === 1 ? '1 novo chamado de suporte' : `${novoSupportCount} novos chamados de suporte`}
+            </div>
+            <div className="text-xs text-red-100">Clique para visualizar e responder</div>
           </div>
           <FiArrowRight size={18} className="opacity-70 shrink-0" />
         </Link>
