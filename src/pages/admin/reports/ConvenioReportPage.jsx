@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from 'react'
+﻿import { useState, useMemo, useEffect, useCallback } from 'react'
 import { useNavigate, Navigate } from 'react-router-dom'
 import { FiArrowLeft, FiPlus, FiTrash2, FiFileText, FiDownload, FiEye, FiClock, FiRotateCcw, FiX, FiZap } from 'react-icons/fi'
 import { useData } from '../../../context/DataContext'
@@ -60,7 +60,7 @@ function PreviewModal({ blob, title, filename, onClose, onDownload }) {
 }
 
 // ─── Histórico ────────────────────────────────────────────────────
-function HistorySection({ patientId, onRestore, refreshKey }) {
+function HistorySection({ patientId, onRestore, refreshKey, specialtiesData, therapists }) {
   const [records, setRecords] = useState([])
   const [loading, setLoading] = useState(false)
 
@@ -94,26 +94,44 @@ function HistorySection({ patientId, onRestore, refreshKey }) {
       {!loading && records.length === 0 && (
         <p className="text-xs text-gray-400">Nenhum relatório registrado para este paciente.</p>
       )}
-      {records.map(r => (
-        <div key={r.id} className="flex items-center justify-between gap-3 py-2 border-b border-gray-50 last:border-0">
-          <div>
-            <div className="text-sm font-medium text-gray-800">{r.version_label}</div>
-            <div className="text-xs text-gray-400">{r.mes_label} · {r.specialty}</div>
+      {records.map(r => {
+        const specData = specialtiesData?.find(s => s.key === r.specialty)
+        const createdByName = r.form_data?.createdByName ||
+          therapists?.find(t => t.userId === r.created_by)?.name
+        return (
+          <div key={r.id} className="flex items-start justify-between gap-3 py-2 border-b border-gray-50 last:border-0">
+            <div className="space-y-1 min-w-0">
+              <div className="text-sm font-medium text-gray-800">{r.version_label}</div>
+              <div className="flex items-center flex-wrap gap-1.5">
+                <span className="text-xs text-gray-400">{r.mes_label}</span>
+                {specData && (
+                  <span
+                    className="text-[10px] font-medium text-white px-1.5 py-0.5 rounded-full leading-none"
+                    style={{ backgroundColor: specData.color || '#6b7280' }}
+                  >
+                    {specData.label}
+                  </span>
+                )}
+              </div>
+              {createdByName && (
+                <div className="text-[11px] text-gray-400">Criado por: {createdByName}</div>
+              )}
+            </div>
+            <div className="flex items-center gap-1 shrink-0 pt-0.5">
+              <button
+                onClick={() => onRestore(r)}
+                className="flex items-center gap-1 px-2 py-1 text-xs text-brand-blue bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
+                title="Restaurar formulário"
+              >
+                <FiRotateCcw size={12} /> Restaurar
+              </button>
+              <button onClick={() => handleDelete(r.id)} className="p-1.5 text-gray-400 hover:text-red-500 rounded-lg transition-colors">
+                <FiX size={13} />
+              </button>
+            </div>
           </div>
-          <div className="flex items-center gap-1 shrink-0">
-            <button
-              onClick={() => onRestore(r.form_data)}
-              className="flex items-center gap-1 px-2 py-1 text-xs text-brand-blue bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
-              title="Restaurar formulário"
-            >
-              <FiRotateCcw size={12} /> Restaurar
-            </button>
-            <button onClick={() => handleDelete(r.id)} className="p-1.5 text-gray-400 hover:text-red-500 rounded-lg transition-colors">
-              <FiX size={13} />
-            </button>
-          </div>
-        </div>
-      ))}
+        )
+      })}
     </div>
   )
 }
@@ -249,16 +267,26 @@ export default function ConvenioReportPage() {
   }
 
   // ── Restaurar do histórico ────────────────────────────────────
-  function handleRestore(formData) {
-    if (!formData) return
-    if (formData.sessions) setSessions(formData.sessions)
-    if (formData.sessionValue != null) setSessionValue(String(formData.sessionValue))
-    if (formData.horario) setHorario(formData.horario)
-    if (formData.responsavel != null) setResponsavel(formData.responsavel)
-    if (formData.diagnosticoText != null) setDiagnosticoText(formData.diagnosticoText)
-    if (formData.encaminhamento != null) setEncaminhamento(formData.encaminhamento)
-    if (formData.objetivos != null) setObjetivos(formData.objetivos)
-    if (formData.desempenho != null) setDesempenho(formData.desempenho)
+  function handleRestore(record) {
+    if (!record) return
+    const fd = record.form_data || {}
+    // Seleção
+    if (record.therapist_id) setTherapistId(record.therapist_id)
+    if (record.patient_id) setPatientId(record.patient_id)
+    if (record.specialty) setSpecialty(record.specialty)
+    if (fd.periodType) setPeriodType(fd.periodType)
+    if (fd.periodMonth) setPeriodMonth(fd.periodMonth)
+    if (fd.periodFrom) setPeriodFrom(fd.periodFrom)
+    if (fd.periodTo) setPeriodTo(fd.periodTo)
+    // Dados do formulário
+    if (fd.sessions) setSessions(fd.sessions)
+    if (fd.sessionValue != null) setSessionValue(String(fd.sessionValue))
+    if (fd.horario) setHorario(fd.horario)
+    if (fd.responsavel != null) setResponsavel(fd.responsavel)
+    if (fd.diagnosticoText != null) setDiagnosticoText(fd.diagnosticoText)
+    if (fd.encaminhamento != null) setEncaminhamento(fd.encaminhamento)
+    if (fd.objetivos != null) setObjetivos(fd.objetivos)
+    if (fd.desempenho != null) setDesempenho(fd.desempenho)
     setSearched(true)
   }
 
@@ -349,15 +377,19 @@ export default function ConvenioReportPage() {
 
   // ── Salvar no histórico ───────────────────────────────────────
   async function saveHistory(ver) {
-    const { data: { user: authUser } } = await supabase.auth.getUser()
     const { error } = await supabase.from('convenio_reports').insert({
       patient_id: patientId,
       therapist_id: therapistId || null,
       specialty,
       mes_label: getMesLabel(),
       version_label: ver,
-      form_data: { sessions, sessionValue, horario, responsavel, diagnosticoText, encaminhamento, objetivos, desempenho },
-      created_by: authUser?.id,
+      form_data: {
+        sessions, sessionValue, horario, responsavel, diagnosticoText,
+        encaminhamento, objetivos, desempenho,
+        periodType, periodMonth, periodFrom, periodTo,
+        createdByName: user.name,
+      },
+      created_by: user.authId,
     })
     if (error) console.error('Erro ao salvar histórico de convênio:', error)
     return !error
@@ -656,7 +688,7 @@ export default function ConvenioReportPage() {
       )}
 
       {/* Histórico */}
-      <HistorySection patientId={patientId} onRestore={handleRestore} refreshKey={historyRefreshKey} />
+      <HistorySection patientId={patientId} onRestore={handleRestore} refreshKey={historyRefreshKey} specialtiesData={specialtiesData} therapists={therapists} />
 
       {/* Modal de preview */}
       {previewBlob && (
