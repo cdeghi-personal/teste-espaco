@@ -45,6 +45,7 @@ import ConvenioReportPage from './pages/admin/reports/ConvenioReportPage'
 import SupportPage from './pages/admin/support/SupportPage'
 import AgeRangesPage from './pages/admin/ageranges/AgeRangesPage'
 import CompanySettingsPage from './pages/admin/company/CompanySettingsPage'
+import GuidePage from './pages/admin/guide/GuidePage'
 
 // Common
 import ScrollToTop from './components/common/ScrollToTop'
@@ -106,6 +107,7 @@ export default function App() {
                 <Route path={ROUTES.REPORTS} element={<ReportsPage />} />
                 <Route path={ROUTES.SUPPORT} element={<SupportPage />} />
                 <Route path={ROUTES.COMPANY_SETTINGS} element={<CompanySettingsPage />} />
+                <Route path={ROUTES.GUIDE} element={<GuidePage />} />
               </Route>
             </Route>
 

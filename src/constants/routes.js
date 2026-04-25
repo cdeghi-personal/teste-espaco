@@ -32,4 +32,5 @@ export const ROUTES = {
   CONVENIO_REPORT:      '/admin/relatorios/convenio',
   SUPPORT:              '/admin/suporte',
   COMPANY_SETTINGS:     '/admin/empresa',
+  GUIDE:                '/admin/guia',
 }

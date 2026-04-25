@@ -92,15 +92,15 @@ export default function AdminSidebar({ open, onClose }) {
         <NavLink to="/" className="flex items-center" onClick={onClose}>
           <img src="/logo.jpg" alt="Casa Amarela" className="h-10 w-auto" />
         </NavLink>
-        <a
-          href="/guia-sistema.html"
-          target="_blank"
-          rel="noopener noreferrer"
+        <NavLink
+          to={ROUTES.GUIDE}
           title="Guia do Sistema"
-          className="p-1.5 rounded-lg text-gray-400 hover:text-brand-blue hover:bg-gray-50 transition-colors"
+          className={({ isActive }) =>
+            `p-1.5 rounded-lg transition-colors ${isActive ? 'text-brand-blue bg-blue-50' : 'text-gray-400 hover:text-brand-blue hover:bg-gray-50'}`
+          }
         >
           <FiBookOpen size={15} />
-        </a>
+        </NavLink>
       </div>
 
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto md:overflow-y-auto">
