@@ -9,6 +9,7 @@ import Button from '../../../components/ui/Button'
 import EmptyState from '../../../components/ui/EmptyState'
 import PatientFormModal from './PatientFormModal'
 import { calculateAge, formatDateShort, calculateAgeYears } from '../../../utils/dateUtils'
+import { hexTextColor } from '../../../utils/colorUtils'
 import { ROUTES } from '../../../constants/routes'
 
 export default function PatientsPage() {
