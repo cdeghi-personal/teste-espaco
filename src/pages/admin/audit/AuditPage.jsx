@@ -5,10 +5,12 @@ import { format, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 
 const ACTION_LABELS = {
-  VIEW:   { label: 'Visualização', color: 'bg-blue-100 text-blue-700' },
-  INSERT: { label: 'Inclusão',     color: 'bg-green-100 text-green-700' },
-  UPDATE: { label: 'Alteração',    color: 'bg-yellow-100 text-yellow-700' },
-  DELETE: { label: 'Exclusão',     color: 'bg-red-100 text-red-700' },
+  VIEW:      { label: 'Visualização', color: 'bg-blue-100 text-blue-700' },
+  INSERT:    { label: 'Inclusão',     color: 'bg-green-100 text-green-700' },
+  UPDATE:    { label: 'Alteração',    color: 'bg-yellow-100 text-yellow-700' },
+  DELETE:    { label: 'Exclusão',     color: 'bg-red-100 text-red-700' },
+  SOLICITAR: { label: 'Solicitação',  color: 'bg-violet-100 text-violet-700' },
+  GERAR:     { label: 'Geração',      color: 'bg-indigo-100 text-indigo-700' },
 }
 
 const RESOURCE_LABELS = {
@@ -19,6 +21,7 @@ const RESOURCE_LABELS = {
   medical_record_exams:     'Exame',
   medical_record_medications: 'Medicamento',
   medical_record_conducts:  'Conduta',
+  convenio_report:          'Rel. Convênio',
 }
 
 const PAGE_SIZE = 50
@@ -82,7 +85,7 @@ export default function AuditPage() {
   useEffect(() => { setPage(0) }, [filterAction, filterResource, filterDate, filterUser, search])
 
   function formatDate(iso) {
-    try { return format(parseISO(iso), "dd/MM/yyyy 'às' HH:mm:ss", { locale: ptBR }) }
+    try { return format(parseISO(iso), 'dd/MM/yy HH:mm', { locale: ptBR }) }
     catch { return iso }
   }
 
@@ -169,11 +172,11 @@ export default function AuditPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-100 text-xs text-gray-500 uppercase tracking-wide bg-gray-50/50">
-                  <th className="px-4 py-3 text-left font-medium">Data/Hora</th>
-                  <th className="px-4 py-3 text-left font-medium">Usuário</th>
-                  <th className="px-4 py-3 text-left font-medium">Ação</th>
-                  <th className="px-4 py-3 text-left font-medium">Recurso</th>
-                  <th className="px-4 py-3 text-left font-medium">Registro</th>
+                  <th className="px-3 py-3 text-left font-medium whitespace-nowrap" style={{ width: '100px' }}>Data/Hora</th>
+                  <th className="px-3 py-3 text-left font-medium" style={{ width: '140px' }}>Usuário</th>
+                  <th className="px-3 py-3 text-left font-medium" style={{ width: '88px' }}>Ação</th>
+                  <th className="px-3 py-3 text-left font-medium" style={{ width: '96px' }}>Recurso</th>
+                  <th className="px-3 py-3 text-left font-medium">Registro</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
@@ -182,15 +185,15 @@ export default function AuditPage() {
                   const resource = RESOURCE_LABELS[log.resource_type] || log.resource_type
                   return (
                     <tr key={log.id} className="hover:bg-gray-50/50 transition-colors">
-                      <td className="px-4 py-3 text-gray-600 whitespace-nowrap text-xs">{formatDate(log.created_at)}</td>
-                      <td className="px-4 py-3 text-gray-700 max-w-[180px] truncate text-xs">{log.user_email || '—'}</td>
-                      <td className="px-4 py-3">
+                      <td className="px-3 py-3 text-gray-600 whitespace-nowrap text-xs">{formatDate(log.created_at)}</td>
+                      <td className="px-3 py-3 text-gray-700 text-xs truncate max-w-0" style={{ maxWidth: '140px' }}>{log.user_email || '—'}</td>
+                      <td className="px-3 py-3">
                         <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${action.color}`}>
                           {action.label}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-gray-600 text-xs">{resource}</td>
-                      <td className="px-4 py-3 text-gray-900 font-medium text-xs max-w-[200px] truncate">{log.resource_name || '—'}</td>
+                      <td className="px-3 py-3 text-gray-600 text-xs">{resource}</td>
+                      <td className="px-3 py-3 text-gray-900 text-xs">{log.resource_name || '—'}</td>
                     </tr>
                   )
                 })}

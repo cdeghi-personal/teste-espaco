@@ -248,6 +248,7 @@ export default function ConvenioReportPage() {
     setResponsavel(patGuardians[0]?.fullName || '')
     setVersionLabel('')  // reset version on new search
     setSearched(true)
+    logConvenioAudit('SOLICITAR')
   }
 
   // ── Sessões ───────────────────────────────────────────────────
@@ -434,7 +435,7 @@ export default function ConvenioReportPage() {
     const { patient, specialtyLabel, credential, mesLabel, ver } = buildParams(getOrMakeVersion())
     if (!patient || !selectedTherapist) return
     setLoadingPDF('relatorio')
-    logConvenioAudit('SOLICITAR', 'Relatório ao Convênio')
+    logConvenioAudit('SOLICITAR', 'Rel. Convênio')
     try {
       const blob = await generateRelatórioConvenioPDF({
         patientName: patient.fullName, diagnosticoText, specialtyLabel,
