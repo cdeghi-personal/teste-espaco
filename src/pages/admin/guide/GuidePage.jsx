@@ -312,8 +312,8 @@ export default function GuidePage() {
           </div>
 
           <div className="flow-wrap">
-            <Step n="1" title="Seleção" desc="Escolha paciente, especialidade e período. Clique em "Buscar Atendimentos" — as sessões são carregadas automaticamente do histórico." />
-            <Step n="2" title="Revisão das sessões" desc="Adicione, remova ou ajuste datas, horários e valores individualmente. Use "aplicar a todas" para padronizar rapidamente." />
+            <Step n="1" title="Seleção" desc={`Escolha paciente, especialidade e período. Clique em "Buscar Atendimentos" — as sessões são carregadas automaticamente do histórico.`} />
+            <Step n="2" title="Revisão das sessões" desc={`Adicione, remova ou ajuste datas, horários e valores individualmente. Use "aplicar a todas" para padronizar rapidamente.`} />
             <Step n="3" title="Texto do Relatório" desc='Preencha diagnóstico (com CID), encaminhamento, objetivos e desempenho. Ou clique em ⚡ Sugerir com IA para gerar um texto baseado nos relatos reais das sessões.' />
             <Step n="4" title="Pré-visualizar e Baixar" desc="Visualize o PDF completo antes de baixar. Ao confirmar, o relatório é registrado no histórico com versionamento automático." />
           </div>
