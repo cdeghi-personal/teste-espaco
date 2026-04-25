@@ -60,6 +60,16 @@ export default function DashboardPage() {
       .then(({ count }) => setUnreadSupportCount(count || 0))
   }, [isAdmin, user?.authId])
 
+  const [reprovadoSupportCount, setReprovadoSupportCount] = useState(0)
+  useEffect(() => {
+    if (!isAdmin) return
+    supabase
+      .from('support_tickets')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'reprovado_usuario')
+      .then(({ count }) => setReprovadoSupportCount(count || 0))
+  }, [isAdmin])
+
   const visiblePatients = isAdmin || user?.belongsToTeam
     ? patients.filter(p => !p.deleted)
     : patients.filter(p => !p.deleted && (p.therapistId === user?.id || (p.involvedTherapistIds || []).includes(user?.id)))
@@ -132,6 +142,25 @@ export default function DashboardPage() {
               {newLeadsCount} {newLeadsCount === 1 ? 'nova mensagem de contato' : 'novas mensagens de contato'}
             </div>
             <div className="text-xs text-red-100">Clique para visualizar e tratar</div>
+          </div>
+          <FiArrowRight size={18} className="opacity-70 shrink-0" />
+        </Link>
+      )}
+
+      {/* Alerta de chamados reprovados — apenas admin */}
+      {isAdmin && reprovadoSupportCount > 0 && (
+        <Link
+          to={ROUTES.SUPPORT}
+          className="flex items-center gap-3 bg-orange-500 text-white px-4 py-3.5 rounded-2xl shadow-sm hover:bg-orange-600 transition-colors"
+        >
+          <div className="w-9 h-9 bg-white/20 rounded-xl flex items-center justify-center shrink-0">
+            <FiBell size={18} />
+          </div>
+          <div className="flex-1">
+            <div className="font-bold text-sm">
+              {reprovadoSupportCount === 1 ? '1 chamado reprovado pelo usuário' : `${reprovadoSupportCount} chamados reprovados pelo usuário`}
+            </div>
+            <div className="text-xs text-orange-100">Clique para visualizar e responder</div>
           </div>
           <FiArrowRight size={18} className="opacity-70 shrink-0" />
         </Link>

@@ -28,7 +28,7 @@ const configNavItems = [
   { to: ROUTES.AGE_RANGES, icon: FiUserX, label: 'Faixas Etárias' },
 ]
 
-function NavItem({ to, icon: Icon, label, end, onClick, badge }) {
+function NavItem({ to, icon: Icon, label, end, onClick, badge, badgeColor = 'bg-red-500' }) {
   return (
     <NavLink
       to={to}
@@ -45,7 +45,7 @@ function NavItem({ to, icon: Icon, label, end, onClick, badge }) {
       <Icon size={18} />
       <span className="flex-1">{label}</span>
       {badge > 0 && (
-        <span className="px-1.5 py-0.5 bg-red-500 text-white text-xs font-bold rounded-full leading-none">{badge}</span>
+        <span className={`px-1.5 py-0.5 ${badgeColor} text-white text-xs font-bold rounded-full leading-none`}>{badge}</span>
       )}
     </NavLink>
   )
@@ -56,6 +56,7 @@ export default function AdminSidebar({ open, onClose }) {
   const navigate = useNavigate()
   const [adminExpanded, setAdminExpanded] = useState(false)
   const [newLeadsCount, setNewLeadsCount] = useState(0)
+  const [reprovadoCount, setReprovadoCount] = useState(0)
 
   useEffect(() => {
     if (user?.role !== 'admin') return
@@ -64,11 +65,16 @@ export default function AdminSidebar({ open, onClose }) {
       .select('id', { count: 'exact', head: true })
       .eq('status', 'novo')
       .then(({ count }) => setNewLeadsCount(count || 0))
+    supabase
+      .from('support_tickets')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'reprovado_usuario')
+      .then(({ count }) => setReprovadoCount(count || 0))
   }, [user?.role])
 
   function handleLogout() {
     logout()
-    navigate('/')
+    navigate(ROUTES.LOGIN)
   }
 
   const specialtyLabel = user?.specialty ? SPECIALTIES[user.specialty]?.label : null
@@ -113,6 +119,8 @@ export default function AdminSidebar({ open, onClose }) {
           icon={FiLifeBuoy}
           label="Suporte"
           onClick={onClose}
+          badge={isAdmin ? reprovadoCount : 0}
+          badgeColor="bg-orange-500"
         />
 
         {/* Seção Administração — visível a todos, colapsável */}

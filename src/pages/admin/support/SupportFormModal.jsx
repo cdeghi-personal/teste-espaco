@@ -22,7 +22,28 @@ export const TICKET_STATUS = {
   resolvido:          { label: 'Resolvido',              color: 'bg-green-100 text-green-700' },
   fechado:            { label: 'Fechado',                color: 'bg-gray-100 text-gray-600' },
   reprovado_usuario:  { label: 'Reprovado pelo Usuário', color: 'bg-orange-100 text-orange-700' },
+  resposta_admin:     { label: 'Solução registrada',      color: 'bg-indigo-100 text-indigo-700', historyOnly: true },
   visualizado:        { label: 'Resposta visualizada',   color: 'bg-teal-100 text-teal-700', historyOnly: true },
+}
+
+const NOTE_MAX = 80
+
+function NoteCell({ note }) {
+  const [expanded, setExpanded] = useState(false)
+  const isLong = note.length > NOTE_MAX
+  return (
+    <span className="text-gray-500 italic">
+      {expanded || !isLong ? note : note.slice(0, NOTE_MAX) + '…'}
+      {isLong && (
+        <button
+          onClick={e => { e.stopPropagation(); setExpanded(v => !v) }}
+          className="ml-1 text-brand-blue not-italic underline text-xs"
+        >
+          {expanded ? 'ver menos' : 'ver mais'}
+        </button>
+      )}
+    </span>
+  )
 }
 
 function formatDateTime(iso) {
@@ -98,6 +119,7 @@ export default function SupportFormModal({ onClose, initial = null, onSaved }) {
         onClose()
       } else {
         const statusChanged = form.status !== initial.status
+        const solutionChanged = (form.solution?.trim() || '') !== (initial.solution?.trim() || '')
 
         const { error } = await supabase
           .from('support_tickets')
@@ -119,6 +141,15 @@ export default function SupportFormModal({ onClose, initial = null, onSaved }) {
             ticket_id: initial.id,
             status: form.status,
             changed_by: user?.name || user?.email || '—',
+          })
+        }
+
+        if (solutionChanged && form.solution?.trim()) {
+          await supabase.from('support_ticket_history').insert({
+            ticket_id: initial.id,
+            status: 'resposta_admin',
+            changed_by: user?.name || user?.email || '—',
+            note: form.solution.trim(),
           })
         }
 
@@ -292,7 +323,11 @@ export default function SupportFormModal({ onClose, initial = null, onSaved }) {
                         </td>
                         <td className="px-3 py-2 text-gray-600">{formatDateTime(h.changed_at)}</td>
                         <td className="px-3 py-2 text-gray-700 font-medium">{h.changed_by}</td>
-                        {hasNotes && <td className="px-3 py-2 text-gray-500 italic">{h.note || '—'}</td>}
+                        {hasNotes && (
+                      <td className="px-3 py-2 max-w-[200px]">
+                        {h.note ? <NoteCell note={h.note} /> : <span className="text-gray-400">—</span>}
+                      </td>
+                    )}
                       </tr>
                     )
                   })}
