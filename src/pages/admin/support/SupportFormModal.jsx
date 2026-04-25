@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { FiClock } from 'react-icons/fi'
+import { useState, useEffect } from 'react'
+import { FiClock, FiBell } from 'react-icons/fi'
 import Modal from '../../../components/ui/Modal'
 import Button from '../../../components/ui/Button'
 import Input from '../../../components/ui/Input'
@@ -15,11 +15,12 @@ export const TICKET_TYPES = {
 }
 
 export const TICKET_STATUS = {
-  novo:             { label: 'Novo',              color: 'bg-red-100 text-red-700' },
-  em_analise:       { label: 'Em Análise',        color: 'bg-amber-100 text-amber-700' },
-  em_desenvolvimento: { label: 'Em Desenvolvimento', color: 'bg-blue-100 text-blue-700' },
-  resolvido:        { label: 'Resolvido',         color: 'bg-green-100 text-green-700' },
-  fechado:          { label: 'Fechado',           color: 'bg-gray-100 text-gray-600' },
+  novo:               { label: 'Novo',                 color: 'bg-red-100 text-red-700' },
+  em_analise:         { label: 'Em Análise',           color: 'bg-amber-100 text-amber-700' },
+  em_desenvolvimento: { label: 'Em Desenvolvimento',   color: 'bg-blue-100 text-blue-700' },
+  resolvido:          { label: 'Resolvido',            color: 'bg-green-100 text-green-700' },
+  fechado:            { label: 'Fechado',              color: 'bg-gray-100 text-gray-600' },
+  visualizado:        { label: 'Resposta visualizada', color: 'bg-teal-100 text-teal-700', historyOnly: true },
 }
 
 function formatDateTime(iso) {
@@ -28,19 +29,32 @@ function formatDateTime(iso) {
   return d.toLocaleDateString('pt-BR') + ' ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
 }
 
-const EMPTY = { subject: '', type: '', author: '', description: '', solution: '', status: 'novo' }
+const EMPTY = { subject: '', type: '', author: '', description: '', solution: '', status: 'novo', nova_resposta: false }
 
 export default function SupportFormModal({ onClose, initial = null, onSaved }) {
   const { user } = useAuth()
   const isAdmin = user?.role === 'admin'
   const isEdit = !!initial?.id
-  // Não-admin vê seus tickets em modo somente leitura (sem editar status/solução)
   const readOnly = isEdit && !isAdmin
 
-  const [form, setForm] = useState(isEdit ? { ...initial } : { ...EMPTY })
+  const [form, setForm] = useState(isEdit ? { ...initial, nova_resposta: initial.nova_resposta || false } : { ...EMPTY })
   const [history, setHistory] = useState(initial?.history || [])
   const [errors, setErrors] = useState({})
   const [saving, setSaving] = useState(false)
+
+  // Não-admin: ao abrir ticket com nova_resposta = true, desmarca via RPC e atualiza histórico
+  useEffect(() => {
+    if (!readOnly || !initial?.nova_resposta) return
+    supabase.rpc('mark_support_ticket_read', { p_ticket_id: initial.id }).then(() => {
+      // Recarrega o histórico para mostrar a entrada de visualização
+      supabase
+        .from('support_ticket_history')
+        .select('*')
+        .eq('ticket_id', initial.id)
+        .order('changed_at', { ascending: true })
+        .then(({ data }) => { if (data) setHistory(data) })
+    })
+  }, [readOnly, initial?.id, initial?.nova_resposta])
 
   function set(field, value) {
     setForm(f => ({ ...f, [field]: value }))
@@ -63,7 +77,6 @@ export default function SupportFormModal({ onClose, initial = null, onSaved }) {
 
     try {
       if (!isEdit) {
-        // Criação: status sempre "novo"
         const { data, error } = await supabase
           .from('support_tickets')
           .insert({
@@ -78,7 +91,6 @@ export default function SupportFormModal({ onClose, initial = null, onSaved }) {
           .single()
         if (error) throw error
 
-        // Histórico inicial
         await supabase.from('support_ticket_history').insert({
           ticket_id: data.id,
           status: 'novo',
@@ -88,7 +100,6 @@ export default function SupportFormModal({ onClose, initial = null, onSaved }) {
         onSaved?.()
         onClose()
       } else {
-        // Edição
         const statusChanged = form.status !== initial.status
 
         const { error } = await supabase
@@ -100,6 +111,7 @@ export default function SupportFormModal({ onClose, initial = null, onSaved }) {
             description: form.description.trim(),
             solution: form.solution?.trim() || null,
             status: form.status,
+            nova_resposta: form.nova_resposta,
             updated_at: new Date().toISOString(),
           })
           .eq('id', initial.id)
@@ -129,7 +141,6 @@ export default function SupportFormModal({ onClose, initial = null, onSaved }) {
     <Modal title={title} onClose={onClose} size="lg">
       <div className="space-y-4">
 
-        {/* Assunto */}
         <Input
           label="Assunto *"
           value={form.subject}
@@ -138,7 +149,6 @@ export default function SupportFormModal({ onClose, initial = null, onSaved }) {
           placeholder="Descreva brevemente o assunto..."
         />
 
-        {/* Tipo + Autor */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Select label="Tipo *" value={form.type} onChange={e => set('type', e.target.value)} error={errors.type}>
             <option value="">Selecione</option>
@@ -155,7 +165,6 @@ export default function SupportFormModal({ onClose, initial = null, onSaved }) {
           />
         </div>
 
-        {/* Descrição */}
         <Textarea
           label="Descrição Detalhada *"
           value={form.description}
@@ -165,7 +174,6 @@ export default function SupportFormModal({ onClose, initial = null, onSaved }) {
           rows={4}
         />
 
-        {/* Solução — admin pode editar; não-admin vê somente leitura se preenchida */}
         {isEdit && (isAdmin || form.solution) && (
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Solução</label>
@@ -176,16 +184,33 @@ export default function SupportFormModal({ onClose, initial = null, onSaved }) {
           </div>
         )}
 
-        {/* Status — apenas para admin */}
         {isEdit && isAdmin && (
           <Select label="Status" value={form.status} onChange={e => set('status', e.target.value)}>
-            {Object.entries(TICKET_STATUS).map(([k, v]) => (
+            {Object.entries(TICKET_STATUS).filter(([, v]) => !v.historyOnly).map(([k, v]) => (
               <option key={k} value={k}>{v.label}</option>
             ))}
           </Select>
         )}
 
-        {/* Status — não-admin vê badge sem editar */}
+        {/* Notificação ao usuário — apenas admin em edição */}
+        {isEdit && isAdmin && (
+          <label className="flex items-center gap-3 p-3 rounded-xl border border-gray-200 cursor-pointer hover:bg-gray-50 transition-colors">
+            <input
+              type="checkbox"
+              checked={form.nova_resposta}
+              onChange={e => set('nova_resposta', e.target.checked)}
+              className="w-4 h-4 rounded accent-amber-500"
+            />
+            <div className="flex items-center gap-2">
+              <FiBell size={15} className={form.nova_resposta ? 'text-amber-500' : 'text-gray-400'} />
+              <div>
+                <div className="text-sm font-medium text-gray-800">Notificar usuário sobre esta resposta</div>
+                <div className="text-xs text-gray-500">O usuário verá um aviso no dashboard até abrir este chamado</div>
+              </div>
+            </div>
+          </label>
+        )}
+
         {isEdit && !isAdmin && (
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
@@ -195,7 +220,6 @@ export default function SupportFormModal({ onClose, initial = null, onSaved }) {
           </div>
         )}
 
-        {/* Histórico — apenas na edição */}
         {isEdit && history.length > 0 && (
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-1.5">
@@ -205,7 +229,7 @@ export default function SupportFormModal({ onClose, initial = null, onSaved }) {
               <table className="w-full text-xs">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="text-left px-3 py-2 font-semibold text-gray-500">Status</th>
+                    <th className="text-left px-3 py-2 font-semibold text-gray-500">Evento</th>
                     <th className="text-left px-3 py-2 font-semibold text-gray-500">Data / Hora</th>
                     <th className="text-left px-3 py-2 font-semibold text-gray-500">Responsável</th>
                   </tr>
@@ -231,7 +255,6 @@ export default function SupportFormModal({ onClose, initial = null, onSaved }) {
           </div>
         )}
 
-        {/* Botões */}
         <div className="flex justify-end gap-2 pt-2">
           <Button variant="outline" onClick={onClose}>{readOnly ? 'Fechar' : 'Cancelar'}</Button>
           {!readOnly && (

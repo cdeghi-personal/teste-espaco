@@ -1,4 +1,4 @@
-import { FiUsers, FiCalendar, FiClipboard, FiTrendingUp, FiMessageSquare, FiArrowRight } from 'react-icons/fi'
+import { FiUsers, FiCalendar, FiClipboard, FiTrendingUp, FiMessageSquare, FiArrowRight, FiBell } from 'react-icons/fi'
 import { useState, useEffect } from 'react'
 import { format } from 'date-fns'
 import { Link } from 'react-router-dom'
@@ -48,6 +48,17 @@ export default function DashboardPage() {
       .eq('status', 'novo')
       .then(({ count }) => setNewLeadsCount(count || 0))
   }, [isAdmin])
+
+  const [unreadSupportCount, setUnreadSupportCount] = useState(0)
+  useEffect(() => {
+    if (isAdmin || !user?.authId) return
+    supabase
+      .from('support_tickets')
+      .select('id', { count: 'exact', head: true })
+      .eq('nova_resposta', true)
+      .eq('created_by_id', user.authId)
+      .then(({ count }) => setUnreadSupportCount(count || 0))
+  }, [isAdmin, user?.authId])
 
   const visiblePatients = isAdmin || user?.belongsToTeam
     ? patients.filter(p => !p.deleted)
@@ -121,6 +132,25 @@ export default function DashboardPage() {
               {newLeadsCount} {newLeadsCount === 1 ? 'nova mensagem de contato' : 'novas mensagens de contato'}
             </div>
             <div className="text-xs text-red-100">Clique para visualizar e tratar</div>
+          </div>
+          <FiArrowRight size={18} className="opacity-70 shrink-0" />
+        </Link>
+      )}
+
+      {/* Alerta de respostas de suporte — apenas não-admin */}
+      {!isAdmin && unreadSupportCount > 0 && (
+        <Link
+          to={ROUTES.SUPPORT}
+          className="flex items-center gap-3 bg-amber-500 text-white px-4 py-3.5 rounded-2xl shadow-sm hover:bg-amber-600 transition-colors"
+        >
+          <div className="w-9 h-9 bg-white/20 rounded-xl flex items-center justify-center shrink-0">
+            <FiBell size={18} />
+          </div>
+          <div className="flex-1">
+            <div className="font-bold text-sm">
+              {unreadSupportCount === 1 ? '1 chamado com nova resposta' : `${unreadSupportCount} chamados com novas respostas`}
+            </div>
+            <div className="text-xs text-amber-100">Clique para visualizar</div>
           </div>
           <FiArrowRight size={18} className="opacity-70 shrink-0" />
         </Link>

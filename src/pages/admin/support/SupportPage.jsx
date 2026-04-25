@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { FiPlus, FiRefreshCw, FiSearch } from 'react-icons/fi'
+import { FiPlus, FiRefreshCw, FiSearch, FiBell } from 'react-icons/fi'
 import HelpButton from '../../../components/ui/HelpButton'
 import { supabase } from '../../../lib/supabase'
 import { useAuth } from '../../../context/AuthContext'
@@ -108,7 +108,7 @@ export default function SupportPage() {
           className="px-3 py-2 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-brand-blue outline-none text-gray-700"
         >
           <option value="">Todos os Status</option>
-          {Object.entries(TICKET_STATUS).map(([k, v]) => (
+          {Object.entries(TICKET_STATUS).filter(([, v]) => !v.historyOnly).map(([k, v]) => (
             <option key={k} value={k}>{v.label}</option>
           ))}
         </select>
@@ -150,9 +150,14 @@ export default function SupportPage() {
                     <tr
                       key={t.id}
                       onClick={() => openEdit(t)}
-                      className="border-b border-gray-50 last:border-0 hover:bg-blue-50/40 cursor-pointer transition-colors"
+                      className={`border-b last:border-0 cursor-pointer transition-colors ${t.nova_resposta ? 'border-amber-100 bg-amber-50 hover:bg-amber-100/60' : 'border-gray-50 hover:bg-blue-50/40'}`}
                     >
-                      <td className="px-4 py-3 font-medium text-gray-900">{t.subject}</td>
+                      <td className="px-4 py-3 font-medium text-gray-900">
+                        <span className="flex items-center gap-2">
+                          {t.nova_resposta && <FiBell size={13} className="text-amber-500 shrink-0" />}
+                          {t.subject}
+                        </span>
+                      </td>
                       <td className="px-4 py-3">
                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${type?.color || 'bg-gray-100 text-gray-600'}`}>
                           {type?.label || t.type}
@@ -181,10 +186,13 @@ export default function SupportPage() {
                 <div
                   key={t.id}
                   onClick={() => openEdit(t)}
-                  className="bg-white rounded-2xl border border-gray-200 p-4 cursor-pointer hover:border-brand-blue transition-colors"
+                  className={`rounded-2xl border p-4 cursor-pointer transition-colors ${t.nova_resposta ? 'bg-amber-50 border-amber-300 hover:border-amber-400' : 'bg-white border-gray-200 hover:border-brand-blue'}`}
                 >
                   <div className="flex items-start justify-between gap-2 mb-2">
-                    <p className="font-medium text-gray-900 text-sm leading-snug">{t.subject}</p>
+                    <p className="font-medium text-gray-900 text-sm leading-snug flex items-center gap-1.5">
+                      {t.nova_resposta && <FiBell size={13} className="text-amber-500 shrink-0" />}
+                      {t.subject}
+                    </p>
                     <span className={`shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${status?.color || 'bg-gray-100 text-gray-600'}`}>
                       {status?.label || t.status}
                     </span>
