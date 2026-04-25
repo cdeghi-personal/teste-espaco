@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect } from 'react'
+﻿import { useState, useMemo, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { FiArrowLeft, FiDownload, FiFilter, FiX, FiSearch, FiUser, FiChevronRight, FiChevronDown, FiCheck } from 'react-icons/fi'
 import { useData } from '../../../context/DataContext'
@@ -8,6 +8,7 @@ import Badge from '../../../components/ui/Badge'
 import Button from '../../../components/ui/Button'
 import EmptyState from '../../../components/ui/EmptyState'
 import { calculateAge, calculateAgeYears, formatDateShort } from '../../../utils/dateUtils'
+import { hexTextColor } from '../../../utils/colorUtils'
 
 // ─── MultiSelectFilter ────────────────────────────────────────────────────────
 
@@ -366,7 +367,7 @@ export default function PatientAdvancedSearchPage() {
                       {therapist && <div className="text-xs text-gray-400 truncate">{therapist.name}</div>}
                       <div className="flex items-center gap-1 mt-1 flex-wrap">
                         {ps && <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${ps.color}`}>{ps.name}</span>}
-                        {ar && <span className="px-2 py-0.5 rounded-full text-xs font-semibold text-white" style={{ backgroundColor: ar.color }}>{ar.name}</span>}
+                        {ar && <span className="px-2 py-0.5 rounded-full text-xs font-semibold" style={{ backgroundColor: ar.color, color: hexTextColor(ar.color) }}>{ar.name}</span>}
                         {(p.specialties || []).slice(0, 1).map(s => <Badge key={s.key} specialty={s.key} />)}
                       </div>
                     </div>
@@ -413,7 +414,7 @@ export default function PatientAdvancedSearchPage() {
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-600">
                           <div>{calculateAge(p.dateOfBirth)}</div>
-                          {ar && <span className="mt-1 inline-block px-2 py-0.5 rounded-full text-xs font-semibold text-white" style={{ backgroundColor: ar.color }}>{ar.name}</span>}
+                          {ar && <span className="mt-1 inline-block px-2 py-0.5 rounded-full text-xs font-semibold" style={{ backgroundColor: ar.color, color: hexTextColor(ar.color) }}>{ar.name}</span>}
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-600 hidden md:table-cell">{therapist?.name || '—'}</td>
                         <td className="px-4 py-3 hidden lg:table-cell">

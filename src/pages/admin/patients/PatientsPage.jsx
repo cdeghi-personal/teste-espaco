@@ -1,4 +1,4 @@
-import { useState } from 'react'
+﻿import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { FiPlus, FiSearch, FiEdit2, FiTrash2, FiUser, FiRotateCcw, FiEyeOff, FiEye, FiChevronRight, FiSliders } from 'react-icons/fi'
 import HelpButton from '../../../components/ui/HelpButton'
@@ -174,7 +174,7 @@ export default function PatientsPage() {
                           ? <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">Excluído</span>
                           : ps && <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${ps.color}`}>{ps.name}</span>
                         }
-                        {(() => { const ar = getAgeRange(p.dateOfBirth); return ar ? <span key="ar" className="px-2 py-0.5 rounded-full text-xs font-semibold text-white" style={{ backgroundColor: ar.color }}>{ar.name}</span> : null })()}
+                        {(() => { const ar = getAgeRange(p.dateOfBirth); return ar ? <span key="ar" className="px-2 py-0.5 rounded-full text-xs font-semibold" style={{ backgroundColor: ar.color, color: hexTextColor(ar.color) }}>{ar.name}</span> : null })()}
                         {p.specialties?.slice(0, 1).map(s => <Badge key={s.key} specialty={s.key} />)}
                       </div>
                     </div>
@@ -236,7 +236,7 @@ export default function PatientsPage() {
                           </div>
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-600"><div>{calculateAge(p.dateOfBirth)}</div>{(() => { const ar = getAgeRange(p.dateOfBirth); return ar ? <span className="mt-1 inline-block px-2 py-0.5 rounded-full text-xs font-semibold text-white" style={{ backgroundColor: ar.color }}>{ar.name}</span> : null })()}</td>
+                      <td className="px-4 py-3 text-sm text-gray-600"><div>{calculateAge(p.dateOfBirth)}</div>{(() => { const ar = getAgeRange(p.dateOfBirth); return ar ? <span className="mt-1 inline-block px-2 py-0.5 rounded-full text-xs font-semibold" style={{ backgroundColor: ar.color, color: hexTextColor(ar.color) }}>{ar.name}</span> : null })()}</td>
                       <td className="px-4 py-3 text-sm text-gray-600 hidden md:table-cell max-w-xs">
                         <span className="truncate block">{p.diagnosis || '—'}</span>
                       </td>

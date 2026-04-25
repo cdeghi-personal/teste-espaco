@@ -10,6 +10,7 @@ import Modal from '../../../components/ui/Modal'
 import { generateRelatórioConvenioPDF, generateListaPresencaPDF, formatMesLabel } from '../../../utils/generateConvenioPDF'
 import { generateId } from '../../../utils/storageUtils'
 import { supabase } from '../../../lib/supabase'
+import { hexTextColor } from '../../../utils/colorUtils'
 
 const CURRENT_MONTH = new Date().toISOString().slice(0, 7)
 
@@ -106,8 +107,8 @@ function HistorySection({ patientId, onRestore, refreshKey, specialtiesData, the
                 <span className="text-xs text-gray-400">{r.mes_label}</span>
                 {specData && (
                   <span
-                    className="text-[10px] font-medium text-white px-1.5 py-0.5 rounded-full leading-none"
-                    style={{ backgroundColor: specData.color || '#6b7280' }}
+                    className="text-[10px] font-medium px-1.5 py-0.5 rounded-full leading-none"
+                    style={{ backgroundColor: specData.color || '#6b7280', color: hexTextColor(specData.color || '#6b7280') }}
                   >
                     {specData.label}
                   </span>
@@ -376,6 +377,21 @@ export default function ConvenioReportPage() {
   }
 
   // ── Salvar no histórico ───────────────────────────────────────
+  async function logConvenioAudit(action, extraLabel) {
+    const patient = patients.find(p => p.id === patientId)
+    const specialtyLabel = specialtiesData.find(s => s.key === specialty)?.label || specialty
+    const parts = [patient?.fullName, selectedTherapist?.name, specialtyLabel, getMesLabel()]
+    if (extraLabel) parts.push(extraLabel)
+    await supabase.from('audit_logs').insert({
+      user_id: user.authId,
+      user_email: user.email,
+      action,
+      resource_type: 'convenio_report',
+      resource_id: patientId || null,
+      resource_name: parts.filter(Boolean).join(' | '),
+    })
+  }
+
   async function saveHistory(ver) {
     const { error } = await supabase.from('convenio_reports').insert({
       patient_id: patientId,
@@ -407,7 +423,10 @@ export default function ConvenioReportPage() {
     downloadBlob(blob, filename)
     const ver = versionLabel || getOrMakeVersion()
     const saved = await saveHistory(ver)
-    if (saved) setHistoryRefreshKey(k => k + 1)
+    if (saved) {
+      setHistoryRefreshKey(k => k + 1)
+      logConvenioAudit('GERAR', ver)
+    }
   }
 
   // ── Preview Relatório ─────────────────────────────────────────
@@ -415,6 +434,7 @@ export default function ConvenioReportPage() {
     const { patient, specialtyLabel, credential, mesLabel, ver } = buildParams(getOrMakeVersion())
     if (!patient || !selectedTherapist) return
     setLoadingPDF('relatorio')
+    logConvenioAudit('SOLICITAR', 'Relatório ao Convênio')
     try {
       const blob = await generateRelatórioConvenioPDF({
         patientName: patient.fullName, diagnosticoText, specialtyLabel,
@@ -437,6 +457,7 @@ export default function ConvenioReportPage() {
     const { patient, specialtyLabel, credential, mesLabel, ver } = buildParams(getOrMakeVersion())
     if (!patient || !selectedTherapist) return
     setLoadingPDF('lista')
+    logConvenioAudit('SOLICITAR', 'Lista de Presença')
     try {
       const blob = await generateListaPresencaPDF({
         patientName: patient.fullName, terapeutaNome: selectedTherapist.name,

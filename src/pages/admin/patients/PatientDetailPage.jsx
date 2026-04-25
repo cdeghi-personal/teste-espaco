@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+﻿import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { FiArrowLeft, FiEdit2, FiUser, FiPhone, FiMail } from 'react-icons/fi'
 import { useData } from '../../../context/DataContext'
@@ -7,6 +7,7 @@ import Badge from '../../../components/ui/Badge'
 import Button from '../../../components/ui/Button'
 import PatientFormModal from './PatientFormModal'
 import { calculateAge, formatDateBR, formatDateShort } from '../../../utils/dateUtils'
+import { hexTextColor } from '../../../utils/colorUtils'
 
 
 export default function PatientDetailPage() {
@@ -136,8 +137,8 @@ export default function PatientDetailPage() {
                 {primaryTherapist ? (
                   <div className="flex items-center gap-1.5">
                     <div
-                      className="w-5 h-5 rounded-full text-white flex items-center justify-center text-xs font-bold"
-                      style={{ backgroundColor: primaryTherapist.color || '#6b7280' }}
+                      className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold"
+                      style={{ backgroundColor: primaryTherapist.color || '#6b7280', color: hexTextColor(primaryTherapist.color || '#6b7280') }}
                     >
                       {primaryTherapist.name.charAt(0)}
                     </div>
@@ -153,8 +154,8 @@ export default function PatientDetailPage() {
                     {involvedTherapists.map(t => (
                       <span
                         key={t.id}
-                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium text-white"
-                        style={{ backgroundColor: t.color || '#6b7280' }}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium"
+                        style={{ backgroundColor: t.color || '#6b7280', color: hexTextColor(t.color || '#6b7280') }}
                       >
                         {t.name}
                       </span>
@@ -181,7 +182,7 @@ export default function PatientDetailPage() {
                           return (
                             <tr key={s.key} className="border-t border-gray-100">
                               <td className="px-3 py-2">
-                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium text-white" style={{ backgroundColor: color }}>
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium" style={{ backgroundColor: color, color: hexTextColor(color) }}>
                                   {spec?.label || s.key}
                                 </span>
                               </td>
