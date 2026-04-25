@@ -88,18 +88,9 @@ export default function AdminSidebar({ open, onClose }) {
       ${open ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
     `}>
       {/* Logo */}
-      <div className="px-4 py-3 border-b border-gray-100 shrink-0 flex items-center justify-between">
+      <div className="px-4 py-3 border-b border-gray-100 shrink-0">
         <NavLink to="/" className="flex items-center" onClick={onClose}>
           <img src="/logo.jpg" alt="Casa Amarela" className="h-10 w-auto" />
-        </NavLink>
-        <NavLink
-          to={ROUTES.GUIDE}
-          title="Guia do Sistema"
-          className={({ isActive }) =>
-            `p-1.5 rounded-lg transition-colors ${isActive ? 'text-brand-blue bg-blue-50' : 'text-gray-400 hover:text-brand-blue hover:bg-gray-50'}`
-          }
-        >
-          <FiBookOpen size={15} />
         </NavLink>
       </div>
 
@@ -131,6 +122,23 @@ export default function AdminSidebar({ open, onClose }) {
           badge={isAdmin ? reprovadoCount : 0}
           badgeColor="bg-orange-500"
         />
+
+        {/* Guia do Sistema */}
+        <NavLink
+          to={ROUTES.GUIDE}
+          onClick={onClose}
+          className={({ isActive }) =>
+            `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all mt-1 ${
+              isActive
+                ? 'bg-gradient-to-r from-blue-600 to-violet-600 text-white shadow-sm'
+                : 'bg-gradient-to-r from-blue-50 to-violet-50 text-blue-700 border border-blue-100 hover:from-blue-100 hover:to-violet-100'
+            }`
+          }
+        >
+          <FiBookOpen size={17} />
+          <span className="flex-1">Guia do Sistema</span>
+          <span className="text-xs font-bold opacity-60">✦</span>
+        </NavLink>
 
         {/* Seção Administração — visível a todos, colapsável */}
         <div className="px-3 pt-4 pb-1">
