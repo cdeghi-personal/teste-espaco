@@ -262,7 +262,7 @@ export default function DashboardPage() {
       {/* Perfil dos Pacientes */}
       <div>
         <h2 className="font-semibold text-gray-900 text-sm md:text-base mb-2">Perfil dos Pacientes</h2>
-        <div className="grid grid-cols-4 md:grid-cols-8 gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-8 gap-2">
           {activeSpecialties.map(spec => {
             const count = visiblePatients.filter(p => p.specialties?.includes(spec.key)).length
             const bg = spec.color || '#e5e7eb'

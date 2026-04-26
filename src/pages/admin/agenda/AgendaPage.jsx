@@ -148,7 +148,7 @@ export default function AgendaPage() {
           </button>
         </div>
 
-        <div className="relative flex-1 min-w-[180px]">
+        <div className="relative flex-1 min-w-0">
           <FiSearch size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
             value={search}

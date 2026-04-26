@@ -138,7 +138,7 @@ function ConductRow({ cd, activeTherapists, getTherapistSpecialties, onSave, onD
           </div>
           <Textarea label="Conduta" value={draft.conduct || ''} onChange={e => setDraft(d => ({ ...d, conduct: e.target.value }))} rows={2} />
           <Textarea label="Objetivo" value={draft.objective || ''} onChange={e => setDraft(d => ({ ...d, objective: e.target.value }))} rows={2} />
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
             <Input label="Data Início" type="date" value={draft.startDate || ''} onChange={e => setDraft(d => ({ ...d, startDate: e.target.value }))} />
             <Input label="Data Fim" type="date" value={draft.endDate || ''} onChange={e => setDraft(d => ({ ...d, endDate: e.target.value }))} />
             <Select label="Status" value={draft.status} onChange={e => setDraft(d => ({ ...d, status: e.target.value }))}>
@@ -616,7 +616,7 @@ export default function MedicalRecordsPage() {
                       </div>
                       <Textarea label="Conduta" value={conductDraft.conduct || ''} onChange={e => setConductDraft(d => ({ ...d, conduct: e.target.value }))} rows={2} />
                       <Textarea label="Objetivo" value={conductDraft.objective || ''} onChange={e => setConductDraft(d => ({ ...d, objective: e.target.value }))} rows={2} />
-                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                         <Input label="Data Início" type="date" value={conductDraft.startDate || ''} onChange={e => setConductDraft(d => ({ ...d, startDate: e.target.value }))} />
                         <Input label="Data Fim" type="date" value={conductDraft.endDate || ''} onChange={e => setConductDraft(d => ({ ...d, endDate: e.target.value }))} />
                         <Select label="Status" value={conductDraft.status || 'nao_iniciada'} onChange={e => setConductDraft(d => ({ ...d, status: e.target.value }))}>

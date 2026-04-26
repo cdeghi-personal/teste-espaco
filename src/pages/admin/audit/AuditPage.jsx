@@ -132,7 +132,7 @@ export default function AuditPage() {
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-2 flex-wrap">
-        <div className="relative flex-1 min-w-[200px]">
+        <div className="relative flex-1 min-w-0">
           <FiSearch size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
             value={search}
