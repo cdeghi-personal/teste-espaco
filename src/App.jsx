@@ -46,6 +46,7 @@ import SupportPage from './pages/admin/support/SupportPage'
 import AgeRangesPage from './pages/admin/ageranges/AgeRangesPage'
 import CompanySettingsPage from './pages/admin/company/CompanySettingsPage'
 import GuidePage from './pages/admin/guide/GuidePage'
+import GuidePageV2 from './pages/admin/guide/GuidePageV2'
 
 // Common
 import ScrollToTop from './components/common/ScrollToTop'
@@ -108,6 +109,7 @@ export default function App() {
                 <Route path={ROUTES.SUPPORT} element={<SupportPage />} />
                 <Route path={ROUTES.COMPANY_SETTINGS} element={<CompanySettingsPage />} />
                 <Route path={ROUTES.GUIDE} element={<GuidePage />} />
+                <Route path={ROUTES.GUIDE_V2} element={<GuidePageV2 />} />
               </Route>
             </Route>
 
