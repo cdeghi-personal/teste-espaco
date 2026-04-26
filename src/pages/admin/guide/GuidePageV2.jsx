@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { useAuth } from '../../../context/AuthContext'
 
 const CSS = `
 .gr2 { --blue:#2563eb; --blue-dark:#1d4ed8; --blue-light:#eff6ff; --blue-mid:#dbeafe;
@@ -240,6 +241,8 @@ function SectionImage({ src, alt }) {
 }
 
 export default function GuidePageV2() {
+  const { user } = useAuth()
+  const isAdmin = user?.role === 'admin'
   const [tab, setTab] = useState('terapeuta')
   const rootRef = useRef(null)
 
@@ -283,11 +286,13 @@ export default function GuidePageV2() {
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="tabs-header">
-        <button className={`tab-btn${tab === 'terapeuta' ? ' active' : ''}`} onClick={() => setTab('terapeuta')}>🩺 Para Terapeutas</button>
-        <button className={`tab-btn${tab === 'admin' ? ' active' : ''}`} onClick={() => setTab('admin')}>🛡️ Para Administradores</button>
-      </div>
+      {/* Tabs — visível apenas para admin */}
+      {isAdmin && (
+        <div className="tabs-header">
+          <button className={`tab-btn${tab === 'terapeuta' ? ' active' : ''}`} onClick={() => setTab('terapeuta')}>🩺 Para Terapeutas</button>
+          <button className={`tab-btn${tab === 'admin' ? ' active' : ''}`} onClick={() => setTab('admin')}>🛡️ Para Administradores</button>
+        </div>
+      )}
 
       {/* ── PAINEL TERAPEUTA ── */}
       <div className={`panel${tab === 'terapeuta' ? ' active' : ''}`}>
@@ -476,7 +481,7 @@ export default function GuidePageV2() {
       </div>{/* /painel terapeuta */}
 
       {/* ── PAINEL ADMIN ── */}
-      <div className={`panel${tab === 'admin' ? ' active' : ''}`}>
+      {isAdmin && <div className={`panel${tab === 'admin' ? ' active' : ''}`}>
 
         <div className="sec" style={{ paddingTop: 8 }}>
           <div className="admin-banner">
@@ -543,7 +548,7 @@ export default function GuidePageV2() {
           </div>
 
         </div>
-      </div>{/* /painel admin */}
+      </div>}{/* /painel admin */}
 
     </div>
   )
