@@ -273,7 +273,7 @@ export default function GuidePageV2() {
           <h1>Tudo que você precisa<br />para <span>cuidar melhor</span></h1>
           <p>Do agendamento ao relatório de convênio — uma plataforma completa criada especialmente para a equipe do Espaço Casa Amarela.</p>
           <div className="hero-stats">
-            {[['11', 'módulos\nintegrados'], ['IA', 'sugestão de texto\npara convênio'], ['PDF', 'relatórios prontos\npara download'], ['1 ano', 'histórico de\nauditoria']].map(([num, lbl]) => (
+            {[['11', 'módulos\nintegrados'], ['IA', 'sugestão de texto\npara convênio'], ['PDF', 'relatórios prontos\npara download']].map(([num, lbl]) => (
               <div key={num} className="stat-chip">
                 <div className="num">{num}</div>
                 <div className="lbl" style={{ whiteSpace: 'pre-line' }}>{lbl}</div>

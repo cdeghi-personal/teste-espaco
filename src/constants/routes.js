@@ -33,5 +33,4 @@ export const ROUTES = {
   SUPPORT:              '/admin/suporte',
   COMPANY_SETTINGS:     '/admin/empresa',
   GUIDE:                '/admin/guia',
-  GUIDE_V2:             '/admin/guia-v2',
 }
