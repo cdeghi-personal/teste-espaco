@@ -146,6 +146,32 @@ const CSS = `
 .gr2 .mini-img-label {
   text-align: center; font-size: 11px; color: var(--gray-400); font-weight: 500;
 }
+
+/* ── Layout split: imagem esquerda + cards direita ── */
+.gr2 .split-wrap {
+  display: flex; gap: 16px; align-items: stretch; margin: 0 0 0;
+}
+.gr2 .split-img {
+  width: 50%; flex-shrink: 0; border-radius: 14px; overflow: hidden;
+  border: 1px solid var(--gray-200); box-shadow: 0 4px 24px rgba(0,0,0,.10);
+}
+.gr2 .split-img img {
+  width: 100%; height: 100%; object-fit: cover; display: block;
+}
+.gr2 .split-cards {
+  flex: 1; display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  gap: 12px;
+}
+.gr2 .split-cards .card {
+  margin: 0; padding: 16px;
+}
+@media (max-width: 768px) {
+  .gr2 .split-wrap { flex-direction: column; }
+  .gr2 .split-img { width: 100%; }
+  .gr2 .split-cards { grid-template-rows: auto; }
+}
 `
 
 function Card({ icon, bg, title, desc, tags = [], delay = 0, style = {} }) {
@@ -250,14 +276,18 @@ export default function GuidePageV2() {
         <div className="sec">
           <p className="sec-title">👥 Gestão de Pacientes</p>
           <p className="sec-sub">Ficha clínica e pessoal completa — tudo em um só lugar.</p>
-          <SectionImage src="/Tela_Paciente.png" alt="Tela de Gestão de Pacientes" />
-          <div className="grid">
-            <Card delay={0.05} icon="🗂️" bg="#eff6ff" title="Ficha completa do paciente" desc="Dados pessoais, escola, médico responsável, diagnóstico principal, comorbidades, forma de pagamento, responsáveis e terapeutas externos." tags={[['360°', 'blue']]} />
-            <Card delay={0.10} icon="👨‍👩‍👧" bg="#f0fdf4" title="Gerente do Caso + Equipe" desc="Cada paciente tem um Gerente do Caso e pode ter múltiplos terapeutas envolvidos. Todos têm acesso ao paciente." tags={[['Multidisciplinar', 'green']]} />
-            <Card delay={0.15} icon="💰" bg="#faf5ff" title="Especialidades com valores" desc="Cada especialidade tem valor separado para o paciente e repasse ao terapeuta — usado automaticamente nos relatórios." tags={[['Financeiro integrado', 'violet']]} />
-            <Card delay={0.20} icon="🔍" bg="#fff7ed" title="Busca Avançada + CSV" desc="Filtre por terapeuta, especialidade, diagnóstico, status, forma de pagamento e faixa etária com múltipla seleção. Exporte em CSV." tags={[['Exportação', 'orange']]} />
-            <Card delay={0.25} icon="🎂" bg="#f0fdf4" title="Faixas Etárias automáticas" desc="Tags coloridas calculadas em tempo real a partir da data de nascimento. Faixas e cores configuráveis pelo administrador." tags={[['Automático', 'green']]} />
-            <Card delay={0.30} icon="⏱️" bg="#eff6ff" title="Últimos 10 atendimentos" desc="A ficha do paciente exibe diretamente os 10 atendimentos mais recentes — sem precisar mudar de tela." tags={[['Tudo na mesma tela', 'blue']]} />
+          <div className="split-wrap">
+            <div className="split-img">
+              <img src="/Tela_Paciente.png" alt="Tela de Gestão de Pacientes" loading="lazy" />
+            </div>
+            <div className="split-cards">
+              <Card delay={0.05} icon="🗂️" bg="#eff6ff" title="Ficha completa do paciente" desc="Dados pessoais, escola, médico responsável, diagnóstico principal, comorbidades, forma de pagamento, responsáveis e terapeutas externos." tags={[['360°', 'blue']]} />
+              <Card delay={0.10} icon="👨‍👩‍👧" bg="#f0fdf4" title="Gerente do Caso + Equipe" desc="Cada paciente tem um Gerente do Caso e pode ter múltiplos terapeutas envolvidos. Todos têm acesso ao paciente." tags={[['Multidisciplinar', 'green']]} />
+              <Card delay={0.15} icon="💰" bg="#faf5ff" title="Especialidades com valores" desc="Cada especialidade tem valor separado para o paciente e repasse ao terapeuta — usado automaticamente nos relatórios." tags={[['Financeiro integrado', 'violet']]} />
+              <Card delay={0.20} icon="🔍" bg="#fff7ed" title="Busca Avançada + CSV" desc="Filtre por terapeuta, especialidade, diagnóstico, status, forma de pagamento e faixa etária com múltipla seleção. Exporte em CSV." tags={[['Exportação', 'orange']]} />
+              <Card delay={0.25} icon="🎂" bg="#f0fdf4" title="Faixas Etárias automáticas" desc="Tags coloridas calculadas em tempo real a partir da data de nascimento. Faixas e cores configuráveis pelo administrador." tags={[['Automático', 'green']]} />
+              <Card delay={0.30} icon="⏱️" bg="#eff6ff" title="Últimos 10 atendimentos" desc="A ficha do paciente exibe diretamente os 10 atendimentos mais recentes — sem precisar mudar de tela." tags={[['Tudo na mesma tela', 'blue']]} />
+            </div>
           </div>
         </div>
 
