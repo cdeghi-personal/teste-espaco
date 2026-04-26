@@ -171,7 +171,23 @@ const CSS = `
   .gr2 .split-wrap { flex-direction: column; }
   .gr2 .split-img { width: 100%; }
   .gr2 .split-cards { grid-template-rows: auto; }
+  .gr2 .split-cards-col { grid-template-rows: auto; }
 }
+
+/* layout invertido: cards esquerda, imagem direita */
+.gr2 .split-wrap.rev { flex-direction: row-reverse; }
+@media (max-width: 768px) {
+  .gr2 .split-wrap.rev { flex-direction: column; }
+}
+
+/* coluna única de cards (para 3 cards) */
+.gr2 .split-cards-col {
+  flex: 1; display: grid;
+  grid-template-columns: 1fr;
+  grid-template-rows: repeat(3, 1fr);
+  gap: 12px;
+}
+.gr2 .split-cards-col .card { margin: 0; padding: 16px; }
 `
 
 function Card({ icon, bg, title, desc, tags = [], delay = 0, style = {} }) {
@@ -415,14 +431,17 @@ export default function GuidePageV2() {
         <div className="sec">
           <p className="sec-title">🎫 Suporte ao Usuário</p>
           <p className="sec-sub">Canal direto com a equipe de administração — dentro do próprio sistema.</p>
-          {/* Tela_Suporte.png ainda não existe na pasta public — adicionar o arquivo e descomentar:
-          <SectionImage src="/Tela_Suporte.png" alt="Tela de Suporte ao Usuário" /> */}
-          <div className="grid">
-            <Card delay={0.05} icon="✉️" bg="#eff6ff" title="Abra chamados facilmente" desc="Registre Erros, Dúvidas ou sugestões de Melhoria. Acompanhe o andamento sem precisar de e-mail ou WhatsApp." />
-            <Card delay={0.10} icon="🔔" bg="#fef3c7" title="Notificação de resposta" desc="Quando o administrador registrar uma solução, seu chamado fica destacado em âmbar e um banner no dashboard avisa para você verificar." tags={[['Notificação visual', 'orange']]} />
-            <Card delay={0.15} icon="✅" bg="#f0fdf4" title="Aprovação ou reprovação" desc={<>Ao receber uma resposta, você decide: <strong>OK com a Resposta</strong> (fecha o chamado) ou <strong>Não OK</strong> (devolve com comentário para nova análise).</>} tags={[['Feedback fechado', 'green']]} />
+          <div className="split-wrap rev">
+            <div className="split-img">
+              <img src="/Tela_Suporte.png" alt="Tela de Suporte ao Usuário" loading="lazy" />
+            </div>
+            <div className="split-cards-col">
+              <Card delay={0.05} icon="✉️" bg="#eff6ff" title="Abra chamados facilmente" desc="Registre Erros, Dúvidas ou sugestões de Melhoria. Acompanhe o andamento sem precisar de e-mail ou WhatsApp." />
+              <Card delay={0.10} icon="🔔" bg="#fef3c7" title="Notificação de resposta" desc="Quando o administrador registrar uma solução, seu chamado fica destacado em âmbar e um banner no dashboard avisa para você verificar." tags={[['Notificação visual', 'orange']]} />
+              <Card delay={0.15} icon="✅" bg="#f0fdf4" title="Aprovação ou reprovação" desc={<>Ao receber uma resposta, você decide: <strong>OK com a Resposta</strong> (fecha o chamado) ou <strong>Não OK</strong> (devolve com comentário para nova análise).</>} tags={[['Feedback fechado', 'green']]} />
+            </div>
           </div>
-          <div style={{ marginTop: 16 }}>
+          <div style={{ marginTop: 20 }}>
             <p style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>Fluxo do chamado:</p>
             <div className="status-flow">
               <span className="sp red">Novo</span><span className="sp-arr">→</span>
