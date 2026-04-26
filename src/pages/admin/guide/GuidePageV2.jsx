@@ -11,14 +11,25 @@ const CSS = `
 .gr2 { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; color:var(--gray-900); }
 .gr2 .hero {
   background:linear-gradient(135deg,#f0f7ff 0%,#faf5ff 50%,#f0fdf4 100%);
-  padding:56px 24px 48px; text-align:center; position:relative; overflow:hidden;
+  padding:40px 36px; position:relative; overflow:hidden;
   border-radius:20px; margin-bottom:32px;
+  display:flex; align-items:center; gap:36px;
 }
 .gr2 .hero::before {
-  content:''; position:absolute; top:-60px; left:50%; transform:translateX(-50%);
+  content:''; position:absolute; top:-60px; left:0;
   width:500px; height:500px; border-radius:50%;
   background:radial-gradient(circle,rgba(37,99,235,.06) 0%,transparent 70%);
   pointer-events:none;
+}
+.gr2 .hero-content { flex:1; min-width:0; }
+.gr2 .hero-img {
+  width:50%; flex-shrink:0; border-radius:14px; overflow:hidden;
+  border:1px solid var(--gray-200); box-shadow:0 4px 28px rgba(0,0,0,.12);
+}
+.gr2 .hero-img img { width:100%; display:block; }
+@media (max-width:768px) {
+  .gr2 .hero { flex-direction:column; padding:32px 20px; }
+  .gr2 .hero-img { width:100%; }
 }
 .gr2 .hero-badge {
   display:inline-flex; align-items:center;
@@ -27,12 +38,12 @@ const CSS = `
   padding:5px 14px; border-radius:99px; margin-bottom:16px; letter-spacing:.3px;
 }
 .gr2 .hero h1 {
-  font-size:clamp(24px,4vw,40px); font-weight:800; color:var(--gray-900);
+  font-size:clamp(22px,3.5vw,36px); font-weight:800; color:var(--gray-900);
   line-height:1.15; margin-bottom:12px; letter-spacing:-.5px;
 }
 .gr2 .hero h1 span { color:var(--blue); }
-.gr2 .hero p { font-size:16px; color:var(--gray-600); max-width:520px; margin:0 auto 28px; line-height:1.65; }
-.gr2 .hero-stats { display:flex; gap:12px; justify-content:center; flex-wrap:wrap; }
+.gr2 .hero p { font-size:15px; color:var(--gray-600); margin:0 0 24px; line-height:1.65; }
+.gr2 .hero-stats { display:flex; gap:10px; flex-wrap:wrap; }
 .gr2 .stat-chip {
   background:white; border:1px solid var(--gray-200);
   border-radius:12px; padding:10px 18px;
@@ -56,6 +67,9 @@ const CSS = `
 }
 .gr2 .sec-sub { font-size:13px; color:var(--gray-600); margin-bottom:24px; }
 .gr2 .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:16px; }
+.gr2 .grid-4 { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; }
+@media (max-width:900px) { .gr2 .grid-4 { grid-template-columns:repeat(2,1fr); } }
+@media (max-width:500px) { .gr2 .grid-4 { grid-template-columns:1fr; } }
 .gr2 .card {
   background:white; border:1px solid var(--gray-200); border-radius:16px; padding:22px;
   box-shadow:var(--shadow); transition:all .2s;
@@ -251,16 +265,21 @@ export default function GuidePageV2() {
 
       {/* Hero */}
       <div className="hero">
-        <div className="hero-badge">✦ Sistema de Gestão Clínica</div>
-        <h1>Tudo que você precisa<br />para <span>cuidar melhor</span></h1>
-        <p>Do agendamento ao relatório de convênio — uma plataforma completa criada especialmente para a equipe do Espaço Casa Amarela.</p>
-        <div className="hero-stats">
-          {[['11', 'módulos\nintegrados'], ['IA', 'sugestão de texto\npara convênio'], ['PDF', 'relatórios prontos\npara download'], ['1 ano', 'histórico de\nauditoria']].map(([num, lbl]) => (
-            <div key={num} className="stat-chip">
-              <div className="num">{num}</div>
-              <div className="lbl" style={{ whiteSpace: 'pre-line' }}>{lbl}</div>
-            </div>
-          ))}
+        <div className="hero-content">
+          <div className="hero-badge">✦ Sistema de Gestão Clínica</div>
+          <h1>Tudo que você precisa<br />para <span>cuidar melhor</span></h1>
+          <p>Do agendamento ao relatório de convênio — uma plataforma completa criada especialmente para a equipe do Espaço Casa Amarela.</p>
+          <div className="hero-stats">
+            {[['11', 'módulos\nintegrados'], ['IA', 'sugestão de texto\npara convênio'], ['PDF', 'relatórios prontos\npara download'], ['1 ano', 'histórico de\nauditoria']].map(([num, lbl]) => (
+              <div key={num} className="stat-chip">
+                <div className="num">{num}</div>
+                <div className="lbl" style={{ whiteSpace: 'pre-line' }}>{lbl}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="hero-img">
+          <img src="/Tela_Principal.png" alt="Tela Principal do Sistema" loading="lazy" />
         </div>
       </div>
 
@@ -278,7 +297,7 @@ export default function GuidePageV2() {
           <p className="sec-title">📅 Agenda Semanal</p>
           <p className="sec-sub">Visualize e gerencie todos os atendimentos da semana em uma tela só.</p>
           <SectionImage src="/Tela_Agenda.png" alt="Tela da Agenda Semanal" />
-          <div className="grid">
+          <div className="grid-4">
             <Card delay={0.05} icon="📅" bg="#eff6ff" title="Visão semanal completa" desc="Seis colunas (Seg–Sex + Sáb/Dom) com atendimentos organizados por dia e horário. No celular, abas por dia." tags={[['Desktop e mobile', 'blue']]} />
             <Card delay={0.10} icon="✏️" bg="#f0fdf4" title="Crie e edite na hora" desc="Novo atendimento ou edição com um clique direto na agenda. Campos de paciente, terapeuta, especialidade, horário e sala." tags={[['Rápido', 'green']]} />
             <Card delay={0.15} icon="🎨" bg="#faf5ff" title="Legenda por terapeuta" desc="Cada terapeuta tem uma cor própria. A legenda inferior mostra o nome completo de cada profissional." />
@@ -314,7 +333,7 @@ export default function GuidePageV2() {
           <p className="sec-title">📋 Registro de Atendimentos</p>
           <p className="sec-sub">Registre, acompanhe e evolua cada sessão com rigor clínico.</p>
           <SectionImage src="/Atendimentos.png" alt="Tela de Registro de Atendimentos" />
-          <div className="grid">
+          <div className="grid-4">
             <Card delay={0.05} icon="📝" bg="#eff6ff" title="Evolução clínica estruturada" desc='Ao marcar "Realizada", os campos Objetivo da Sessão, Relato de Evolução e Objetivo da Próxima Sessão tornam-se obrigatórios.' tags={[['Rigor clínico', 'blue']]} />
             <Card delay={0.10} icon="🏷️" bg="#f0fdf4" title="Status configuráveis" desc="Realizada, Cancelada, Falta… os status são definidos pela clínica. Status automáticos podem ser atribuídos pelo sistema." tags={[['Flexível', 'green']]} />
             <Card delay={0.15} icon="🏢" bg="#fff7ed" title="Sala + Horário" desc="Cada atendimento registra a sala utilizada e o horário exato — essenciais para o relatório de convênio e organização da agenda." tags={[['Gestão de espaço', 'orange']]} />
@@ -329,7 +348,7 @@ export default function GuidePageV2() {
           <p className="sec-title">🏥 Prontuário Clínico</p>
           <p className="sec-sub">O histórico clínico completo do paciente em quatro seções organizadas.</p>
           <SectionImage src="/Tela_Prontuario.png" alt="Tela do Prontuário Clínico" />
-          <div className="grid">
+          <div className="grid-4">
             <Card delay={0.05} icon="🧪" bg="#eff6ff" title="Exames Complementares" desc="Registre exames com data, link/anexo e observações. Histórico cronológico completo e editável." />
             <Card delay={0.10} icon="💊" bg="#fff7ed" title="Medicamentos" desc="Controle de medicamentos em uso ou interrompidos, com data de início/fim e observações clínicas." />
             <Card delay={0.15} icon="🎯" bg="#f0fdf4" title="Conduta & Objetivo Terapêutico" desc="Registre a conduta de cada terapeuta com objetivos, datas e status de andamento. Vinculado por especialidade." tags={[['Por terapeuta', 'green']]} />
