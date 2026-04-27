@@ -38,12 +38,12 @@ Deno.serve(async (req) => {
       })
     }
 
-    const { date, hour, userName, categoria } = await req.json()
+    const { date, hour, userName, categoria, hint } = await req.json()
 
     const periodo = hour < 12 ? 'Bom dia' : hour < 18 ? 'Boa tarde' : 'Boa noite'
 
     const instrucaoBase = instrucaoPorCategoria[categoria] ?? instrucaoPorCategoria['motivacional']
-    const instrucao = instrucaoBase.replaceAll('{date}', date)
+    const instrucao = instrucaoBase.replaceAll('{date}', date) + (hint ? ` ${hint}` : '')
 
     const systemPrompt = `Você é um assistente simpático do Espaço Casa Amarela, uma clínica de terapias infantis no Brasil.
 

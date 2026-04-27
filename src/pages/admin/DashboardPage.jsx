@@ -19,6 +19,57 @@ function textColorForBg(hex) {
   return (0.299 * r + 0.587 * g + 0.114 * b) > 140 ? '#1f2937' : '#ffffff'
 }
 
+const GREETING_CATEGORIAS = [
+  'motivacional', 'pessoal', 'bemEstar', 'geografia',
+  'cinema', 'musica', 'tecnologia', 'historia', 'ciencia', 'gastronomia',
+]
+
+const LOADING_MSGS = [
+  'Hmm, deixa eu ver o que vou te falar hoje... 🤔',
+  'Um segundo, estou consultando o calendário cósmico... 🔭',
+  'Aguenta aí, procurando a mensagem certa pra você... ✨',
+  'Pensando, pensando... quase lá! 💭',
+  'Deixa eu vasculhar minha enciclopédia mental... 📚',
+]
+
+const CENTURIES = ['XIII', 'XIV', 'XV', 'XVI', 'XVII', 'XVIII', 'XIX', 'XX', 'XXI']
+const DECADES   = ['1800', '1810', '1820', '1830', '1840', '1850', '1860', '1870', '1880', '1890',
+                   '1900', '1910', '1920', '1930', '1940', '1950', '1960', '1970', '1980', '1990',
+                   '2000', '2010', '2020']
+
+const HINT_MAP = {
+  geografia:    { pool: CENTURIES, fmt: v => `Prefira algo do século ${v}.` },
+  historia:     { pool: CENTURIES, fmt: v => `Prefira fatos do século ${v}.` },
+  gastronomia:  { pool: CENTURIES, fmt: v => `Prefira algo originado ou popular no século ${v}.` },
+  cinema:       { pool: DECADES,   fmt: v => `Prefira um filme da década de ${v}.` },
+  musica:       { pool: DECADES,   fmt: v => `Prefira artista ou álbum da década de ${v}.` },
+  ciencia:      { pool: DECADES,   fmt: v => `Prefira uma descoberta ou estudo da década de ${v}.` },
+  tecnologia:   { pool: DECADES,   fmt: v => `Prefira uma invenção ou inovação da década de ${v}.` },
+  motivacional: {
+    pool: ['dedicação', 'comprometimento', 'aprendizado contínuo', 'foco', 'resiliência',
+           'paciência', 'empatia', 'persistência', 'trabalho em equipe', 'propósito'],
+    fmt: v => `Tema da mensagem: ${v}.`,
+  },
+  pessoal: {
+    pool: ['hobbies', 'artes', 'literatura', 'hábitos saudáveis', 'clima', 'culinária',
+           'viagens', 'animais de estimação', 'filmes e séries', 'esportes'],
+    fmt: v => `Assunto da pergunta: ${v}.`,
+  },
+  bemEstar: {
+    pool: ['cuidado com o corpo', 'saúde mental', 'alimentação saudável', 'relação com a família',
+           'amizades', 'qualidade do sono', 'exercício físico', 'momentos de lazer',
+           'respiração e relaxamento', 'hidratação'],
+    fmt: v => `A dica deve ser sobre: ${v}.`,
+  },
+}
+
+function pickHint(categoria) {
+  const entry = HINT_MAP[categoria]
+  if (!entry) return null
+  const value = entry.pool[Math.floor(Math.random() * entry.pool.length)]
+  return entry.fmt(value)
+}
+
 export default function DashboardPage() {
   const { user } = useAuth()
   const { patients, consultations, therapists, rooms, patientStatuses, specialtiesData } = useData()
@@ -40,18 +91,7 @@ export default function DashboardPage() {
   const isAdmin = user?.role === 'admin'
   const isSupportAdmin = isAdmin && !user?.id
 
-  // Greeting dinâmico — categoria sorteada no frontend para variedade entre usuários
-  const GREETING_CATEGORIAS = [
-    'motivacional', 'pessoal', 'bemEstar', 'geografia',
-    'cinema', 'musica', 'tecnologia', 'historia', 'ciencia', 'gastronomia',
-  ]
-  const LOADING_MSGS = [
-    'Hmm, deixa eu ver o que vou te falar hoje... 🤔',
-    'Um segundo, estou consultando o calendário cósmico... 🔭',
-    'Aguenta aí, procurando a mensagem certa pra você... ✨',
-    'Pensando, pensando... quase lá! 💭',
-    'Deixa eu vasculhar minha enciclopédia mental... 📚',
-  ]
+  // Greeting dinâmico — categoria e sub-hint sorteados no frontend para variedade entre usuários
   const [greetingMsg, setGreetingMsg] = useState('')
   const [greetingLoading, setGreetingLoading] = useState(false)
   const [loadingMsg] = useState(() => LOADING_MSGS[Math.floor(Math.random() * LOADING_MSGS.length)])
@@ -66,9 +106,10 @@ export default function DashboardPage() {
       .forEach(k => localStorage.removeItem(k))
     const firstName = user?.name?.split(' ')[0] || 'você'
     const categoria = GREETING_CATEGORIAS[Math.floor(Math.random() * GREETING_CATEGORIAS.length)]
+    const hint = pickHint(categoria)
     setGreetingLoading(true)
     supabase.functions.invoke('dashboard-greeting', {
-      body: { date: today, hour: now.getHours(), userName: firstName, categoria },
+      body: { date: today, hour: now.getHours(), userName: firstName, categoria, hint },
     }).then(({ data, error }) => {
       setGreetingLoading(false)
       if (!error && data?.message) {
