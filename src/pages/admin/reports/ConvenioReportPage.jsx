@@ -386,6 +386,7 @@ export default function ConvenioReportPage() {
     await supabase.from('audit_logs').insert({
       user_id: user.authId,
       user_email: user.email,
+      user_name: user.name || '',
       action,
       resource_type: 'convenio_report',
       resource_id: patientId || null,
