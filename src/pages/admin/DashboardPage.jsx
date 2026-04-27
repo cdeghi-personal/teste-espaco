@@ -40,7 +40,8 @@ export default function DashboardPage() {
   const isAdmin = user?.role === 'admin'
   const isSupportAdmin = isAdmin && !user?.id
 
-  // Greeting dinâmico — gerado por IA, cacheado por dia no localStorage
+  // Greeting dinâmico — categoria sorteada no frontend para garantir variedade entre usuários
+  const GREETING_CATEGORIAS = ['efemeride', 'santo', 'aniversario', 'comemorativa', 'motivacional', 'pessoal', 'bemEstar']
   const [greetingMsg, setGreetingMsg] = useState('')
   useEffect(() => {
     if (!user?.authId) return
@@ -48,8 +49,9 @@ export default function DashboardPage() {
     const cached = localStorage.getItem(cacheKey)
     if (cached) { setGreetingMsg(cached); return }
     const firstName = user?.name?.split(' ')[0] || 'você'
+    const categoria = GREETING_CATEGORIAS[Math.floor(Math.random() * GREETING_CATEGORIAS.length)]
     supabase.functions.invoke('dashboard-greeting', {
-      body: { date: today, hour: now.getHours(), userName: firstName },
+      body: { date: today, hour: now.getHours(), userName: firstName, categoria },
     }).then(({ data, error }) => {
       if (!error && data?.message) {
         setGreetingMsg(data.message)

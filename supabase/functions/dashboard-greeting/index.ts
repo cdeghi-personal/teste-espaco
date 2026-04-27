@@ -1,5 +1,6 @@
 // Supabase Edge Function — dashboard-greeting
-// Gera uma mensagem de abertura variada e personalizada para o dashboard.
+// Gera uma mensagem de abertura personalizada para o dashboard.
+// A categoria é sorteada no frontend para garantir variedade entre usuários no mesmo dia.
 // JWT Verification deve estar DESATIVADO.
 
 const corsHeaders = {
@@ -8,6 +9,16 @@ const corsHeaders = {
 }
 
 const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY')
+
+const instrucaoPorCategoria = {
+  efemeride:    `Mencione UMA efeméride histórica real e verificável que ocorreu nesta data (${'{date}'}) em qualquer ano. Pode ser um evento histórico, uma invenção, uma conquista esportiva, um lançamento cultural marcante. Se não tiver certeza de nenhum fato real para esta data, mude para uma mensagem motivacional.`,
+  santo:        `Mencione o santo ou santa do dia no calendário católico brasileiro para a data ${'{date}'}. Diga o nome e um detalhe breve e simpático sobre ele/ela.`,
+  aniversario:  `Mencione o aniversário de UMA personalidade famosa e reconhecida internacionalmente ou no Brasil que nasceu nesta data (${'{date}'}) — pode ser artista, cientista, esportista, escritor etc. Cite o nome e por que é lembrado. Use apenas fatos que você tem certeza.`,
+  comemorativa: `Mencione uma data ou semana comemorativa associada ao dia ${'{date}'} (ex: Dia do Trabalho, Dia das Mães, Dia Mundial da Saúde Mental etc.). Se não houver uma óbvia, mencione uma curiosidade cultural ou folclórica do período.`,
+  motivacional: `Escreva uma mensagem motivacional calorosa e pessoal para alguém que dedica o dia a cuidar de crianças com necessidades especiais. Deve ser genuína, não genérica.`,
+  pessoal:      `Faça UMA pergunta amigável, descontraída e pessoal sobre o dia a dia — algo que uma pessoa próxima perguntaria (ex: sobre o café da manhã, uma caminhada, uma boa noite de sono, um pequeno prazer do dia). Não fale de trabalho.`,
+  bemEstar:     `Compartilhe uma dica rápida e prática de bem-estar ou autocuidado, voltada para profissionais de saúde que costumam esquecer de cuidar de si mesmos. Seja específico e humano, não genérico.`,
+}
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -21,30 +32,26 @@ Deno.serve(async (req) => {
       })
     }
 
-    const { date, hour, userName } = await req.json()
+    const { date, hour, userName, categoria } = await req.json()
 
     const periodo = hour < 12 ? 'Bom dia' : hour < 18 ? 'Boa tarde' : 'Boa noite'
 
+    const instrucaoBase = instrucaoPorCategoria[categoria] ?? instrucaoPorCategoria['motivacional']
+    const instrucao = instrucaoBase.replaceAll('{date}', date)
+
     const systemPrompt = `Você é um assistente simpático do Espaço Casa Amarela, uma clínica de terapias infantis no Brasil.
-Sua tarefa é gerar UMA mensagem curta e variada de abertura do dashboard para o usuário.
 
-A mensagem DEVE começar com "${periodo}, ${userName}!" e depois ter UMA frase adicional.
+Gere UMA mensagem de abertura de dashboard para o usuário "${userName}".
 
-Alterne aleatoriamente entre estes tipos de mensagem:
-- Efeméride histórica verificável do dia ${date} (ex: aniversário de invenção, evento histórico, conquista esportiva brasileira)
-- Santo ou santa do dia no calendário católico brasileiro
-- Aniversário de uma personalidade famosa e reconhecida (nascida neste dia)
-- Data comemorativa ou curiosidade cultural do dia
-- Mensagem motivacional curta e pessoal voltada ao contexto de quem cuida de crianças
-- Pergunta amigável e descontraída sobre o dia a dia (ex: "Conseguiu tomar um café com calma hoje?")
-- Dica rápida de bem-estar ou autocuidado
+A mensagem DEVE:
+1. Começar com "${periodo}, ${userName}!"
+2. Ter UMA frase adicional seguindo esta instrução específica: ${instrucao}
 
-REGRAS OBRIGATÓRIAS:
-- Máximo de 2 frases no total
+REGRAS:
+- Máximo de 2 frases no total (o cumprimento + a frase adicional)
 - Tom caloroso, humano e natural — nunca corporativo ou genérico
 - Português brasileiro informal
-- Inclua um emoji no final da mensagem (adequado ao tema)
-- Para fatos históricos: use APENAS fatos que você tem certeza que são reais e verificáveis — se não tiver certeza, prefira outro tipo de mensagem
+- Inclua UM emoji adequado ao tema no final
 - Retorne APENAS o texto da mensagem, sem aspas, sem explicações, sem markdown`
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -57,9 +64,9 @@ REGRAS OBRIGATÓRIAS:
         model: 'gpt-4o-mini',
         messages: [
           { role: 'system', content: systemPrompt },
-          { role: 'user', content: `Gere a mensagem para hoje, ${date}, hora ${hour}h, usuário: ${userName}.` },
+          { role: 'user', content: `Data: ${date}, hora: ${hour}h.` },
         ],
-        temperature: 0.95,
+        temperature: 0.85,
         max_tokens: 120,
       }),
     })
@@ -74,11 +81,11 @@ REGRAS OBRIGATÓRIAS:
     const data = await response.json()
     const message = data.choices?.[0]?.message?.content?.trim() || ''
 
-    return new Response(JSON.stringify({ message }), {
+    return new Response(JSON.stringify({ message, categoria }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   } catch (err) {
-    return new Response(JSON.stringify({ error: err.message }), {
+    return new Response(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }), {
       status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   }
