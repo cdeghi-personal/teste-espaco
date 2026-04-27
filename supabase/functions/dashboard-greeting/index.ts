@@ -10,19 +10,20 @@ const corsHeaders = {
 
 const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY')
 
+// IMPORTANTE: categorias que dependem de datas específicas foram REMOVIDAS ou convertidas
+// para curiosidades gerais, pois LLMs não são confiáveis para afirmar que algo aconteceu
+// em um dia exato — tendem a confabular datas.
 const instrucaoPorCategoria = {
-  efemeride:    `Mencione UMA efeméride histórica real e verificável que ocorreu nesta data ({date}) em qualquer ano — evento histórico, invenção, conquista esportiva ou lançamento cultural. Se não lembrar de nenhum fato seguro para esta data, escreva uma mensagem motivacional no lugar.`,
-  santo:        `Mencione o santo ou santa do dia no calendário católico brasileiro para a data {date}. Diga o nome e um detalhe breve e simpático sobre ele/ela.`,
-  aniversario:  `Mencione o aniversário de UMA personalidade muito famosa (artista, cientista, esportista, escritor) nascida nesta data ({date}). Cite o nome e por que é lembrado. Só use fatos que você tem certeza.`,
-  comemorativa: `Mencione uma data comemorativa ou semana temática associada ao dia {date} (ex: Dia do Trabalho, Dia Mundial da Saúde Mental, Dia das Crianças). Se não houver uma clara, mencione uma curiosidade folclórica ou cultural deste período do ano.`,
   motivacional: `Escreva uma mensagem motivacional calorosa e genuína para alguém que dedica o dia a cuidar de crianças com necessidades especiais. Sem clichê — seja específico e humano.`,
-  pessoal:      `Faça UMA pergunta amigável e descontraída sobre o dia a dia — algo que uma pessoa próxima perguntaria (ex: sobre o café da manhã, um passeio, uma boa noite de sono, um pequeno prazer do dia). Nada de trabalho.`,
+  pessoal:      `Faça UMA pergunta amigável e descontraída sobre o dia a dia — algo que uma pessoa próxima perguntaria (sobre o café da manhã, um passeio, uma boa noite de sono, um pequeno prazer do dia). Nada de trabalho.`,
   bemEstar:     `Compartilhe uma dica prática e específica de bem-estar ou autocuidado voltada a profissionais de saúde que costumam esquecer de cuidar de si. Seja concreto, não genérico.`,
-  cinema:       `Mencione o aniversário de lançamento de UM filme clássico ou muito querido que estreou nesta data ({date}) em qualquer ano. Inclua o ano, o nome do diretor e uma frase convidativa para rever ou falar sobre ele. Só use fatos verificáveis — se não lembrar de nenhum filme para esta data, cite um fato curioso sobre cinema em geral.`,
-  musica:       `Mencione o aniversário de um álbum icônico, música marcante ou evento musical histórico que aconteceu nesta data ({date}) em qualquer ano — lançamento de disco, show histórico, formação de banda. Só use fatos verificáveis — se não lembrar de nenhum para esta data, mencione uma curiosidade musical interessante.`,
-  tecnologia:   `Mencione uma curiosidade ou efeméride do mundo da tecnologia relacionada a esta data ({date}) — criação de um dispositivo, lançamento de software, invenção de um protocolo, primeiro acesso à internet etc. Diga quantos anos atrás foi. Só use fatos verificáveis — se não lembrar de nenhum para esta data, mencione uma curiosidade tecnológica interessante.`,
-  historia:     `Mencione um evento histórico marcante que aconteceu nesta data ({date}) em qualquer época — guerra, tratado, descoberta, independência, revolução. Diga quantos anos atrás foi. Use somente fatos verificáveis — se não lembrar de nenhum seguro para esta data, escolha um evento histórico notável de qualquer dia próximo.`,
-  geografia:    `Compartilhe UMA curiosidade geográfica surpreendente e pouco conhecida — pode ser sobre uma capital inusitada, um rio ou montanha impressionante, um fenômeno geográfico, um fato sobre algum país ou cidade. Não precisa ser da data de hoje. Termine com uma pergunta leve ao usuário.`,
+  geografia:    `Compartilhe UMA curiosidade geográfica surpreendente e pouco conhecida — capital inusitada, rio ou montanha impressionante, fenômeno geográfico, fato sobre algum país. Termine com uma pergunta leve ao usuário.`,
+  cinema:       `Compartilhe UMA curiosidade fascinante sobre um filme clássico ou muito amado — pode ser sobre os bastidores, o elenco, uma cena icônica ou o impacto cultural. NÃO diga que aconteceu hoje nem mencione nenhuma data específica. Termine com uma pergunta convidativa para o usuário.`,
+  musica:       `Compartilhe UMA curiosidade interessante sobre um álbum icônico ou artista musical muito famoso — algo pouco conhecido pelo público em geral. NÃO diga que aconteceu hoje nem mencione nenhuma data específica. Termine com uma sugestão para o usuário ouvir algo.`,
+  tecnologia:   `Compartilhe UMA curiosidade fascinante sobre uma invenção, tecnologia ou inovação que mudou o mundo — pode ser a história de como surgiu, um detalhe curioso, ou um fato surpreendente. NÃO diga que aconteceu hoje nem mencione nenhuma data específica.`,
+  historia:     `Compartilhe UM fato histórico curioso e pouco conhecido — pode ser sobre qualquer época e qualquer lugar do mundo. Algo genuinamente surpreendente. NÃO diga que aconteceu hoje nem mencione nenhuma data específica.`,
+  ciencia:      `Compartilhe UMA curiosidade científica fascinante — sobre o universo, o corpo humano, animais, física, biologia, qualquer área. Algo que cause aquele "nossa, não sabia disso!". NÃO mencione nenhuma data específica.`,
+  gastronomia:  `Compartilhe UMA curiosidade divertida sobre alguma comida, bebida ou tradição gastronômica — pode ser a origem de um prato famoso, um fato surpreendente sobre um ingrediente, ou um costume alimentar inusitado de algum país. Termine com uma pergunta leve.`,
 }
 
 Deno.serve(async (req) => {

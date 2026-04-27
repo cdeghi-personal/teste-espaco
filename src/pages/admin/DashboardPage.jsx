@@ -42,9 +42,8 @@ export default function DashboardPage() {
 
   // Greeting dinâmico — categoria sorteada no frontend para variedade entre usuários
   const GREETING_CATEGORIAS = [
-    'efemeride', 'santo', 'aniversario', 'comemorativa',
-    'motivacional', 'pessoal', 'bemEstar',
-    'cinema', 'musica', 'tecnologia', 'historia', 'geografia',
+    'motivacional', 'pessoal', 'bemEstar', 'geografia',
+    'cinema', 'musica', 'tecnologia', 'historia', 'ciencia', 'gastronomia',
   ]
   const LOADING_MSGS = [
     'Hmm, deixa eu ver o que vou te falar hoje... 🤔',
