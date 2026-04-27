@@ -69,14 +69,22 @@ export default function AgendaPage() {
   const activeRooms = rooms.filter(r => r.active !== false)
   const activeTherapists = therapists.filter(t => t.active !== false)
 
+  function isTeamTherapist(therapistId) {
+    return getTherapist(therapistId)?.belongsToTeam === true
+  }
+
   function filterConsultation(c, iso) {
     if (c.date !== iso) return false
     if (!user) return false
-    if (user.role !== 'admin' && !user.belongsToTeam && c.therapistId !== user.id) return false
-    if (search) {
-      const patient = getPatient(c.patientId)
-      if (!patient?.fullName.toLowerCase().includes(search.toLowerCase())) return false
+    if (isTeamTherapist(c.therapistId)) {
+      // Consultas da equipe: restritas a admin, membros da equipe ou próprio terapeuta
+      if (user.role !== 'admin' && !user.belongsToTeam && c.therapistId !== user.id) return false
+      if (search) {
+        const patient = getPatient(c.patientId)
+        if (!patient?.fullName.toLowerCase().includes(search.toLowerCase())) return false
+      }
     }
+    // Consultas de não-equipe: visíveis para todos (anônimas), ignoram filtro de busca
     if (filterRoom && c.roomId !== filterRoom) return false
     if (filterTherapist && c.therapistId !== filterTherapist) return false
     return true
@@ -97,6 +105,9 @@ export default function AgendaPage() {
   }
 
   function cardStyle(item) {
+    if (!isTeamTherapist(item.therapistId)) {
+      return { backgroundColor: '#d1d5db', color: '#374151' }
+    }
     const therapist = getTherapist(item.therapistId)
     const bg = therapist?.color || '#1e6a9e'
     return { backgroundColor: bg, color: textColorForBg(bg) }
@@ -216,7 +227,8 @@ export default function AgendaPage() {
                 {dayItems.length === 0 ? (
                   <div className="h-full flex items-center justify-center text-xs text-gray-300 py-10">Livre</div>
                 ) : dayItems.map(item => {
-                  const patient = getPatient(item.patientId)
+                  const isPrivate = !isTeamTherapist(item.therapistId)
+                  const patient = isPrivate ? null : getPatient(item.patientId)
                   const room = getRoom(item.roomId)
                   const style = cardStyle(item)
                   return (
@@ -228,13 +240,25 @@ export default function AgendaPage() {
                       <div className="flex items-baseline gap-1 min-w-0">
                         <span className="font-bold shrink-0">{fmtTime(item.time)}</span>
                         <span className="opacity-60">-</span>
-                        <span className="font-medium truncate">{shortName(patient?.fullName)}</span>
+                        <span className={`font-medium truncate ${isPrivate ? 'italic' : ''}`}>
+                          {isPrivate ? 'Consulta Particular' : shortName(patient?.fullName)}
+                        </span>
                       </div>
                       {room && <div className="truncate opacity-75 mt-0.5" style={{ fontSize: '10px' }}>{room.name}</div>}
-                      {(user?.role === 'admin' || user?.id === item.therapistId) && (
+                      {!isPrivate && (user?.role === 'admin' || user?.id === item.therapistId) && (
                         <div className="absolute top-1 right-1 hidden group-hover:flex gap-0.5">
                           <button
                             onClick={() => { setEditItem(item); setShowModal(true); logAudit('VIEW', 'consultations', item.id, getPatient(item.patientId)?.fullName || item.id) }}
+                            className="w-5 h-5 rounded flex items-center justify-center bg-black/20 hover:bg-black/40 transition-colors"
+                          >
+                            <FiEdit2 size={10} />
+                          </button>
+                        </div>
+                      )}
+                      {isPrivate && user?.role === 'admin' && (
+                        <div className="absolute top-1 right-1 hidden group-hover:flex gap-0.5">
+                          <button
+                            onClick={() => { setEditItem(item); setShowModal(true) }}
                             className="w-5 h-5 rounded flex items-center justify-center bg-black/20 hover:bg-black/40 transition-colors"
                           >
                             <FiEdit2 size={10} />
@@ -256,7 +280,8 @@ export default function AgendaPage() {
                 {weekendItems.length === 0 ? (
                   <div className="h-full flex items-center justify-center text-xs text-gray-300 py-10">Livre</div>
                 ) : weekendItems.map(item => {
-                  const patient = getPatient(item.patientId)
+                  const isPrivate = !isTeamTherapist(item.therapistId)
+                  const patient = isPrivate ? null : getPatient(item.patientId)
                   const room = getRoom(item.roomId)
                   const style = cardStyle(item)
                   const isSun = item.date !== satIso
@@ -269,14 +294,26 @@ export default function AgendaPage() {
                       <div className="flex items-baseline gap-1 min-w-0">
                         <span className="font-bold shrink-0">{fmtTime(item.time)}</span>
                         <span className="opacity-60">-</span>
-                        <span className="font-medium truncate">{shortName(patient?.fullName)}</span>
+                        <span className={`font-medium truncate ${isPrivate ? 'italic' : ''}`}>
+                          {isPrivate ? 'Consulta Particular' : shortName(patient?.fullName)}
+                        </span>
                       </div>
                       {room && <div className="truncate opacity-75 mt-0.5" style={{ fontSize: '10px' }}>{room.name}</div>}
                       <div className="opacity-60 mt-0.5" style={{ fontSize: '10px' }}>{isSun ? 'Dom' : 'Sáb'}</div>
-                      {(user?.role === 'admin' || user?.id === item.therapistId) && (
+                      {!isPrivate && (user?.role === 'admin' || user?.id === item.therapistId) && (
                         <div className="absolute top-1 right-1 hidden group-hover:flex gap-0.5">
                           <button
                             onClick={() => { setEditItem(item); setShowModal(true); logAudit('VIEW', 'consultations', item.id, getPatient(item.patientId)?.fullName || item.id) }}
+                            className="w-5 h-5 rounded flex items-center justify-center bg-black/20 hover:bg-black/40 transition-colors"
+                          >
+                            <FiEdit2 size={10} />
+                          </button>
+                        </div>
+                      )}
+                      {isPrivate && user?.role === 'admin' && (
+                        <div className="absolute top-1 right-1 hidden group-hover:flex gap-0.5">
+                          <button
+                            onClick={() => { setEditItem(item); setShowModal(true) }}
                             className="w-5 h-5 rounded flex items-center justify-center bg-black/20 hover:bg-black/40 transition-colors"
                           >
                             <FiEdit2 size={10} />
@@ -356,7 +393,8 @@ export default function AgendaPage() {
             return (
               <div className="divide-y divide-gray-50">
                 {dayItems.map(item => {
-                  const patient = getPatient(item.patientId)
+                  const isPrivate = !isTeamTherapist(item.therapistId)
+                  const patient = isPrivate ? null : getPatient(item.patientId)
                   const therapist = getTherapist(item.therapistId)
                   const room = getRoom(item.roomId)
                   const style = cardStyle(item)
@@ -365,17 +403,25 @@ export default function AgendaPage() {
                       <div className="w-1 self-stretch rounded-full shrink-0" style={{ backgroundColor: style.backgroundColor }} />
                       <div className="flex-1 min-w-0">
                         <div className="font-semibold text-sm text-gray-900">{fmtTime(item.time)}</div>
-                        <div className="text-sm text-gray-700 truncate">{patient?.fullName}</div>
+                        <div className={`text-sm truncate ${isPrivate ? 'text-gray-400 italic' : 'text-gray-700'}`}>
+                          {isPrivate ? 'Consulta Particular' : patient?.fullName}
+                        </div>
                         <div className="text-xs text-gray-500 truncate">
-                          {therapist?.name}{room ? ` • ${room.name}` : ''}
+                          {isPrivate ? (room?.name || '') : `${therapist?.name}${room ? ` • ${room.name}` : ''}`}
                         </div>
                       </div>
-                      {(user?.role === 'admin' || user?.id === item.therapistId) && (
+                      {!isPrivate && (user?.role === 'admin' || user?.id === item.therapistId) && (
                         <div className="flex gap-1 shrink-0">
                           <button onClick={() => { setEditItem(item); setShowModal(true); logAudit('VIEW', 'consultations', item.id, patient?.fullName || item.id) }} className="p-2 rounded-lg text-gray-400 hover:text-brand-blue hover:bg-blue-50">
                             <FiEdit2 size={15} />
                           </button>
-
+                        </div>
+                      )}
+                      {isPrivate && user?.role === 'admin' && (
+                        <div className="flex gap-1 shrink-0">
+                          <button onClick={() => { setEditItem(item); setShowModal(true) }} className="p-2 rounded-lg text-gray-400 hover:text-brand-blue hover:bg-blue-50">
+                            <FiEdit2 size={15} />
+                          </button>
                         </div>
                       )}
                     </div>
@@ -390,12 +436,18 @@ export default function AgendaPage() {
       {/* Legenda terapeutas */}
       {isAdminOrTeam && (
         <div className="flex flex-wrap gap-3">
-          {activeTherapists.filter(t => t.color).map(t => (
+          {activeTherapists.filter(t => t.belongsToTeam && t.color).map(t => (
             <div key={t.id} className="flex items-center gap-1.5 text-xs text-gray-600">
               <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: t.color }} />
               {t.name}
             </div>
           ))}
+          {activeTherapists.some(t => !t.belongsToTeam) && (
+            <div className="flex items-center gap-1.5 text-xs text-gray-500">
+              <span className="w-3 h-3 rounded-full shrink-0 bg-gray-300" />
+              Consultas Particulares
+            </div>
+          )}
         </div>
       )}
 

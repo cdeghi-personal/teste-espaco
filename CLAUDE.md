@@ -73,6 +73,7 @@ src/
       rooms/            RoomsPage, RoomFormModal
       ageranges/        AgeRangesPage, AgeRangeFormModal
       audit/            AuditPage
+      guide/            GuidePageV2          # Guia do Sistema — rota protegida /admin/guia (admin only)
       contactleads/     ContactLeadsPage
       reports/          ReportsPage, ConvenioReportPage
       support/          SupportPage, SupportFormModal
@@ -118,13 +119,18 @@ supabase/
   50_support_update_owner.sql    # RLS UPDATE policy para dono do ticket — fix real que permite RPCs SECURITY DEFINER atualizarem o registro
   51_support_fix_therapist_name.sql  # Fix: RPCs usavam t.full_name → corrigido para t.name (therapists usa name)
   52_support_status_reprovado.sql    # Recria CHECK constraint de status incluindo reprovado_usuario
-  53_audit_user_name.sql         # Adiciona user_name em audit_logs; recria fn_audit_log e log_view_audit com resolução de nome (terapeuta → display name → email)
+  53_audit_user_name.sql         # Adiciona user_name em audit_logs; recria fn_audit_log e log_view_audit com resolução de nome (terapeuta → display name → email) — ATENÇÃO: reverteu p_resource_id de TEXT para UUID acidentalmente (corrigido em 60)
   54_audit_backfill_user_name.sql    # Popula user_name nos registros existentes de audit_logs
   55_audit_cleanup_cron.sql      # Substituído por 56 — agendava DELETE simples de >90 dias sem histórico
   56_audit_history_table.sql     # Retenção em dois níveis: audit_logs (90 dias ativos) + audit_logs_history (arquivo até 1 ano); pg_cron diário 03:00 UTC via maintain_audit_logs()
+  57_session_audit.sql           # RPC log_session_audit(p_type) SECURITY DEFINER — registra LOGIN e sessao_retomada no audit_logs
+  58_fix_session_audit.sql       # Fix: adiciona SET row_security = off + GRANT para anon em log_session_audit
+  59_fix_session_audit_uuid.sql  # Fix: resource_id e UUID — removido do INSERT (fica NULL); resource_name recebe o label
+  60_fix_log_view_audit_uuid.sql # Fix: script 53 reverteu log_view_audit para UUID — restaura parametro TEXT + GRANT anon
   functions/
     invite-therapist/index.ts    # Edge Function — envia convite por e-mail ao criar terapeuta
     suggest-convenio/index.ts    # Edge Function — gera sugestões de texto para relatório de convênio via OpenAI gpt-4o-mini
+    dashboard-greeting/index.ts  # Edge Function — saudacao personalizada do dashboard via OpenAI gpt-4o-mini (JWT Verification DESATIVADO)
 ```
 
 ## Supabase — Banco de Dados
@@ -312,6 +318,7 @@ Authentication → URL Configuration:
 '/admin/pacientes/avancado'     // busca avançada de pacientes — todos autenticados; filtros multi-select (terapeuta, gerente de caso, especialidade, forma de pagamento, diagnóstico, status, faixa etária); exporta CSV
 '/admin/relatorios/convenio'    // relatório de convênio — todos autenticados; gera Relatório ao Convênio + Lista de Presença em PDF
 '/admin/empresa'                // dados da empresa (Razão Social + CNPJ) — admin only
+'/admin/guia'                   // Guia do Sistema (GuidePageV2) — admin only; abas 'Para Terapeutas' e 'Para Administradores' visiveis so para admin
 ```
 
 ## Padrões de código
@@ -425,6 +432,16 @@ Authentication → URL Configuration:
 - Funções em `src/utils/generateConvenioPDF.js`: `generateRelatórioConvenioPDF()`, `generateListaPresencaPDF()`, `formatMesLabel()`, `MONTHS`.
 - `MONTHS` e `formatMesLabel` re-exportados de `pdfShared.js` via `export { MONTHS, formatMesLabel } from './pdfShared'`.
 
+## Dashboard (`/admin`)
+
+- **Saudacao IA:** mensagem de abertura gerada pela Edge Function `dashboard-greeting` via OpenAI gpt-4o-mini.
+  - **Cache:** `localStorage` com chave `greeting_${today}_${user.authId}` — uma chamada por usuario por dia; entradas de dias anteriores limpas automaticamente na proxima geracao.
+  - **Categoria:** sorteada no frontend (`GREETING_CATEGORIAS`) a cada novo dia — 10 opcoes: `motivacional`, `pessoal`, `bemEstar`, `geografia`, `cinema`, `musica`, `tecnologia`, `historia`, `ciencia`, `gastronomia`.
+  - **Sub-hint:** sorteado junto com a categoria (`HINT_MAP`) — seculo (XIII-XXI) para geografia/historia/gastronomia; decada (1800-2020) para cinema/musica/ciencia/tecnologia; tema especifico para motivacional/pessoal/bemEstar. Enviado como diretiva adicional ao modelo.
+  - **Categorias com datas removidas** (`efemeride`, `santo`, `aniversario`, `comemorativa`) — LLMs confabulam datas especificas.
+  - **Loading:** mensagem humorstica exibida enquanto aguarda a Edge Function.
+  - **Deploy:** `npx supabase functions deploy dashboard-greeting --project-ref ffkkgmikvsqhutftoajh`
+
 ## Dados da Empresa (`/admin/empresa`)
 
 - **Acesso:** admin only (terapeutas redirecionados para `/admin`).
@@ -500,7 +517,8 @@ Authentication → URL Configuration:
   - tabelas de config (specialties, payment_methods, diagnoses, etc.) → `name` ou `label`
   - demais → `date::TEXT` ou vazio
 - **user_name:** coluna `user_name TEXT` em `audit_logs` — resolvida por `fn_audit_log` com prioridade: nome do terapeuta (via `therapists.name`) → `user_metadata.full_name` → `user_metadata.name` → email
-- **VIEW** registrado via RPC `log_view_audit(resource_type, resource_id, resource_name)`
+- **VIEW** registrado via RPC `log_view_audit(resource_type, resource_id TEXT, resource_name)` — parametro resource_id e TEXT (nao UUID) para compatibilidade com PostgREST; GRANT para authenticated e anon
+- **LOGIN** registrado via RPC `log_session_audit(p_type)` chamada pelo AuthContext — p_type: `login` (formulario) ou `sessao_retomada` (token salvo no browser); refreshes silenciosos de token nao sao logados
 - `AuditPage`: só admin; filtros por ação, recurso, usuário (select dinâmico mostra nomes, filtra por email), data e texto (busca em resource_name)
 - **Retenção em dois níveis:**
   - `audit_logs` → 90 dias (acesso pelo painel)
@@ -533,7 +551,10 @@ Constantes: `PATIENT_SELECT` (inclui `patient_specialties(specialty, patient_val
 - **Vercel** — conectado ao GitHub (branch `main`), deploy automático no push
 - `vercel.json` com rewrite `/* → /index.html` para SPA routing
 - Variáveis de ambiente: `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY` no Vercel
-- Edge Functions: `npx supabase functions deploy invite-therapist --project-ref ffkkgmikvsqhutftoajh`
+- Edge Functions (deploy individual):
+  - `npx supabase functions deploy invite-therapist --project-ref ffkkgmikvsqhutftoajh`
+  - `npx supabase functions deploy suggest-convenio --project-ref ffkkgmikvsqhutftoajh`
+  - `npx supabase functions deploy dashboard-greeting --project-ref ffkkgmikvsqhutftoajh`
 
 ## Política de Senha Forte (ResetPasswordPage)
 
