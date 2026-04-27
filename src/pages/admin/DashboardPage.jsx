@@ -60,6 +60,10 @@ export default function DashboardPage() {
     const cacheKey = `greeting_${today}_${user.authId}`
     const cached = localStorage.getItem(cacheKey)
     if (cached) { setGreetingMsg(cached); return }
+    // Limpa entradas antigas do mesmo usuário (dias anteriores)
+    Object.keys(localStorage)
+      .filter(k => k.startsWith('greeting_') && k.endsWith(`_${user.authId}`) && k !== cacheKey)
+      .forEach(k => localStorage.removeItem(k))
     const firstName = user?.name?.split(' ')[0] || 'você'
     const categoria = GREETING_CATEGORIAS[Math.floor(Math.random() * GREETING_CATEGORIAS.length)]
     setGreetingLoading(true)
