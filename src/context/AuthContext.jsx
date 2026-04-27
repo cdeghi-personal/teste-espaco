@@ -91,22 +91,28 @@ export function AuthProvider({ children }) {
       const loginType = sessionStorage.getItem('_login_type')
       if (loginType) {
         sessionStorage.removeItem('_login_type')
-        supabase.rpc('log_session_audit', { p_type: loginType }).catch(() => {})
+        supabase.rpc('log_session_audit', { p_type: loginType })
+          .then(({ error }) => { if (error) console.warn('[audit] log_session_audit error:', error) })
+          .catch(err => console.warn('[audit] log_session_audit catch:', err))
       } else if (wasInitial) {
-        supabase.rpc('log_session_audit', { p_type: 'sessao_retomada' }).catch(() => {})
+        supabase.rpc('log_session_audit', { p_type: 'sessao_retomada' })
+          .then(({ error }) => { if (error) console.warn('[audit] log_session_audit error:', error) })
+          .catch(err => console.warn('[audit] log_session_audit catch:', err))
       }
       // TOKEN_REFRESHED e outras chamadas silenciosas: wasInitial=false, sem flag → não loga
     }
   }
 
   async function login(email, password) {
+    // Flag marcada ANTES do signInWithPassword para garantir que onAuthStateChange
+    // já encontre o tipo correto quando loadUser for chamado
+    sessionStorage.setItem('_login_type', 'login')
     const { error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) {
+      sessionStorage.removeItem('_login_type')
       console.error('Supabase login error:', error)
       return { success: false, error: error.message }
     }
-    // Marca que o próximo loadUser vem de um login explícito via formulário
-    sessionStorage.setItem('_login_type', 'login')
     return { success: true }
   }
 
