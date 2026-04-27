@@ -40,6 +40,24 @@ export default function DashboardPage() {
   const isAdmin = user?.role === 'admin'
   const isSupportAdmin = isAdmin && !user?.id
 
+  // Greeting dinâmico — gerado por IA, cacheado por dia no localStorage
+  const [greetingMsg, setGreetingMsg] = useState('')
+  useEffect(() => {
+    if (!user?.authId) return
+    const cacheKey = `greeting_${today}_${user.authId}`
+    const cached = localStorage.getItem(cacheKey)
+    if (cached) { setGreetingMsg(cached); return }
+    const firstName = user?.name?.split(' ')[0] || 'você'
+    supabase.functions.invoke('dashboard-greeting', {
+      body: { date: today, hour: now.getHours(), userName: firstName },
+    }).then(({ data, error }) => {
+      if (!error && data?.message) {
+        setGreetingMsg(data.message)
+        localStorage.setItem(cacheKey, data.message)
+      }
+    })
+  }, [user?.authId]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const [newLeadsCount, setNewLeadsCount] = useState(0)
   useEffect(() => {
     if (!isAdmin) return
@@ -126,7 +144,9 @@ export default function DashboardPage() {
     <div className="p-3 md:p-6 space-y-4 md:space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-xl md:text-2xl font-bold text-gray-900">{greeting}, {user?.name?.split(' ')[0]}! 👋</h1>
+        <h1 className="text-xl md:text-2xl font-bold text-gray-900">
+          {greetingMsg || `${greeting}, ${user?.name?.split(' ')[0]}! 👋`}
+        </h1>
         <p className="text-gray-500 text-xs md:text-sm mt-1">
           {now.toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
         </p>
