@@ -84,8 +84,8 @@ export default function AuditPage() {
     if (filterResource) query = query.eq('resource_type', filterResource)
     if (filterUser) query = query.eq('user_email', filterUser)
     if (filterDate) {
-      query = query.gte('created_at', `${filterDate}T00:00:00`)
-                   .lte('created_at', `${filterDate}T23:59:59`)
+      query = query.gte('created_at', `${filterDate}T00:00:00+00:00`)
+                   .lte('created_at', `${filterDate}T23:59:59+00:00`)
     }
     if (search) {
       query = query.ilike('resource_name', `%${search}%`)
@@ -101,8 +101,6 @@ export default function AuditPage() {
 
   useEffect(() => { fetchLogs() }, [fetchLogs])
 
-  // Reset page when filters change
-  useEffect(() => { setPage(0) }, [filterAction, filterResource, filterDate, filterUser, search])
 
   function formatDate(iso) {
     try { return format(parseISO(iso), 'dd/MM/yy HH:mm', { locale: ptBR }) }
@@ -138,14 +136,14 @@ export default function AuditPage() {
           <FiSearch size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
             value={search}
-            onChange={e => setSearch(e.target.value)}
+            onChange={e => { setPage(0); setSearch(e.target.value) }}
             placeholder="Buscar por registro..."
             className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-brand-blue outline-none bg-white"
           />
         </div>
         <select
           value={filterUser}
-          onChange={e => setFilterUser(e.target.value)}
+          onChange={e => { setPage(0); setFilterUser(e.target.value) }}
           className="px-3 py-2 text-sm border border-gray-200 rounded-xl bg-white focus:ring-2 focus:ring-brand-blue outline-none"
         >
           <option value="">Todos os Usuários</option>
@@ -155,7 +153,7 @@ export default function AuditPage() {
         </select>
         <select
           value={filterAction}
-          onChange={e => setFilterAction(e.target.value)}
+          onChange={e => { setPage(0); setFilterAction(e.target.value) }}
           className="px-3 py-2 text-sm border border-gray-200 rounded-xl bg-white focus:ring-2 focus:ring-brand-blue outline-none"
         >
           <option value="">Todas as Ações</option>
@@ -165,7 +163,7 @@ export default function AuditPage() {
         </select>
         <select
           value={filterResource}
-          onChange={e => setFilterResource(e.target.value)}
+          onChange={e => { setPage(0); setFilterResource(e.target.value) }}
           className="px-3 py-2 text-sm border border-gray-200 rounded-xl bg-white focus:ring-2 focus:ring-brand-blue outline-none"
         >
           <option value="">Todos os Recursos</option>
@@ -176,7 +174,7 @@ export default function AuditPage() {
         <input
           type="date"
           value={filterDate}
-          onChange={e => setFilterDate(e.target.value)}
+          onChange={e => { setPage(0); setFilterDate(e.target.value) }}
           className="px-3 py-2 text-sm border border-gray-200 rounded-xl bg-white focus:ring-2 focus:ring-brand-blue outline-none"
         />
       </div>
