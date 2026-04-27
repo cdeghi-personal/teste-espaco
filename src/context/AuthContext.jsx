@@ -3,16 +3,25 @@ import { supabase } from '../lib/supabase'
 
 const AuthContext = createContext(null)
 
+async function logSessionEvent(type) {
+  try {
+    const { error } = await supabase.rpc('log_session_audit', { p_type: type })
+    if (error) console.warn('[audit] log_session_audit error:', error)
+  } catch (err) {
+    console.warn('[audit] log_session_audit catch:', err)
+  }
+}
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
   const [needsPasswordReset, setNeedsPasswordReset] = useState(false)
 
-  // Detecta se é a primeira chamada a loadUser (sessão restaurada do browser vs. login explícito)
+  // Detecta se e a primeira chamada a loadUser (sessao restaurada do browser vs. login explicito)
   const isInitialSessionRef = useRef(true)
 
   useEffect(() => {
-    // Sessão inicial
+    // Sessao inicial
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
         loadUser(session.user)
@@ -22,10 +31,10 @@ export function AuthProvider({ children }) {
       }
     })
 
-    // Mudanças de auth (login, logout, convite aceito, reset de senha)
+    // Mudancas de auth (login, logout, convite aceito, reset de senha)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'PASSWORD_RECOVERY') {
-        // Link de reset de senha clicado — redireciona para tela de definição de senha
+        // Link de reset de senha clicado — redireciona para tela de definicao de senha
         setNeedsPasswordReset(true)
         setIsLoading(false)
         return
@@ -45,7 +54,7 @@ export function AuthProvider({ children }) {
     const wasInitial = isInitialSessionRef.current
     isInitialSessionRef.current = false
     try {
-      // Busca o role do usuário — maybeSingle não lança erro se não encontrar
+      // Busca o role do usuario — maybeSingle nao lanca erro se nao encontrar
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('role')
@@ -54,10 +63,10 @@ export function AuthProvider({ children }) {
 
       if (profileError) console.error('Erro ao buscar profile:', profileError)
 
-      const role = profile?.role || 'admin' // fallback seguro: se não tem profile, trata como admin
+      const role = profile?.role || 'admin' // fallback seguro: se nao tem profile, trata como admin
 
-      // Busca registro de terapeuta para qualquer role — admins que também são
-      // terapeutas precisam do therapist.id para controle de acesso em alguns módulos
+      // Busca registro de terapeuta para qualquer role — admins que tambem sao
+      // terapeutas precisam do therapist.id para controle de acesso em alguns modulos
       const { data: therapist } = await supabase
         .from('therapists')
         .select('id, name, specialty, belongs_to_team')
@@ -75,8 +84,8 @@ export function AuthProvider({ children }) {
         belongsToTeam: therapist?.belongs_to_team || false,
       })
     } catch (err) {
-      console.error('Erro ao carregar usuário:', err)
-      // Mesmo com erro, mantém o usuário logado com dados mínimos
+      console.error('Erro ao carregar usuario:', err)
+      // Mesmo com erro, mantem o usuario logado com dados minimos
       setUser({
         authId: authUser.id,
         id: null,
@@ -87,25 +96,21 @@ export function AuthProvider({ children }) {
       })
     } finally {
       setIsLoading(false)
-      // Loga o evento de sessão — fire-and-forget, não bloqueia o carregamento
+      // Loga o evento de sessao — fire-and-forget via funcao externa (supabase.rpc nao e Promise nativa)
       const loginType = sessionStorage.getItem('_login_type')
       if (loginType) {
         sessionStorage.removeItem('_login_type')
-        supabase.rpc('log_session_audit', { p_type: loginType })
-          .then(({ error }) => { if (error) console.warn('[audit] log_session_audit error:', error) })
-          .catch(err => console.warn('[audit] log_session_audit catch:', err))
+        logSessionEvent(loginType)
       } else if (wasInitial) {
-        supabase.rpc('log_session_audit', { p_type: 'sessao_retomada' })
-          .then(({ error }) => { if (error) console.warn('[audit] log_session_audit error:', error) })
-          .catch(err => console.warn('[audit] log_session_audit catch:', err))
+        logSessionEvent('sessao_retomada')
       }
-      // TOKEN_REFRESHED e outras chamadas silenciosas: wasInitial=false, sem flag → não loga
+      // TOKEN_REFRESHED e outras chamadas silenciosas: wasInitial=false, sem flag — nao loga
     }
   }
 
   async function login(email, password) {
     // Flag marcada ANTES do signInWithPassword para garantir que onAuthStateChange
-    // já encontre o tipo correto quando loadUser for chamado
+    // ja encontre o tipo correto quando loadUser for chamado
     sessionStorage.setItem('_login_type', 'login')
     const { error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) {
