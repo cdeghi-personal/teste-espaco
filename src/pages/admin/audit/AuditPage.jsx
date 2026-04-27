@@ -12,6 +12,7 @@ const ACTION_LABELS = {
   CONSULTA:  { label: 'Consulta',     color: 'bg-cyan-100 text-cyan-700' },
   SOLICITAR: { label: 'Solicitação',  color: 'bg-violet-100 text-violet-700' },
   GERAR:     { label: 'Geração',      color: 'bg-indigo-100 text-indigo-700' },
+  LOGIN:     { label: 'Login',        color: 'bg-teal-100 text-teal-700' },
 }
 
 const RESOURCE_LABELS = {
@@ -32,6 +33,7 @@ const RESOURCE_LABELS = {
   appointment_types:        'Tipo de Atendimento',
   rooms:                    'Sala',
   age_ranges:               'Faixa Etária',
+  session:                  'Sessão',
 }
 
 const PAGE_SIZE = 50

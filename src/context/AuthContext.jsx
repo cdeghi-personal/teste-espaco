@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from 'react'
+import { createContext, useContext, useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 
 const AuthContext = createContext(null)
@@ -8,12 +8,16 @@ export function AuthProvider({ children }) {
   const [isLoading, setIsLoading] = useState(true)
   const [needsPasswordReset, setNeedsPasswordReset] = useState(false)
 
+  // Detecta se é a primeira chamada a loadUser (sessão restaurada do browser vs. login explícito)
+  const isInitialSessionRef = useRef(true)
+
   useEffect(() => {
     // Sessão inicial
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
         loadUser(session.user)
       } else {
+        isInitialSessionRef.current = false
         setIsLoading(false)
       }
     })
@@ -38,6 +42,8 @@ export function AuthProvider({ children }) {
   }, [])
 
   async function loadUser(authUser) {
+    const wasInitial = isInitialSessionRef.current
+    isInitialSessionRef.current = false
     try {
       // Busca o role do usuário — maybeSingle não lança erro se não encontrar
       const { data: profile, error: profileError } = await supabase
@@ -81,6 +87,15 @@ export function AuthProvider({ children }) {
       })
     } finally {
       setIsLoading(false)
+      // Loga o evento de sessão — fire-and-forget, não bloqueia o carregamento
+      const loginType = sessionStorage.getItem('_login_type')
+      if (loginType) {
+        sessionStorage.removeItem('_login_type')
+        supabase.rpc('log_session_audit', { p_type: loginType }).catch(() => {})
+      } else if (wasInitial) {
+        supabase.rpc('log_session_audit', { p_type: 'sessao_retomada' }).catch(() => {})
+      }
+      // TOKEN_REFRESHED e outras chamadas silenciosas: wasInitial=false, sem flag → não loga
     }
   }
 
@@ -90,6 +105,8 @@ export function AuthProvider({ children }) {
       console.error('Supabase login error:', error)
       return { success: false, error: error.message }
     }
+    // Marca que o próximo loadUser vem de um login explícito via formulário
+    sessionStorage.setItem('_login_type', 'login')
     return { success: true }
   }
 
