@@ -943,14 +943,13 @@ export function DataProvider({ children }) {
 
   async function logAudit(action, resourceType, resourceId, resourceName = '') {
     try {
-      const { error: auditErr } = await supabase.rpc('log_view_audit', {
+      await supabase.rpc('log_view_audit', {
         p_resource_type: resourceType,
         p_resource_id:   resourceId || null,
         p_resource_name: resourceName || '',
       })
-      if (auditErr) console.warn('[audit] log_view_audit error:', auditErr)
-    } catch (err) {
-      console.warn('[audit] log_view_audit:', err)
+    } catch {
+      // silently fail — erros de auditoria nao devem quebrar a UI
     }
   }
 
