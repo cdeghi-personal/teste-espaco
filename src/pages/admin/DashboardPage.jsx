@@ -40,9 +40,22 @@ export default function DashboardPage() {
   const isAdmin = user?.role === 'admin'
   const isSupportAdmin = isAdmin && !user?.id
 
-  // Greeting dinâmico — categoria sorteada no frontend para garantir variedade entre usuários
-  const GREETING_CATEGORIAS = ['efemeride', 'santo', 'aniversario', 'comemorativa', 'motivacional', 'pessoal', 'bemEstar']
+  // Greeting dinâmico — categoria sorteada no frontend para variedade entre usuários
+  const GREETING_CATEGORIAS = [
+    'efemeride', 'santo', 'aniversario', 'comemorativa',
+    'motivacional', 'pessoal', 'bemEstar',
+    'cinema', 'musica', 'tecnologia', 'historia', 'geografia',
+  ]
+  const LOADING_MSGS = [
+    'Hmm, deixa eu ver o que vou te falar hoje... 🤔',
+    'Um segundo, estou consultando o calendário cósmico... 🔭',
+    'Aguenta aí, procurando a mensagem certa pra você... ✨',
+    'Pensando, pensando... quase lá! 💭',
+    'Deixa eu vasculhar minha enciclopédia mental... 📚',
+  ]
   const [greetingMsg, setGreetingMsg] = useState('')
+  const [greetingLoading, setGreetingLoading] = useState(false)
+  const [loadingMsg] = useState(() => LOADING_MSGS[Math.floor(Math.random() * LOADING_MSGS.length)])
   useEffect(() => {
     if (!user?.authId) return
     const cacheKey = `greeting_${today}_${user.authId}`
@@ -50,9 +63,11 @@ export default function DashboardPage() {
     if (cached) { setGreetingMsg(cached); return }
     const firstName = user?.name?.split(' ')[0] || 'você'
     const categoria = GREETING_CATEGORIAS[Math.floor(Math.random() * GREETING_CATEGORIAS.length)]
+    setGreetingLoading(true)
     supabase.functions.invoke('dashboard-greeting', {
       body: { date: today, hour: now.getHours(), userName: firstName, categoria },
     }).then(({ data, error }) => {
+      setGreetingLoading(false)
       if (!error && data?.message) {
         setGreetingMsg(data.message)
         localStorage.setItem(cacheKey, data.message)
@@ -146,8 +161,10 @@ export default function DashboardPage() {
     <div className="p-3 md:p-6 space-y-4 md:space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-xl md:text-2xl font-bold text-gray-900">
-          {greetingMsg || `${greeting}, ${user?.name?.split(' ')[0]}! 👋`}
+        <h1 className={`text-xl md:text-2xl font-bold transition-colors duration-300 ${greetingLoading ? 'text-gray-400 italic' : 'text-gray-900'}`}>
+          {greetingLoading
+            ? loadingMsg
+            : greetingMsg || `${greeting}, ${user?.name?.split(' ')[0]}! 👋`}
         </h1>
         <p className="text-gray-500 text-xs md:text-sm mt-1">
           {now.toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
