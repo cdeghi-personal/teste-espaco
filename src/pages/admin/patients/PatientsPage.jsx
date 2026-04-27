@@ -160,7 +160,7 @@ export default function PatientsPage() {
                   <div
                     key={p.id}
                     className={`flex items-center gap-3 px-3 py-3 ${!p.deleted ? 'active:bg-gray-50' : 'opacity-60'}`}
-                    onClick={() => { if (!p.deleted) { logAudit('VIEW', 'patients', p.id, p.fullName); navigate(`/admin/pacientes/${p.id}`) } }}
+                    onClick={() => { if (!p.deleted) { navigate(`/admin/pacientes/${p.id}`) } }}
                   >
                     <div className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold text-sm shrink-0 ${
                       p.deleted ? 'bg-gray-100 text-gray-400' : 'bg-brand-yellow/20 text-brand-blue'
@@ -222,7 +222,7 @@ export default function PatientsPage() {
                     <tr
                       key={p.id}
                       className={`hover:bg-gray-50/50 cursor-pointer transition-colors ${p.deleted ? 'opacity-60' : ''}`}
-                      onClick={() => { if (!p.deleted) { logAudit('VIEW', 'patients', p.id, p.fullName); navigate(`/admin/pacientes/${p.id}`) } }}
+                      onClick={() => { if (!p.deleted) { navigate(`/admin/pacientes/${p.id}`) } }}
                     >
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
