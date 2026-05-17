@@ -66,8 +66,13 @@ export function addPageHeader(doc, logoData, subtitle, companySettings = null, r
   doc.setFontSize(7)
   doc.setTextColor(200, 210, 255)
   if (companySettings?.razaoSocial) {
-    doc.text(companySettings.razaoSocial, pageW - margin, 8, { align: 'right' })
-    if (companySettings.cnpj) doc.text(`CNPJ: ${companySettings.cnpj}`, pageW - margin, 13, { align: 'right' })
+    doc.text(companySettings.razaoSocial, pageW - margin, 7, { align: 'right' })
+    const cnpjLine = companySettings.cnpj ? `CNPJ: ${companySettings.cnpj}` : ''
+    const cnesLine = companySettings.cnes ? `CNES: ${companySettings.cnes}` : ''
+    const infoLine = [cnpjLine, cnesLine].filter(Boolean).join('  |  ')
+    if (infoLine) doc.text(infoLine, pageW - margin, 12, { align: 'right' })
+  } else if (companySettings?.cnes) {
+    doc.text(`CNES: ${companySettings.cnes}`, pageW - margin, 12, { align: 'right' })
   }
   doc.text(rightText || '', pageW - margin, 18, { align: 'right' })
   // Reset to body defaults

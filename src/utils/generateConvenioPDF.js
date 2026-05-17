@@ -9,6 +9,8 @@ import {
 
 export { MONTHS, formatMesLabel } from './pdfShared'
 
+const DESEMPENHO_FIXO = 'O paciente apresentou desempenho compatível com seu plano terapêutico, demonstrando avanços graduais nos objetivos trabalhados e melhora na execução das atividades propostas, mantendo boa responsividade aos procedimentos de ensino. Observou-se engajamento adequado nas sessões, com disposição para participar e concluir as tarefas. Embora alguns objetivos ainda demandem manutenção para consolidação, o desempenho geral indica evolução estável e coerente com seu perfil de desenvolvimento. Recomenda-se a continuidade do acompanhamento, com manutenção dos objetivos em consolidação e inclusão progressiva de novas metas conforme sua prontidão, favorecendo seu desenvolvimento global e atendendo às suas necessidades.'
+
 function pageBreak(doc, y, needed, logoData, subtitle, versionLabel, companySettings) {
   if (y + needed > doc.internal.pageSize.height - 28) {
     doc.addPage()
@@ -41,10 +43,11 @@ function buildSessionTimeGroups(sessions, fallbackHorario) {
 // ─── Relatório ao Convênio ──────────────────────────────────────
 
 export async function generateRelatórioConvenioPDF({
-  patientName, diagnosticoText, specialtyLabel,
+  patientName, patientFirstName, diagnosticoText, specialtyLabel,
   terapeutaNome, terapeutaRegistro, mesLabel,
   sessions, sessionValue, horario,
-  encaminhamento, objetivos, desempenho,
+  referralChallenges,
+  objetivos,
   versionLabel = '', returnBlob = false, companySettings = null,
 }) {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
@@ -110,11 +113,15 @@ export async function generateRelatórioConvenioPDF({
   })
   y = doc.lastAutoTable.finalY + 10
 
-  // ── Encaminhamento ──
+  // ── Encaminhamento (texto gerado a partir do template) ──
+  const firstName = patientFirstName || patientName.split(' ')[0]
+  const desafiosText = referralChallenges?.trim() || '___________'
+  const encaminhamentoText = `${firstName} foi encaminhado para atendimento ${specialtyLabel} devido a dificuldades observadas em seu desenvolvimento, incluindo ${desafiosText}. O objetivo do acompanhamento é realizar avaliação contínua, intervir de forma estruturada conforme as necessidades apresentadas e promover avanços funcionais que favoreçam seu desenvolvimento.`
+
   y = pageBreak(doc, y, 22, logoData, subtitle, versionLabel, companySettings)
   doc.setFontSize(11); doc.setFont('helvetica', 'bold'); doc.setTextColor(...PDF_DARK)
   doc.text('Encaminhamento', margin, y); y += 7
-  for (const line of doc.splitTextToSize(encaminhamento || '—', contentW)) {
+  for (const line of doc.splitTextToSize(encaminhamentoText, contentW)) {
     y = pageBreak(doc, y, 6, logoData, subtitle, versionLabel, companySettings)
     doc.setFontSize(9.5); doc.setFont('helvetica', 'normal'); doc.setTextColor(...PDF_DARK)
     doc.text(line, margin, y); y += 5
@@ -140,11 +147,11 @@ export async function generateRelatórioConvenioPDF({
   }
   y += 6
 
-  // ── Desempenho e Conclusão ──
+  // ── Desempenho e Conclusão (texto fixo) ──
   y = pageBreak(doc, y, 22, logoData, subtitle, versionLabel, companySettings)
   doc.setFontSize(11); doc.setFont('helvetica', 'bold'); doc.setTextColor(...PDF_DARK)
   doc.text('Desempenho e Conclusão', margin, y); y += 7
-  for (const line of doc.splitTextToSize(desempenho || '—', contentW)) {
+  for (const line of doc.splitTextToSize(DESEMPENHO_FIXO, contentW)) {
     y = pageBreak(doc, y, 6, logoData, subtitle, versionLabel, companySettings)
     doc.setFontSize(9.5); doc.setFont('helvetica', 'normal'); doc.setTextColor(...PDF_DARK)
     doc.text(line, margin, y); y += 5

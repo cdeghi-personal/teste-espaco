@@ -127,6 +127,9 @@ supabase/
   58_fix_session_audit.sql       # Fix: adiciona SET row_security = off + GRANT para anon em log_session_audit
   59_fix_session_audit_uuid.sql  # Fix: resource_id e UUID — removido do INSERT (fica NULL); resource_name recebe o label
   60_fix_log_view_audit_uuid.sql # Fix: script 53 reverteu log_view_audit para UUID — restaura parametro TEXT + GRANT anon
+  61_therapist_specialty_can_be_rt.sql # Adiciona can_be_rt boolean DEFAULT false em therapist_specialties
+  62_patient_specialty_report_settings.sql # Nova tabela patient_specialty_report_settings (referral_challenges por paciente+especialidade) + RLS
+  63_convenio_reports_rt_goals_cnes.sql # convenio_reports: responsible_therapist_id + intervention_goals; company_settings: cnes
   functions/
     invite-therapist/index.ts    # Edge Function — envia convite por e-mail ao criar terapeuta
     suggest-convenio/index.ts    # Edge Function — gera sugestões de texto para relatório de convênio via OpenAI gpt-4o-mini
@@ -164,7 +167,7 @@ Encontrar em: Supabase Dashboard → Project Settings → API.
 | `diagnoses` | Tabela de config — toggle `active` |
 | `patient_statuses` | Tabela de config — toggle `active` |
 | `rooms` | Salas — toggle `active` |
-| `therapist_specialties` | Relação N:N terapeuta ↔ especialidade + nº do conselho regional |
+| `therapist_specialties` | Relação N:N terapeuta ↔ especialidade + nº do conselho regional + flag `can_be_rt` |
 | `patient_external_therapists` | Terapeutas externos vinculados ao paciente (nome, especialidade, telefone) |
 | `consultation_statuses` | Status do atendimento — toggle `active`, cor configurável, flag `automatic` |
 | `appointment_types` | Tipos de atendimento (Sessão Individual, Grupo etc.) — toggle `active` |
@@ -179,13 +182,15 @@ Encontrar em: Supabase Dashboard → Project Settings → API.
 | `support_tickets` | Chamados de suporte — subject, type, author, description, solution, status, nova_resposta (BOOLEAN), created_by_id |
 | `support_ticket_history` | Histórico de status dos chamados — ticket_id, status, changed_at, changed_by, note (TEXT) |
 | `age_ranges` | Faixas etárias — name, min_age, max_age, color; critério: min_age ≤ idade < max_age |
-| `convenio_reports` | Histórico de relatórios ao convênio gerados em PDF — patient_id, therapist_id, specialty, mes_label, version_label, created_by |
-| `company_settings` | Configurações da empresa — linha única (id=1, CHECK constraint); razao_social, cnpj, ai_system_prompt, updated_at |
+| `convenio_reports` | Histórico de relatórios ao convênio — patient_id, therapist_id, responsible_therapist_id (RT), specialty, mes_label, version_label, intervention_goals, created_by |
+| `patient_specialty_report_settings` | Desafios relacionados do Encaminhamento por paciente + especialidade — unique(patient_id, specialty), referral_challenges |
+| `company_settings` | Configurações da empresa — linha única (id=1, CHECK constraint); razao_social, cnpj, cnes, ai_system_prompt, updated_at |
 
 ### Mappers (DB → App)
 
 Todos em `src/lib/supabase.js`. Convertem snake_case do banco para camelCase do app:
 - `mapPatient` — `specialties` agora é `[{ key, patientValue, therapistValue }]` (não mais string[])
+- `mapTherapist` — `therapistSpecialties` agora é `[{ specialty, credential, canBeRt }]`
 - `mapGuardian` (inclui `neighborhood`), `mapTherapist`, `mapAppointment` (inclui `startTime`, `endTime` calculado via duration), `mapConsultation` (inclui `time`, `roomId`)
 - `mapSpecialty`, `mapPaymentMethod`, `mapDiagnosis`, `mapPatientStatus`, `mapRoom`
 - `mapConsultationStatus` (inclui `automatic`), `mapAppointmentType`, `mapExam`, `mapMedication`, `mapConduct`
@@ -418,17 +423,76 @@ Authentication → URL Configuration:
 ## Relatório de Convênio (`/admin/relatorios/convenio`)
 
 - **Acesso:** todos os autenticados. Terapeutas veem seus próprios pacientes; admin seleciona qualquer terapeuta.
-- **Fluxo:** (1) Seleciona terapeuta (admin) + paciente + especialidade + período → Buscar Atendimentos; (2) Edita sessões (data + horário + valor por linha, add/remove); (3) Preenche Diagnóstico com CID, Encaminhamento, Objetivos, Desempenho; (4) Visualiza preview do nome do arquivo + histórico de versões; (5) Gera PDFs.
-- **Relatório ao Convênio (PDF):** seções Identificação, Atendimentos do Mês, Encaminhamento, Objetivos de Intervenção, Desempenho e Conclusão, assinatura em caixa. Rodapé com endereço/contato em todas as páginas.
+- **Fluxo:** (1) Seleciona terapeuta emissor + paciente + especialidade + período → Buscar Atendimentos; (2) Edita sessões; (3) Preenche Diagnóstico, Desafios Relacionados, Objetivos; (4) Pré-visualiza e gera PDFs.
+- **Relatório ao Convênio (PDF):** seções Identificação, Atendimentos do Mês, Encaminhamento (template automático), Objetivos de Intervenção, Desempenho e Conclusão (texto fixo), Fechamento, Assinatura em caixa. Rodapé com endereço/contato em todas as páginas.
 - **Lista de Presença (PDF):** tabela Data | Valor | Local | Horário | Assinatura Profissional | Assinatura Responsável + linhas de assinatura.
+
+### Responsável Técnico (RT)
+
+Conceito crítico: nem todo terapeuta pode ser RT em todas as especialidades. Definido na relação `therapist_specialties` via campo `can_be_rt boolean default false`.
+
+**Regra de seleção do RT:**
+1. Ao selecionar terapeuta emissor + especialidade, verificar `therapist.therapistSpecialties.find(s => s.specialty === specialty)?.canBeRt`.
+2. Se `canBeRt === true`: o próprio emissor é o RT. Nenhum campo adicional é exibido.
+3. Se `canBeRt !== true`: exibir campo "Responsável Técnico" com apenas terapeutas que têm `can_be_rt = true` para aquela especialidade. Se nenhum existir, bloquear a geração.
+4. O RT efetivo (`selectedRT`) é quem aparece no PDF — nome, especialidade e conselho regional.
+
+**No PDF (Relatório e Lista de Presença):** os parâmetros `terapeutaNome` e `terapeutaRegistro` recebem dados do RT (não do emissor quando diferente). O emissor fica apenas em `therapist_id` no histórico.
+
+**Cadastro:** `TherapistFormModal.jsx` tem coluna "RT?" (checkbox) na seção de Especialidades e Registros Profissionais.
+
+### Encaminhamento (template automático)
+
+Não é mais texto livre. Texto gerado automaticamente:
+> "[Primeiro nome] foi encaminhado para atendimento [especialidade] devido a dificuldades observadas em seu desenvolvimento, incluindo [desafios relacionados]. O objetivo do acompanhamento é realizar avaliação contínua, intervir de forma estruturada conforme as necessidades apresentadas e promover avanços funcionais que favoreçam seu desenvolvimento."
+
+- **Desafios relacionados:** campo editável na tela (`referralChallenges`). Persistido por paciente+especialidade na tabela `patient_specialty_report_settings`. Preenchido na primeira geração, reutilizado automaticamente nas seguintes. Atualizado no banco ao "Baixar e Registrar".
+- O PDF exibe o texto completo montado.
+
+### Tabela patient_specialty_report_settings
+
+| Coluna | Tipo | Descrição |
+|---|---|---|
+| `id` | uuid PK | — |
+| `patient_id` | uuid → patients | — |
+| `specialty` | text | chave da especialidade |
+| `referral_challenges` | text | desafios relacionados do encaminhamento |
+| `created_at`, `updated_at` | timestamptz | — |
+
+Constraint única: `(patient_id, specialty)`. RLS: admin tudo; terapeuta SELECT/INSERT/UPDATE para pacientes que gerencia.
+
+### Objetivos de Intervenção (auto-carregamento)
+
+- Campo `objetivos` (`intervention_goals` no banco) é mensalmente editável.
+- Ao buscar atendimentos, o sistema carrega automaticamente o `intervention_goals` do último relatório gerado para aquele `patient_id + specialty`.
+- Ao "Baixar e Registrar", salvo em `convenio_reports.intervention_goals`.
+
+### Desempenho e Conclusão (texto fixo)
+
+Não é mais editável. Texto padrão fixo definido em `DESEMPENHO_FIXO` em `generateConvenioPDF.js`. Exibido como read-only na tela.
+
+### Campos do convenio_reports
+
+| Coluna | Tipo | Descrição |
+|---|---|---|
+| `patient_id` | uuid | — |
+| `therapist_id` | uuid | terapeuta emissor |
+| `responsible_therapist_id` | uuid | RT (quando diferente do emissor) |
+| `specialty` | text | — |
+| `mes_label` | text | — |
+| `version_label` | text | — |
+| `intervention_goals` | text | objetivos do mês (pré-carregado na próxima geração) |
+| `form_data` | jsonb | snapshot completo do formulário |
+| `created_by` | uuid | auth.uid() do criador |
+
 - **Diagnóstico:** pré-preenchido com `patient.diagnosis` + nomes das comorbidades; editável (terapeuta acrescenta CID).
-- **Registro/credencial:** `therapist.specialties.find(s => s.specialty === selectedSpecialty)?.credential`.
+- **Registro/credencial:** `rtTherapist.therapistSpecialties.find(s => s.specialty === specialty)?.credential`.
 - **Nome do arquivo:** inclui especialidade — ex: `relatorio_convenio_nome_ESPECIALIDADE_Mes_Ano.pdf`.
-- **Versionamento:** `versionLabel` (ex: `v1`, `v2`) impresso no cabeçalho do PDF; histórico gravado em `convenio_reports`.
-- **companySettings:** passado para ambas as funções PDF; exibe Razão Social e CNPJ no cabeçalho.
-- **Horários por sessão:** cada sessão tem campo `time` individual (preenchido do banco ao buscar). Campo "Horário padrão" com botão "aplicar a todas" para o caso comum. O PDF agrupa sessões por horário e gera uma linha "Datas e Horários" por grupo — ex: `04, 10 às 17:30` e `05, 12 às 18h`. Internamente: `buildSessionTimeGroups(sessions, fallbackHorario)`.
-- **Auto-refresh do histórico:** após "Baixar e Registrar", a seção recarrega automaticamente via `historyRefreshKey` passado ao `HistorySection`.
-- **Sugestão com IA:** botão "Sugerir com IA" (⚡ violeta) no topo da seção 3. Chama a Edge Function `suggest-convenio` via `supabase.functions.invoke`. Sintetiza os relatos reais dos atendimentos (Objetivo da Sessão, Relato de Evolução, Objetivo da Próxima Sessão) via GPT-4o-mini. Filtra conteúdo genérico via `isSubstantial()` — exige ao menos 2 sessões com conteúdo substancial ou 1 com evolução >80 chars; bloqueia a chamada e exibe aviso âmbar se insuficiente. Passa `aiSystemPrompt` do `companySettings` à função; fallback para `DEFAULT_SYSTEM_PROMPT` focado em síntese. Requer secret `OPENAI_API_KEY` no Supabase + JWT Verification **DESATIVADO**.
+- **Versionamento:** `versionLabel` impresso no cabeçalho do PDF; histórico gravado em `convenio_reports`.
+- **companySettings:** passado para ambas as funções PDF; exibe Razão Social, CNPJ e CNES (se configurado) no cabeçalho.
+- **Horários por sessão:** cada sessão tem campo `time` individual. Campo "Horário padrão" + botão "aplicar a todas". O PDF agrupa por horário via `buildSessionTimeGroups(sessions, fallbackHorario)`.
+- **Auto-refresh do histórico:** após "Baixar e Registrar", seção recarrega via `historyRefreshKey`.
+- **Sugestão com IA:** botão "Sugerir Objetivos com IA" (⚡ violeta). Sugere apenas `objetivos`; encaminhamento e desempenho não são mais sugeridos pela IA. Requer `OPENAI_API_KEY` no Supabase + JWT Verification **DESATIVADO**.
 - Funções em `src/utils/generateConvenioPDF.js`: `generateRelatórioConvenioPDF()`, `generateListaPresencaPDF()`, `formatMesLabel()`, `MONTHS`.
 - `MONTHS` e `formatMesLabel` re-exportados de `pdfShared.js` via `export { MONTHS, formatMesLabel } from './pdfShared'`.
 
@@ -445,10 +509,11 @@ Authentication → URL Configuration:
 ## Dados da Empresa (`/admin/empresa`)
 
 - **Acesso:** admin only (terapeutas redirecionados para `/admin`).
-- **Campos:** Razão Social, CNPJ (com máscara automática `XX.XXX.XXX/XXXX-XX`) e **Prompt da IA** (textarea `font-mono`, botão "Restaurar prompt padrão").
-- **Armazenamento:** tabela `company_settings` — linha única (id=1, `CHECK (id = 1)`); UPDATE via `updateCompanySettings()`. Campo `ai_system_prompt` (TEXT) adicionado em `44_ai_prompt.sql`.
-- **Prompt da IA:** `companySettings.aiSystemPrompt` é enviado à Edge Function `suggest-convenio` como systemPrompt. Se vazio, usa `DEFAULT_SYSTEM_PROMPT` (síntese de múltiplas sessões, sem concatenar).
-- `companySettings` (do `useData()`) é passado como parâmetro opcional para todas as funções geradoras de PDF — `generateProntuarioPDF`, `generateConsultasPacientePDF`, `generateConsultasTerapeutaPDF`, `generateRelatórioConvenioPDF`, `generateListaPresencaPDF`.
+- **Campos:** Razão Social, CNPJ (máscara `XX.XXX.XXX/XXXX-XX`), **CNES** (opcional) e **Prompt da IA** (textarea `font-mono`, botão "Restaurar prompt padrão").
+- **Armazenamento:** tabela `company_settings` — linha única (id=1, `CHECK (id = 1)`); UPDATE via `updateCompanySettings()`. Campo `cnes` TEXT adicionado em `63_convenio_reports_rt_goals_cnes.sql`.
+- **CNES:** exibido no cabeçalho dos PDFs ao lado do CNPJ, se preenchido. Tratado em `addPageHeader` de `pdfShared.js`.
+- **Prompt da IA:** `companySettings.aiSystemPrompt` enviado à Edge Function `suggest-convenio`. Se vazio, usa `DEFAULT_SYSTEM_PROMPT`.
+- `companySettings` (do `useData()`) agora inclui `{ razaoSocial, cnpj, cnes, aiSystemPrompt }` — passado como parâmetro opcional para todas as funções geradoras de PDF.
 
 ## Utilitários PDF Compartilhados (`src/utils/pdfShared.js`)
 

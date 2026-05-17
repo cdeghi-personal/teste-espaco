@@ -24,6 +24,7 @@ export default function CompanySettingsPage() {
   const toast = useToast()
   const [razaoSocial, setRazaoSocial] = useState('')
   const [cnpj, setCnpj] = useState('')
+  const [cnes, setCnes] = useState('')
   const [aiSystemPrompt, setAiSystemPrompt] = useState('')
   const [saving, setSaving] = useState(false)
 
@@ -32,6 +33,7 @@ export default function CompanySettingsPage() {
   useEffect(() => {
     setRazaoSocial(companySettings.razaoSocial || '')
     setCnpj(companySettings.cnpj || '')
+    setCnes(companySettings.cnes || '')
     setAiSystemPrompt(companySettings.aiSystemPrompt || '')
   }, [companySettings])
 
@@ -56,6 +58,7 @@ export default function CompanySettingsPage() {
     const result = await updateCompanySettings({
       razaoSocial: razaoSocial.trim(),
       cnpj: cnpj.trim(),
+      cnes: cnes.trim(),
       aiSystemPrompt: aiSystemPrompt.trim(),
     })
     setSaving(false)
@@ -73,7 +76,7 @@ export default function CompanySettingsPage() {
     <div className="max-w-2xl mx-auto px-4 py-8">
       <h1 className="text-2xl font-bold text-gray-900 mb-1">Dados da Empresa</h1>
       <p className="text-sm text-gray-500 mb-6">
-        Razão Social e CNPJ exibidos no cabeçalho dos PDFs. Prompt da IA usado no Relatório de Convênio.
+        Razão Social, CNPJ e CNES exibidos no cabeçalho dos PDFs. Prompt da IA usado no Relatório de Convênio.
       </p>
 
       <form onSubmit={handleSave} className="space-y-5">
@@ -97,6 +100,16 @@ export default function CompanySettingsPage() {
               value={cnpj}
               onChange={handleCnpjChange}
               placeholder="00.000.000/0000-00"
+            />
+          </div>
+          <div>
+            <label className={labelClass}>CNES <span className="font-normal text-gray-400">(opcional — exibido no cabeçalho dos PDFs)</span></label>
+            <input
+              className={inputClass}
+              value={cnes}
+              onChange={e => setCnes(e.target.value)}
+              placeholder="Ex: 1234567"
+              maxLength={20}
             />
           </div>
         </div>

@@ -79,7 +79,7 @@ export function DataProvider({ children }) {
   const [consultationStatuses, setConsultationStatuses] = useState([])
   const [appointmentTypes, setAppointmentTypes] = useState([])
   const [ageRanges, setAgeRanges] = useState([])
-  const [companySettings, setCompanySettings] = useState({ razaoSocial: '', cnpj: '', aiSystemPrompt: '' })
+  const [companySettings, setCompanySettings] = useState({ razaoSocial: '', cnpj: '', aiSystemPrompt: '', cnes: '' })
   const [isLoading, setIsLoading] = useState(true)
 
   const fetchAll = useCallback(async () => {
@@ -99,7 +99,7 @@ export function DataProvider({ children }) {
       supabase.from('guardians').select(GUARDIAN_SELECT),
       supabase.from('appointments').select('*').order('date').order('time'),
       supabase.from('consultations').select(CONSULTATION_SELECT).order('date', { ascending: false }),
-      supabase.from('therapists').select('*, therapist_specialties(specialty, credential)').order('name'),
+      supabase.from('therapists').select('*, therapist_specialties(specialty, credential, can_be_rt)').order('name'),
       supabase.from('specialties').select('*').order('label'),
       supabase.from('payment_methods').select('*').order('name'),
       supabase.from('diagnoses').select('*').order('name'),
@@ -108,7 +108,7 @@ export function DataProvider({ children }) {
       supabase.from('consultation_statuses').select('*').order('name'),
       supabase.from('appointment_types').select('*').order('name'),
       supabase.from('age_ranges').select('*').order('min_age'),
-      supabase.from('company_settings').select('razao_social, cnpj, ai_system_prompt').eq('id', 1).maybeSingle(),
+      supabase.from('company_settings').select('razao_social, cnpj, ai_system_prompt, cnes').eq('id', 1).maybeSingle(),
     ])
 
     setPatients((patientsRes.data || []).map(mapPatient))
@@ -127,7 +127,7 @@ export function DataProvider({ children }) {
       id: r.id, name: r.name, minAge: r.min_age, maxAge: r.max_age, color: r.color,
     })))
     if (companyRes.data) {
-      setCompanySettings({ razaoSocial: companyRes.data.razao_social || '', cnpj: companyRes.data.cnpj || '', aiSystemPrompt: companyRes.data.ai_system_prompt || '' })
+      setCompanySettings({ razaoSocial: companyRes.data.razao_social || '', cnpj: companyRes.data.cnpj || '', aiSystemPrompt: companyRes.data.ai_system_prompt || '', cnes: companyRes.data.cnes || '' })
     }
     setIsLoading(false)
   }, [])
@@ -932,10 +932,10 @@ export function DataProvider({ children }) {
   async function updateCompanySettings(data) {
     const { error } = await supabase
       .from('company_settings')
-      .update({ razao_social: data.razaoSocial || null, cnpj: data.cnpj || null, ai_system_prompt: data.aiSystemPrompt || null, updated_at: new Date().toISOString() })
+      .update({ razao_social: data.razaoSocial || null, cnpj: data.cnpj || null, ai_system_prompt: data.aiSystemPrompt || null, cnes: data.cnes || null, updated_at: new Date().toISOString() })
       .eq('id', 1)
     if (error) return dbError(error, toast)
-    setCompanySettings({ razaoSocial: data.razaoSocial || '', cnpj: data.cnpj || '', aiSystemPrompt: data.aiSystemPrompt || '' })
+    setCompanySettings({ razaoSocial: data.razaoSocial || '', cnpj: data.cnpj || '', aiSystemPrompt: data.aiSystemPrompt || '', cnes: data.cnes || '' })
     return {}
   }
 

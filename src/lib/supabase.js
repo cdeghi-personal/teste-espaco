@@ -94,6 +94,7 @@ export function mapTherapist(row) {
     therapistSpecialties: (row.therapist_specialties || []).map(s => ({
       specialty: s.specialty,
       credential: s.credential || '',
+      canBeRt: s.can_be_rt || false,
     })),
     belongsToTeam: row.belongs_to_team || false,
     active: row.active,
@@ -280,7 +281,12 @@ export async function syncTherapistSpecialties(therapistId, specialties = []) {
   const valid = specialties.filter(s => s.specialty)
   if (valid.length) {
     await supabase.from('therapist_specialties').insert(
-      valid.map(s => ({ therapist_id: therapistId, specialty: s.specialty, credential: s.credential || null }))
+      valid.map(s => ({
+        therapist_id: therapistId,
+        specialty: s.specialty,
+        credential: s.credential || null,
+        can_be_rt: s.canBeRt || false,
+      }))
     )
   }
 }

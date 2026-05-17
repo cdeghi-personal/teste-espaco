@@ -1,6 +1,6 @@
-﻿import { useState, useMemo, useEffect, useCallback } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
 import { useNavigate, Navigate } from 'react-router-dom'
-import { FiArrowLeft, FiPlus, FiTrash2, FiFileText, FiDownload, FiEye, FiClock, FiRotateCcw, FiX, FiZap } from 'react-icons/fi'
+import { FiArrowLeft, FiPlus, FiTrash2, FiFileText, FiDownload, FiEye, FiClock, FiRotateCcw, FiX, FiZap, FiAlertCircle } from 'react-icons/fi'
 import { useData } from '../../../context/DataContext'
 import { useAuth } from '../../../context/AuthContext'
 import { ROUTES } from '../../../constants/routes'
@@ -145,7 +145,6 @@ export default function ConvenioReportPage() {
   const isAdmin = user?.role === 'admin'
   const canAccess = isAdmin || user?.belongsToTeam
 
-  // Guard: terapeutas fora da equipe não acessam
   if (!canAccess) return <Navigate to={ROUTES.REPORTS} replace />
 
   // ── Seleção ──────────────────────────────────────────────────
@@ -158,6 +157,9 @@ export default function ConvenioReportPage() {
   const [periodTo, setPeriodTo] = useState('')
   const [searched, setSearched] = useState(false)
 
+  // ── RT ────────────────────────────────────────────────────────
+  const [rtId, setRtId] = useState('')
+
   // ── Sessões ──────────────────────────────────────────────────
   const [sessions, setSessions] = useState([])
   const [sessionValue, setSessionValue] = useState('')
@@ -169,9 +171,8 @@ export default function ConvenioReportPage() {
   // ── Texto ────────────────────────────────────────────────────
   const [responsavel, setResponsavel] = useState('')
   const [diagnosticoText, setDiagnosticoText] = useState('')
-  const [encaminhamento, setEncaminhamento] = useState('')
+  const [referralChallenges, setReferralChallenges] = useState('')
   const [objetivos, setObjetivos] = useState('')
-  const [desempenho, setDesempenho] = useState('')
 
   // ── Preview / versão ─────────────────────────────────────────
   const [versionLabel, setVersionLabel] = useState('')
@@ -204,6 +205,29 @@ export default function ConvenioReportPage() {
     return specialtiesData.filter(s => keys.includes(s.key) && s.active !== false)
   }, [patients, patientId, specialtiesData])
 
+  // ── Lógica de RT ─────────────────────────────────────────────
+  const emitterCanBeRt = useMemo(() => {
+    if (!selectedTherapist || !specialty) return false
+    const specEntry = (selectedTherapist.therapistSpecialties || []).find(s => s.specialty === specialty)
+    return specEntry?.canBeRt === true
+  }, [selectedTherapist, specialty])
+
+  const eligibleRTs = useMemo(() => {
+    if (!specialty) return []
+    return activeTherapists.filter(t =>
+      (t.therapistSpecialties || []).some(s => s.specialty === specialty && s.canBeRt === true)
+    )
+  }, [activeTherapists, specialty])
+
+  // RT efetivo para o PDF: emissor (se pode ser RT) ou o RT selecionado
+  const selectedRT = useMemo(() => {
+    if (emitterCanBeRt) return selectedTherapist
+    return therapists.find(t => t.id === rtId) || null
+  }, [emitterCanBeRt, selectedTherapist, rtId, therapists])
+
+  // Reset rtId quando a especialidade muda
+  useEffect(() => { setRtId('') }, [specialty])
+
   function getDateRange() {
     if (periodType === 'month') {
       const [y, m] = periodMonth.split('-')
@@ -219,7 +243,7 @@ export default function ConvenioReportPage() {
   }
 
   // ── Buscar atendimentos ───────────────────────────────────────
-  function handleSearch() {
+  async function handleSearch() {
     setError('')
     if (!patientId) { setError('Selecione o paciente.'); return }
     if (!specialty) { setError('Selecione a especialidade.'); return }
@@ -236,7 +260,6 @@ export default function ConvenioReportPage() {
 
     setSessions(found.map(c => ({ id: c.id, date: c.date, value: defValue, time: c.time ? c.time.slice(0, 5) : '' })))
     setSessionValue(String(defValue || ''))
-    // Set default horario from first session (for apply-all convenience)
     if (found.length > 0 && found[0].time) setHorario(found[0].time.slice(0, 5))
 
     const mainDiag = patient?.diagnosis || ''
@@ -246,7 +269,29 @@ export default function ConvenioReportPage() {
 
     const patGuardians = guardians.filter(g => (g.patientIds || []).includes(patientId) && g.active !== false)
     setResponsavel(patGuardians[0]?.fullName || '')
-    setVersionLabel('')  // reset version on new search
+    setVersionLabel('')
+
+    // Carrega desafios persistidos para este paciente + especialidade
+    const { data: rsData } = await supabase
+      .from('patient_specialty_report_settings')
+      .select('referral_challenges')
+      .eq('patient_id', patientId)
+      .eq('specialty', specialty)
+      .maybeSingle()
+    setReferralChallenges(rsData?.referral_challenges || '')
+
+    // Pré-carrega objetivos do último relatório gerado para este paciente + especialidade
+    const { data: lastReport } = await supabase
+      .from('convenio_reports')
+      .select('intervention_goals')
+      .eq('patient_id', patientId)
+      .eq('specialty', specialty)
+      .not('intervention_goals', 'is', null)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    setObjetivos(lastReport?.intervention_goals || '')
+
     setSearched(true)
     logConvenioAudit('CONSULTA')
   }
@@ -272,7 +317,6 @@ export default function ConvenioReportPage() {
   function handleRestore(record) {
     if (!record) return
     const fd = record.form_data || {}
-    // Seleção
     if (record.therapist_id) setTherapistId(record.therapist_id)
     if (record.patient_id) setPatientId(record.patient_id)
     if (record.specialty) setSpecialty(record.specialty)
@@ -280,15 +324,17 @@ export default function ConvenioReportPage() {
     if (fd.periodMonth) setPeriodMonth(fd.periodMonth)
     if (fd.periodFrom) setPeriodFrom(fd.periodFrom)
     if (fd.periodTo) setPeriodTo(fd.periodTo)
-    // Dados do formulário
     if (fd.sessions) setSessions(fd.sessions)
     if (fd.sessionValue != null) setSessionValue(String(fd.sessionValue))
     if (fd.horario) setHorario(fd.horario)
     if (fd.responsavel != null) setResponsavel(fd.responsavel)
     if (fd.diagnosticoText != null) setDiagnosticoText(fd.diagnosticoText)
-    if (fd.encaminhamento != null) setEncaminhamento(fd.encaminhamento)
+    // referralChallenges: novo campo (também aceita legado "encaminhamento")
+    if (fd.referralChallenges != null) setReferralChallenges(fd.referralChallenges)
+    else if (fd.encaminhamento != null) setReferralChallenges(fd.encaminhamento)
     if (fd.objetivos != null) setObjetivos(fd.objetivos)
-    if (fd.desempenho != null) setDesempenho(fd.desempenho)
+    if (fd.rtId) setRtId(fd.rtId)
+    else if (record.responsible_therapist_id) setRtId(record.responsible_therapist_id)
     setSearched(true)
   }
 
@@ -297,10 +343,8 @@ export default function ConvenioReportPage() {
     setAiError('')
     setAiWarning('')
     const specialtyLabel = specialtiesData.find(s => s.key === specialty)?.label || specialty
-    const hasContent = encaminhamento || objetivos || desempenho
-    if (hasContent && !confirm('Os campos de texto já têm conteúdo. Deseja sobrescrever com as sugestões da IA?')) return
+    if (objetivos && !confirm('O campo Objetivos já tem conteúdo. Deseja sobrescrever com as sugestões da IA?')) return
 
-    // Palavras genéricas que não contribuem para a IA
     const GENERIC_TERMS = ['n/a', 'na', 'continuidade', 'continuidade no tratamento',
       'continuidade do tratamento', 'sem alterações', 'sem alteracao', 'idem', '-', '—']
 
@@ -308,10 +352,9 @@ export default function ConvenioReportPage() {
       if (!text) return false
       const normalized = text.trim().toLowerCase()
       if (GENERIC_TERMS.includes(normalized)) return false
-      return normalized.length >= 15  // mínimo 15 chars após excluir genéricos
+      return normalized.length >= 15
     }
 
-    // Coleta apenas sessões com conteúdo real e substancial
     const sessionIds = new Set(validSessions.map(s => s.id))
     const sessionDetails = consultations
       .filter(c => sessionIds.has(c.id) &&
@@ -325,15 +368,12 @@ export default function ConvenioReportPage() {
       })
       .join('\n\n')
 
-    // Exige ao menos 2 sessões com conteúdo substancial OU 1 sessão com evolução detalhada (>80 chars)
     const sessionsWithContent = consultations.filter(c => sessionIds.has(c.id) &&
       (isSubstantial(c.mainObjective) || isSubstantial(c.evolutionNotes) || isSubstantial(c.nextObjectives)))
     const hasRichContent = sessionsWithContent.length >= 2 ||
       sessionsWithContent.some(c => (c.evolutionNotes || '').length > 80)
-    const sessionDetailsSubstantial = hasRichContent ? sessionDetails : null
 
-    // Bloqueia chamada à IA se não há conteúdo substancial nos atendimentos
-    if (!sessionDetailsSubstantial) {
+    if (!hasRichContent) {
       setAiWarning('Os atendimentos deste período não têm relatos detalhados suficientes. Preencha o Objetivo da Sessão, Relato de Evolução e Objetivo da Próxima Sessão nos atendimentos para que a IA possa gerar sugestões úteis.')
       return
     }
@@ -346,15 +386,13 @@ export default function ConvenioReportPage() {
           diagnostico: diagnosticoText,
           numSessoes: validSessions.length,
           terapeutaNome: selectedTherapist?.name || '',
-          sessionDetails: sessionDetailsSubstantial,
+          sessionDetails,
           aiSystemPrompt: companySettings.aiSystemPrompt || '',
         },
       })
       if (fnError) throw new Error(fnError.message)
       if (data?.error) throw new Error(data.error)
-      if (data?.encaminhamento) setEncaminhamento(data.encaminhamento)
       if (data?.objetivos) setObjetivos(data.objetivos)
-      if (data?.desempenho) setDesempenho(data.desempenho)
     } catch (err) {
       setAiError(err.message || 'Erro ao gerar sugestões.')
     } finally {
@@ -366,8 +404,9 @@ export default function ConvenioReportPage() {
   function buildParams(ver) {
     const patient = patients.find(p => p.id === patientId)
     const specialtyLabel = specialtiesData.find(s => s.key === specialty)?.label || specialty
-    const credential = selectedTherapist?.specialties?.find(s => s.specialty === specialty)?.credential || ''
-    return { patient, specialtyLabel, credential, mesLabel: getMesLabel(), ver }
+    const rtTherapist = selectedRT || selectedTherapist
+    const credential = (rtTherapist?.therapistSpecialties || []).find(s => s.specialty === specialty)?.credential || ''
+    return { patient, specialtyLabel, credential, mesLabel: getMesLabel(), ver, rtTherapist }
   }
 
   function getOrMakeVersion() {
@@ -375,6 +414,17 @@ export default function ConvenioReportPage() {
     const v = makeVersionLabel()
     setVersionLabel(v)
     return v
+  }
+
+  // ── Salvar desafios persistentes ──────────────────────────────
+  async function saveReferralChallenges() {
+    if (!patientId || !specialty) return
+    await supabase
+      .from('patient_specialty_report_settings')
+      .upsert(
+        { patient_id: patientId, specialty, referral_challenges: referralChallenges || null, updated_at: new Date().toISOString() },
+        { onConflict: 'patient_id,specialty' }
+      )
   }
 
   // ── Salvar no histórico ───────────────────────────────────────
@@ -395,16 +445,20 @@ export default function ConvenioReportPage() {
   }
 
   async function saveHistory(ver) {
+    const rtTherapist = selectedRT
     const { error } = await supabase.from('convenio_reports').insert({
       patient_id: patientId,
       therapist_id: therapistId || null,
+      responsible_therapist_id: (rtTherapist && rtTherapist.id !== therapistId) ? rtTherapist.id : null,
       specialty,
       mes_label: getMesLabel(),
       version_label: ver,
+      intervention_goals: objetivos || null,
       form_data: {
         sessions, sessionValue, horario, responsavel, diagnosticoText,
-        encaminhamento, objetivos, desempenho,
+        referralChallenges, objetivos,
         periodType, periodMonth, periodFrom, periodTo,
+        rtId: !emitterCanBeRt ? rtId : null,
         createdByName: user.name,
       },
       created_by: user.authId,
@@ -423,6 +477,7 @@ export default function ConvenioReportPage() {
 
   async function handleDownloadAndLog(blob, filename) {
     downloadBlob(blob, filename)
+    await saveReferralChallenges()
     const ver = versionLabel || getOrMakeVersion()
     const saved = await saveHistory(ver)
     if (saved) {
@@ -433,18 +488,27 @@ export default function ConvenioReportPage() {
 
   // ── Preview Relatório ─────────────────────────────────────────
   async function handlePreviewRelatorio() {
-    const { patient, specialtyLabel, credential, mesLabel, ver } = buildParams(getOrMakeVersion())
-    if (!patient || !selectedTherapist) return
+    const { patient, specialtyLabel, credential, mesLabel, ver, rtTherapist } = buildParams(getOrMakeVersion())
+    if (!patient || !rtTherapist) return
     setLoadingPDF('relatorio')
     logConvenioAudit('SOLICITAR', 'Rel. Convênio')
     try {
       const blob = await generateRelatórioConvenioPDF({
-        patientName: patient.fullName, diagnosticoText, specialtyLabel,
-        terapeutaNome: selectedTherapist.name, terapeutaRegistro: credential,
-        mesLabel, sessions: sessions.filter(s => s.date),
-        sessionValue: parseFloat(sessionValue) || 0, horario,
-        encaminhamento, objetivos, desempenho,
-        versionLabel: ver, returnBlob: true, companySettings,
+        patientName: patient.fullName,
+        patientFirstName: patient.fullName.split(' ')[0],
+        diagnosticoText,
+        specialtyLabel,
+        terapeutaNome: rtTherapist.name,
+        terapeutaRegistro: credential,
+        mesLabel,
+        sessions: sessions.filter(s => s.date),
+        sessionValue: parseFloat(sessionValue) || 0,
+        horario,
+        referralChallenges,
+        objetivos,
+        versionLabel: ver,
+        returnBlob: true,
+        companySettings,
       })
       const safe = patient.fullName.replace(/[^\w]/g, '_')
       const safeSpec = specialtyLabel.replace(/[^\w]/g, '_')
@@ -456,16 +520,22 @@ export default function ConvenioReportPage() {
 
   // ── Preview Lista ─────────────────────────────────────────────
   async function handlePreviewLista() {
-    const { patient, specialtyLabel, credential, mesLabel, ver } = buildParams(getOrMakeVersion())
-    if (!patient || !selectedTherapist) return
+    const { patient, specialtyLabel, credential, mesLabel, ver, rtTherapist } = buildParams(getOrMakeVersion())
+    if (!patient || !rtTherapist) return
     setLoadingPDF('lista')
     logConvenioAudit('SOLICITAR', 'Lista de Presença')
     try {
       const blob = await generateListaPresencaPDF({
-        patientName: patient.fullName, terapeutaNome: selectedTherapist.name,
-        terapeutaRegistro: credential, specialtyLabel, mesLabel,
+        patientName: patient.fullName,
+        terapeutaNome: rtTherapist.name,
+        terapeutaRegistro: credential,
+        specialtyLabel,
+        mesLabel,
         sessions: sessions.filter(s => s.date),
-        responsavel, versionLabel: ver, returnBlob: true, companySettings,
+        responsavel,
+        versionLabel: ver,
+        returnBlob: true,
+        companySettings,
       })
       const safe = patient.fullName.replace(/[^\w]/g, '_')
       const safeSpec = specialtyLabel.replace(/[^\w]/g, '_')
@@ -475,9 +545,19 @@ export default function ConvenioReportPage() {
     } finally { setLoadingPDF('') }
   }
 
+  // ── Encaminhamento preview (gerado a partir do template) ──────
+  const encaminhamentoPreview = useMemo(() => {
+    const patient = patients.find(p => p.id === patientId)
+    const firstName = patient?.fullName?.split(' ')[0] || '...'
+    const specialtyLabel = specialtiesData.find(s => s.key === specialty)?.label || '...'
+    const desafios = referralChallenges?.trim() || '___________'
+    return `${firstName} foi encaminhado para atendimento ${specialtyLabel} devido a dificuldades observadas em seu desenvolvimento, incluindo ${desafios}. O objetivo do acompanhamento é realizar avaliação contínua, intervir de forma estruturada conforme as necessidades apresentadas e promover avanços funcionais que favoreçam seu desenvolvimento.`
+  }, [patients, patientId, specialtiesData, specialty, referralChallenges])
+
   const validSessions = sessions.filter(s => s.date)
   const totalValue = sessions.reduce((sum, s) => sum + (parseFloat(s.value) || 0), 0)
-  const canGenerate = searched && patientId && specialty && selectedTherapist && validSessions.length > 0
+  const rtIsValid = emitterCanBeRt || !!rtId
+  const canGenerate = searched && patientId && specialty && selectedTherapist && validSessions.length > 0 && rtIsValid
   const selectClass = 'px-3 py-2 text-sm border border-gray-200 rounded-xl bg-white focus:ring-2 focus:ring-brand-blue outline-none w-full'
   const labelClass = 'block text-xs text-gray-500 mb-1 font-medium'
 
@@ -495,11 +575,11 @@ export default function ConvenioReportPage() {
           </div>
         </div>
         <HelpButton title="Como gerar o Relatório de Convênio">
-          <p><strong>1. Seleção:</strong> escolha o paciente, a especialidade e o período (mês ou De/Até) e clique em <em>Buscar Atendimentos</em>. O sistema carregará automaticamente as sessões registradas no período.</p>
-          <p><strong>2. Sessões:</strong> revise as sessões encontradas. Você pode adicionar, remover ou alterar datas e valores individualmente. Use <em>"aplicar a todas"</em> para padronizar o valor e o <em>Horário padrão</em> + botão "aplicar a todas" para padronizar o horário.</p>
-          <p><strong>3. Texto do Relatório:</strong> preencha o campo <em>Diagnóstico</em> incluindo os códigos CID (pré-preenchido com o diagnóstico do cadastro). Escreva o Encaminhamento, os Objetivos (um por linha — cada linha vira um bullet) e o Desempenho e Conclusão. Use o botão <em>⚡ Sugerir com IA</em> para gerar sugestões de texto baseadas nos relatos reais dos atendimentos.</p>
-          <p><strong>4. Pré-visualizar:</strong> clique em <em>Pré-visualizar</em> para ver o documento antes de baixar. Na pré-visualização, clique em <em>Baixar e Registrar</em> para baixar o PDF e gravar no histórico.</p>
-          <p><strong>Histórico:</strong> os relatórios gerados ficam registrados abaixo. Clique em <em>Restaurar</em> para recuperar os dados de um relatório anterior e gerar uma nova versão.</p>
+          <p><strong>1. Seleção:</strong> escolha o terapeuta emissor, o paciente e a especialidade. Se o emissor não puder ser Responsável Técnico (RT) naquela especialidade, um campo adicional será exibido para selecionar o RT.</p>
+          <p><strong>2. Sessões:</strong> revise as sessões encontradas. Você pode adicionar, remover ou alterar datas, horários e valores individualmente.</p>
+          <p><strong>3. Texto:</strong> preencha o Diagnóstico (com CID), os Desafios Relacionados (usado no Encaminhamento) e os Objetivos de Intervenção. O Encaminhamento é gerado automaticamente a partir do template e os Desafios são salvos automaticamente por paciente/especialidade. O Desempenho e Conclusão é um texto padrão fixo.</p>
+          <p><strong>4. Pré-visualizar:</strong> clique em <em>Pré-visualizar</em> para ver o documento. Na pré-visualização, clique em <em>Baixar e Registrar</em> para salvar o PDF e registrar no histórico.</p>
+          <p><strong>Histórico:</strong> os relatórios ficam registrados abaixo. Clique em <em>Restaurar</em> para recuperar dados de um relatório anterior.</p>
         </HelpButton>
       </div>
 
@@ -509,7 +589,7 @@ export default function ConvenioReportPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {isAdmin && (
             <div>
-              <label className={labelClass}>Terapeuta</label>
+              <label className={labelClass}>Terapeuta emissor</label>
               <select value={therapistId} onChange={e => { setTherapistId(e.target.value); setPatientId(''); setSpecialty(''); setSearched(false) }} className={selectClass}>
                 <option value="">Selecione</option>
                 {activeTherapists.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
@@ -533,6 +613,36 @@ export default function ConvenioReportPage() {
             </select>
           </div>
         </div>
+
+        {/* RT — exibido quando emissor não pode ser RT para a especialidade selecionada */}
+        {specialty && selectedTherapist && !emitterCanBeRt && (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 space-y-2">
+            <div className="flex items-start gap-2">
+              <FiAlertCircle size={15} className="text-amber-600 shrink-0 mt-0.5" />
+              <p className="text-xs text-amber-700">
+                <strong>{selectedTherapist.name}</strong> não está configurado como Responsável Técnico (RT) para <strong>{specialtiesData.find(s => s.key === specialty)?.label || specialty}</strong>. Selecione um RT abaixo para continuar.
+              </p>
+            </div>
+            {eligibleRTs.length === 0 ? (
+              <p className="text-xs text-red-600 font-medium pl-5">Nenhum terapeuta ativo cadastrado como RT para esta especialidade. Configure o campo RT no cadastro do terapeuta antes de gerar o relatório.</p>
+            ) : (
+              <div className="pl-5">
+                <label className={labelClass}>Responsável Técnico (RT) *</label>
+                <select value={rtId} onChange={e => setRtId(e.target.value)} className={selectClass}>
+                  <option value="">Selecione o RT</option>
+                  {eligibleRTs.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                </select>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Confirmação visual quando RT = emissor */}
+        {specialty && selectedTherapist && emitterCanBeRt && (
+          <p className="text-xs text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+            <strong>{selectedTherapist.name}</strong> é RT para esta especialidade e assinará o relatório.
+          </p>
+        )}
 
         <div className="space-y-2">
           <label className={labelClass}>Período</label>
@@ -634,7 +744,7 @@ export default function ConvenioReportPage() {
           <div className="flex items-start justify-between gap-3">
             <div>
               <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">3. Texto do Relatório</h2>
-              <p className="text-xs text-gray-400 mt-1">A qualidade da sugestão da IA depende diretamente do que foi registrado nos atendimentos — Objetivo da Sessão, Relato de Evolução e Objetivo da Próxima Sessão.</p>
+              <p className="text-xs text-gray-400 mt-1">A sugestão de Objetivos pela IA depende dos relatos registrados nos atendimentos.</p>
             </div>
             <button
               onClick={handleSuggestAI}
@@ -642,7 +752,7 @@ export default function ConvenioReportPage() {
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-violet-600 hover:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl transition-colors shrink-0"
             >
               <FiZap size={13} />
-              {loadingAI ? 'Gerando...' : 'Sugerir com IA'}
+              {loadingAI ? 'Gerando...' : 'Sugerir Objetivos com IA'}
             </button>
           </div>
           {aiWarning && (
@@ -651,6 +761,8 @@ export default function ConvenioReportPage() {
           {aiError && (
             <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{aiError}</p>
           )}
+
+          {/* Responsável e diagnóstico */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className={labelClass}>Responsável legal (Lista de Presença)</label>
@@ -664,23 +776,50 @@ export default function ConvenioReportPage() {
               placeholder="Ex: TDAH - CID-10: F90.0; TEA - CID-11: 6A02.0"
               className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl bg-white focus:ring-2 focus:ring-brand-blue outline-none resize-none" />
           </div>
-          <div>
-            <label className={labelClass}>Encaminhamento</label>
-            <textarea value={encaminhamento} onChange={e => setEncaminhamento(e.target.value)} rows={5}
-              placeholder="Descreva o histórico e motivo do encaminhamento..."
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl bg-white focus:ring-2 focus:ring-brand-blue outline-none resize-y" />
+
+          {/* Encaminhamento — desafios relacionados */}
+          <div className="space-y-2">
+            <div>
+              <label className={labelClass}>
+                Encaminhamento — Desafios relacionados
+                <span className="ml-1 text-gray-400 font-normal">(salvo por paciente/especialidade)</span>
+              </label>
+              <textarea
+                value={referralChallenges}
+                onChange={e => setReferralChallenges(e.target.value)}
+                rows={2}
+                placeholder="Ex: déficit de atenção e impulsividade, dificuldades na regulação sensorial e comunicação"
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl bg-white focus:ring-2 focus:ring-brand-blue outline-none resize-none"
+              />
+            </div>
+            <div className="bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5">
+              <p className="text-[10px] text-gray-400 uppercase tracking-wide font-medium mb-1">Pré-visualização do Encaminhamento</p>
+              <p className="text-xs text-gray-600 leading-relaxed">{encaminhamentoPreview}</p>
+            </div>
           </div>
+
+          {/* Objetivos de intervenção */}
           <div>
-            <label className={labelClass}>Objetivos de Intervenção <span className="text-gray-400 font-normal">(uma linha = um bullet)</span></label>
+            <label className={labelClass}>
+              Objetivos de Intervenção
+              <span className="text-gray-400 font-normal ml-1">(uma linha = um bullet — pré-carregado do último relatório)</span>
+            </label>
             <textarea value={objetivos} onChange={e => setObjetivos(e.target.value)} rows={5}
               placeholder={"Melhorar a modulação vestibular;\nAprimorar viso-dispraxia;"}
               className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl bg-white focus:ring-2 focus:ring-brand-blue outline-none resize-y" />
           </div>
+
+          {/* Desempenho e Conclusão — texto fixo */}
           <div>
-            <label className={labelClass}>Desempenho e Conclusão</label>
-            <textarea value={desempenho} onChange={e => setDesempenho(e.target.value)} rows={6}
-              placeholder="Descreva o desempenho do paciente e as recomendações..."
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl bg-white focus:ring-2 focus:ring-brand-blue outline-none resize-y" />
+            <label className={labelClass}>
+              Desempenho e Conclusão
+              <span className="ml-1 text-gray-400 font-normal">(texto padrão fixo)</span>
+            </label>
+            <div className="bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5">
+              <p className="text-xs text-gray-500 leading-relaxed">
+                O paciente apresentou desempenho compatível com seu plano terapêutico, demonstrando avanços graduais nos objetivos trabalhados e melhora na execução das atividades propostas, mantendo boa responsividade aos procedimentos de ensino. Observou-se engajamento adequado nas sessões, com disposição para participar e concluir as tarefas. Embora alguns objetivos ainda demandem manutenção para consolidação, o desempenho geral indica evolução estável e coerente com seu perfil de desenvolvimento. Recomenda-se a continuidade do acompanhamento, com manutenção dos objetivos em consolidação e inclusão progressiva de novas metas conforme sua prontidão, favorecendo seu desenvolvimento global e atendendo às suas necessidades.
+              </p>
+            </div>
           </div>
         </div>
       )}
@@ -689,6 +828,12 @@ export default function ConvenioReportPage() {
       {searched && (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
           <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">4. Pré-visualizar e Gerar</h2>
+          {selectedRT && (
+            <p className="text-xs text-gray-500 mb-2">
+              Terapeuta no PDF: <strong>{selectedRT.name}</strong>
+              {!emitterCanBeRt && selectedTherapist && ` (emissor: ${selectedTherapist.name})`}
+            </p>
+          )}
           {versionLabel && (
             <div className="flex items-center gap-1.5 text-xs text-gray-400 mb-3">
               <FiClock size={12} /> Versão: <span className="font-medium text-gray-600">{versionLabel}</span>
@@ -704,7 +849,11 @@ export default function ConvenioReportPage() {
           </div>
           {!canGenerate && (
             <p className="text-xs text-gray-400 mt-2">
-              {!patientId || !specialty ? 'Selecione paciente e especialidade.' : 'Adicione pelo menos uma sessão com data.'}
+              {!patientId || !specialty
+                ? 'Selecione paciente e especialidade.'
+                : !rtIsValid
+                ? 'Selecione o Responsável Técnico (RT) para a especialidade.'
+                : 'Adicione pelo menos uma sessão com data.'}
             </p>
           )}
         </div>

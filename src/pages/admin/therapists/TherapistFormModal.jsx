@@ -8,7 +8,7 @@ import Select from '../../../components/ui/Select'
 import { useData } from '../../../context/DataContext'
 import { useToast } from '../../../components/ui/Toast'
 
-const EMPTY_SPEC = { specialty: '', credential: '' }
+const EMPTY_SPEC = { specialty: '', credential: '', canBeRt: false }
 
 const EMPTY = {
   name: '', email: '', phone: '', cpf: '',
@@ -214,14 +214,15 @@ export default function TherapistFormModal({ onClose, initial = {} }) {
           )}
           <div className="space-y-2">
             {/* Cabeçalho da tabela */}
-            <div className="hidden sm:grid grid-cols-[1fr_1fr_32px] gap-2 px-1">
+            <div className="hidden sm:grid grid-cols-[1fr_1fr_56px_32px] gap-2 px-1">
               <span className="text-xs text-gray-400 font-medium">Especialidade</span>
               <span className="text-xs text-gray-400 font-medium">Nº Conselho Regional</span>
+              <span className="text-xs text-gray-400 font-medium text-center">RT?</span>
               <span />
             </div>
 
             {form.therapistSpecialties.map((row, i) => (
-              <div key={i} className="grid grid-cols-[1fr_1fr_32px] gap-2 items-start">
+              <div key={i} className="grid grid-cols-[1fr_1fr_56px_32px] gap-2 items-start">
                 <Select
                   value={row.specialty}
                   onChange={e => setSpecRow(i, 'specialty', e.target.value)}
@@ -236,6 +237,15 @@ export default function TherapistFormModal({ onClose, initial = {} }) {
                   onChange={e => setSpecRow(i, 'credential', e.target.value)}
                   placeholder="Ex: CRFa 2/12345"
                 />
+                <div className="flex items-center justify-center mt-1">
+                  <input
+                    type="checkbox"
+                    checked={row.canBeRt || false}
+                    onChange={e => setSpecRow(i, 'canBeRt', e.target.checked)}
+                    title="Pode ser Responsável Técnico (RT) nesta especialidade"
+                    className="w-4 h-4 rounded accent-brand-blue cursor-pointer"
+                  />
+                </div>
                 <button
                   type="button"
                   onClick={() => removeSpecRow(i)}
