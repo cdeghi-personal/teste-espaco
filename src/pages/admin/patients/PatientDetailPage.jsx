@@ -9,6 +9,7 @@ import PatientFormModal from './PatientFormModal'
 import { calculateAge, formatDateBR, formatDateShort } from '../../../utils/dateUtils'
 import { hexTextColor } from '../../../utils/colorUtils'
 import { PAYMENT_TYPE_LABELS } from '../../../constants/paymentTypes'
+import PrepaidSection from './PrepaidSection'
 
 
 export default function PatientDetailPage() {
@@ -41,6 +42,7 @@ export default function PatientDetailPage() {
     .map(tid => therapists.find(t => t.id === tid))
     .filter(Boolean)
   const paymentMethod = paymentMethods.find(pm => pm.id === patient.paymentMethodId)
+  const prepaidSpecialties = (patient.specialties || []).filter(s => s.paymentType === 'PREPAID_PACKAGE')
   const patientConsultations = consultations
     .filter(c => c.patientId === id)
     .sort((a, b) => b.date.localeCompare(a.date))
@@ -249,6 +251,22 @@ export default function PatientDetailPage() {
               <p className="text-sm text-gray-700 leading-relaxed">{patient.notes}</p>
             </div>
           )}
+
+          {/* Pacotes Pré-pagos */}
+          {prepaidSpecialties.map(s => {
+            const spec = specialtiesData.find(sd => sd.key === s.key)
+            return (
+              <div key={s.key} className="lg:col-span-2">
+                <PrepaidSection
+                  patientId={id}
+                  specialty={s.key}
+                  specialtyLabel={spec?.label || s.key}
+                  defaultPatientValue={s.patientValue}
+                  defaultTherapistValue={s.therapistValue}
+                />
+              </div>
+            )
+          })}
 
           {/* Últimas consultas */}
           {patientConsultations.length > 0 && (

@@ -982,6 +982,73 @@ export function DataProvider({ children }) {
     setAgeRanges(prev => prev.filter(r => r.id !== id))
   }
 
+  // ─── Prepaid Packages & Ledger ───────────────────────────────────────────────
+
+  async function addPrepaidPackage(patientId, specialty, data) {
+    const { data: { session } } = await supabase.auth.getSession()
+    const createdBy = session?.user?.id || null
+    const { data: pkg, error } = await supabase
+      .from('patient_prepaid_packages')
+      .insert({
+        patient_id: patientId,
+        specialty,
+        sessions_quantity: data.sessionsQuantity,
+        patient_value_per_session: data.patientValuePerSession ?? null,
+        therapist_value_per_session: data.therapistValuePerSession ?? null,
+        total_paid: data.totalPaid ?? null,
+        notes: data.notes || null,
+        purchased_at: data.purchasedAt || new Date().toISOString().slice(0, 10),
+        created_by: createdBy,
+      })
+      .select().single()
+    if (error) return dbError(error, toast)
+    // Registra CREDIT no ledger
+    await supabase.from('patient_prepaid_ledger').insert({
+      patient_id: patientId,
+      specialty,
+      package_id: pkg.id,
+      entry_type: 'CREDIT',
+      sessions_quantity: data.sessionsQuantity,
+      notes: data.notes || null,
+      created_by: createdBy,
+    })
+    return pkg
+  }
+
+  async function getPrepaidData(patientId, specialty) {
+    const [packagesRes, ledgerRes] = await Promise.all([
+      supabase.from('patient_prepaid_packages')
+        .select('*')
+        .eq('patient_id', patientId)
+        .eq('specialty', specialty)
+        .order('purchased_at', { ascending: false }),
+      supabase.from('patient_prepaid_ledger')
+        .select('*')
+        .eq('patient_id', patientId)
+        .eq('specialty', specialty)
+        .order('created_at', { ascending: true }),
+    ])
+    const packages = packagesRes.data || []
+    const ledger = ledgerRes.data || []
+    const balance = ledger.reduce((sum, e) => sum + (e.sessions_quantity || 0), 0)
+    return { packages, ledger: [...ledger].reverse(), balance }
+  }
+
+  async function addLedgerAdjustment(patientId, specialty, sessionsQty, notes) {
+    const { data: { session } } = await supabase.auth.getSession()
+    const createdBy = session?.user?.id || null
+    const { error } = await supabase.from('patient_prepaid_ledger').insert({
+      patient_id: patientId,
+      specialty,
+      entry_type: 'ADJUSTMENT',
+      sessions_quantity: sessionsQty,
+      notes: notes || null,
+      created_by: createdBy,
+    })
+    if (error) return dbError(error, toast)
+    return {}
+  }
+
   // ─── Company Settings ────────────────────────────────────────────────────────
 
   async function updateCompanySettings(data) {
@@ -1045,6 +1112,7 @@ export function DataProvider({ children }) {
     getConducts, addConduct, updateConduct, deleteConduct,
     logAudit,
     companySettings, updateCompanySettings,
+    addPrepaidPackage, getPrepaidData, addLedgerAdjustment,
   }
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>
