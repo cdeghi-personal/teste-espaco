@@ -20,24 +20,16 @@ function pageBreak(doc, y, needed, logoData, subtitle, versionLabel, companySett
   return y
 }
 
-function buildDatasStr(sessions) {
+function buildSessionsLine(sessions, fallbackHorario) {
   if (!sessions.length) return '—'
   const allSameMonth = sessions.every(s => s.date?.slice(0, 7) === sessions[0].date?.slice(0, 7))
-  const parts = allSameMonth
-    ? sessions.map(s => s.date.split('-')[2])
-    : sessions.map(s => fmtDatePDF(s.date))
+  const parts = sessions.map(s => {
+    const day = allSameMonth ? s.date.split('-')[2] : fmtDatePDF(s.date)
+    const time = (s.time || fallbackHorario || '').trim()
+    return time ? `${day} às ${time}` : day
+  })
   if (parts.length === 1) return parts[0]
   return parts.slice(0, -1).join(', ') + ' e ' + parts[parts.length - 1]
-}
-
-function buildSessionTimeGroups(sessions, fallbackHorario) {
-  const groups = new Map()
-  for (const s of sessions) {
-    const key = (s.time || fallbackHorario || '').trim()
-    if (!groups.has(key)) groups.set(key, [])
-    groups.get(key).push(s)
-  }
-  return [...groups.entries()].map(([time, grp]) => ({ time, datasStr: buildDatasStr(grp) }))
 }
 
 // ─── Relatório ao Convênio ──────────────────────────────────────
@@ -75,12 +67,14 @@ export async function generateRelatórioConvenioPDF({
     body: [
       [{ content: 'Paciente:', styles: { fontStyle: 'bold', fillColor: PDF_LIGHT } }, { content: patientName, colSpan: 3 }],
       [{ content: 'Diagnóstico:', styles: { fontStyle: 'bold', fillColor: PDF_LIGHT } }, { content: diagnosticoText || '—', colSpan: 3 }],
-      [{ content: 'Especialidade:', styles: { fontStyle: 'bold', fillColor: PDF_LIGHT } }, { content: specialtyLabel, colSpan: 3 }],
-      [{ content: 'Terapeuta responsável:', styles: { fontStyle: 'bold', fillColor: PDF_LIGHT } }, { content: terapeutaLine, colSpan: 3 }],
+      [
+        { content: 'Especialidade:', styles: { fontStyle: 'bold', fillColor: PDF_LIGHT } }, { content: specialtyLabel },
+        { content: 'Terapeuta responsável:', styles: { fontStyle: 'bold', fillColor: PDF_LIGHT } }, { content: terapeutaLine },
+      ],
     ],
     theme: 'grid',
     styles: { fontSize: 9, cellPadding: 3.5, textColor: PDF_DARK },
-    columnStyles: { 0: { cellWidth: 48 }, 1: { cellWidth: contentW - 48 } },
+    columnStyles: { 0: { cellWidth: 44 }, 1: { cellWidth: 44 }, 2: { cellWidth: 46 }, 3: { cellWidth: contentW - 134 } },
     tableLineColor: [200, 210, 220], tableLineWidth: 0.3,
   })
   y = doc.lastAutoTable.finalY + 8
@@ -88,18 +82,13 @@ export async function generateRelatórioConvenioPDF({
   // ── Atendimentos do Mês ──
   y = pageBreak(doc, y, 50, logoData, subtitle, versionLabel, companySettings)
   y = sectionBlock(doc, 'Atendimentos do Mês', y, { uppercase: false })
-  const timeGroups = buildSessionTimeGroups(sessions, horario)
   const total = sessions.reduce((sum, s) => sum + (parseFloat(s.value) || 0), 0)
-  const datasRows = timeGroups.map(({ time, datasStr }) => [
-    { content: 'Datas e Horários:', styles: { fontStyle: 'bold', fillColor: PDF_LIGHT } },
-    { content: time ? `${datasStr} às ${time}` : datasStr, colSpan: 3 },
-  ])
 
   autoTable(doc, {
     startY: y, margin: { left: margin, right: margin },
     body: [
       [{ content: 'Mês de referência:', styles: { fontStyle: 'bold', fillColor: PDF_LIGHT } }, { content: mesLabel, colSpan: 3 }],
-      ...datasRows,
+      [{ content: 'Datas e Horários:', styles: { fontStyle: 'bold', fillColor: PDF_LIGHT } }, { content: buildSessionsLine(sessions, horario), colSpan: 3 }],
       [
         { content: 'Valor de sessão:', styles: { fontStyle: 'bold', fillColor: PDF_LIGHT } }, { content: fmtCurrencyPDF(sessionValue) },
         { content: 'Total:', styles: { fontStyle: 'bold', fillColor: PDF_LIGHT } }, { content: fmtCurrencyPDF(total) },

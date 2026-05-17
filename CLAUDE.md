@@ -490,9 +490,12 @@ Não é mais editável. Texto padrão fixo definido em `DESEMPENHO_FIXO` em `gen
 - **Nome do arquivo:** inclui especialidade — ex: `relatorio_convenio_nome_ESPECIALIDADE_Mes_Ano.pdf`.
 - **Versionamento:** `versionLabel` impresso no cabeçalho do PDF; histórico gravado em `convenio_reports`.
 - **companySettings:** passado para ambas as funções PDF; exibe Razão Social, CNPJ e CNES (se configurado) no cabeçalho.
-- **Horários por sessão:** cada sessão tem campo `time` individual. Campo "Horário padrão" + botão "aplicar a todas". O PDF agrupa por horário via `buildSessionTimeGroups(sessions, fallbackHorario)`.
+- **Horários por sessão:** cada sessão tem campo `time` individual. Campo "Horário padrão" + botão "aplicar a todas". O PDF produz uma linha única via `buildSessionsLine(sessions, fallbackHorario)` — formato: `"02 às 17:00, 15 às 18:00 e 27 às 11:00"`.
+- **Busca de atendimentos:** filtra `consultations` por `patientId + therapistId (emissor) + specialty + date range`. Admin recebe erro se não tiver terapeuta emissor selecionado.
 - **Auto-refresh do histórico:** após "Baixar e Registrar", seção recarrega via `historyRefreshKey`.
-- **Sugestão com IA:** botão "Sugerir Objetivos com IA" (⚡ violeta). Sugere apenas `objetivos`; encaminhamento e desempenho não são mais sugeridos pela IA. Requer `OPENAI_API_KEY` no Supabase + JWT Verification **DESATIVADO**.
+- **Sugestão com IA:** botão "Sugerir com IA" (⚡ violeta), posicionado inline ao lado da label "Objetivos de Intervenção". Sugere apenas `objetivos`; encaminhamento e desempenho não são sugeridos pela IA. Requer `OPENAI_API_KEY` no Supabase + JWT Verification **DESATIVADO**.
+- **Histórico — RT:** `saveHistory` sempre persiste `responsible_therapist_id: selectedRT?.id || null` (mesmo quando RT = emissor). `handleRestore` prioriza `record.responsible_therapist_id` antes de `fd.rtId` (legado).
+- **PDF Identificação:** tabela compacta — Paciente e Diagnóstico em linha própria (colSpan 3); Especialidade e Terapeuta responsável compartilham a mesma linha em 4 colunas (44/44/46/48mm).
 - Funções em `src/utils/generateConvenioPDF.js`: `generateRelatórioConvenioPDF()`, `generateListaPresencaPDF()`, `formatMesLabel()`, `MONTHS`.
 - `MONTHS` e `formatMesLabel` re-exportados de `pdfShared.js` via `export { MONTHS, formatMesLabel } from './pdfShared'`.
 

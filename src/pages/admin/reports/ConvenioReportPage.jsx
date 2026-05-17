@@ -245,13 +245,14 @@ export default function ConvenioReportPage() {
   // ── Buscar atendimentos ───────────────────────────────────────
   async function handleSearch() {
     setError('')
+    if (isAdmin && !therapistId) { setError('Selecione o terapeuta emissor.'); return }
     if (!patientId) { setError('Selecione o paciente.'); return }
     if (!specialty) { setError('Selecione a especialidade.'); return }
     if (periodType === 'range' && (!periodFrom || !periodTo)) { setError('Informe o período completo.'); return }
 
     const { from, to } = getDateRange()
     const found = consultations
-      .filter(c => c.patientId === patientId && c.specialty === specialty && c.date >= from && c.date <= to)
+      .filter(c => c.patientId === patientId && c.therapistId === therapistId && c.specialty === specialty && c.date >= from && c.date <= to)
       .sort((a, b) => a.date.localeCompare(b.date))
 
     const patient = patients.find(p => p.id === patientId)
@@ -333,8 +334,8 @@ export default function ConvenioReportPage() {
     if (fd.referralChallenges != null) setReferralChallenges(fd.referralChallenges)
     else if (fd.encaminhamento != null) setReferralChallenges(fd.encaminhamento)
     if (fd.objetivos != null) setObjetivos(fd.objetivos)
-    if (fd.rtId) setRtId(fd.rtId)
-    else if (record.responsible_therapist_id) setRtId(record.responsible_therapist_id)
+    if (record.responsible_therapist_id) setRtId(record.responsible_therapist_id)
+    else if (fd.rtId) setRtId(fd.rtId)
     setSearched(true)
   }
 
@@ -449,7 +450,7 @@ export default function ConvenioReportPage() {
     const { error } = await supabase.from('convenio_reports').insert({
       patient_id: patientId,
       therapist_id: therapistId || null,
-      responsible_therapist_id: (rtTherapist && rtTherapist.id !== therapistId) ? rtTherapist.id : null,
+      responsible_therapist_id: selectedRT?.id || null,
       specialty,
       mes_label: getMesLabel(),
       version_label: ver,
@@ -741,20 +742,7 @@ export default function ConvenioReportPage() {
       {/* Texto */}
       {searched && (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-4">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">3. Texto do Relatório</h2>
-              <p className="text-xs text-gray-400 mt-1">A sugestão de Objetivos pela IA depende dos relatos registrados nos atendimentos.</p>
-            </div>
-            <button
-              onClick={handleSuggestAI}
-              disabled={loadingAI || !specialty || !selectedTherapist}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-violet-600 hover:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl transition-colors shrink-0"
-            >
-              <FiZap size={13} />
-              {loadingAI ? 'Gerando...' : 'Sugerir Objetivos com IA'}
-            </button>
-          </div>
+          <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">3. Texto do Relatório</h2>
           {aiWarning && (
             <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">{aiWarning}</p>
           )}
@@ -800,10 +788,20 @@ export default function ConvenioReportPage() {
 
           {/* Objetivos de intervenção */}
           <div>
-            <label className={labelClass}>
-              Objetivos de Intervenção
-              <span className="text-gray-400 font-normal ml-1">(uma linha = um bullet — pré-carregado do último relatório)</span>
-            </label>
+            <div className="flex items-center justify-between gap-2 mb-1">
+              <label className={labelClass + ' mb-0'}>
+                Objetivos de Intervenção
+                <span className="text-gray-400 font-normal ml-1">(uma linha = um bullet — pré-carregado do último relatório)</span>
+              </label>
+              <button
+                onClick={handleSuggestAI}
+                disabled={loadingAI || !specialty || !selectedTherapist}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-violet-600 hover:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl transition-colors shrink-0"
+              >
+                <FiZap size={13} />
+                {loadingAI ? 'Gerando...' : 'Sugerir com IA'}
+              </button>
+            </div>
             <textarea value={objetivos} onChange={e => setObjetivos(e.target.value)} rows={5}
               placeholder={"Melhorar a modulação vestibular;\nAprimorar viso-dispraxia;"}
               className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl bg-white focus:ring-2 focus:ring-brand-blue outline-none resize-y" />
