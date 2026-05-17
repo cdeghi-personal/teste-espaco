@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { FiPlus, FiTrash2 } from 'react-icons/fi'
 import Modal from '../../../components/ui/Modal'
 import Button from '../../../components/ui/Button'
@@ -21,7 +21,7 @@ const EMPTY = {
 }
 
 export default function ConsultationFormModal({ onClose, initial = {}, readOnly = false }) {
-  const { patients, therapists, specialtiesData, rooms, consultationStatuses, appointmentTypes, appointments, addConsultation, updateConsultation } = useData()
+  const { patients, therapists, specialtiesData, rooms, consultationStatuses, appointmentTypes, appointments, addConsultation, updateConsultation, getPrepaidData } = useData()
   const { user } = useAuth()
   const isEdit = !!initial.id
 
@@ -38,6 +38,19 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
     activities: initial.activities ? [...initial.activities.map(a => ({ ...a }))] : [],
   })
   const [errors, setErrors] = useState({})
+  const [prepaidBalance, setPrepaidBalance] = useState(null)
+
+  useEffect(() => {
+    if (!form.patientId || !form.specialty) { setPrepaidBalance(null); return }
+    const patient = patients.find(p => p.id === form.patientId)
+    const spec = (patient?.specialties || []).find(s => s.key === form.specialty)
+    if (spec?.paymentType !== 'PREPAID_PACKAGE') { setPrepaidBalance(null); return }
+    let cancelled = false
+    getPrepaidData(form.patientId, form.specialty).then(d => {
+      if (!cancelled) setPrepaidBalance(d.balance)
+    })
+    return () => { cancelled = true }
+  }, [form.patientId, form.specialty, patients, getPrepaidData])
 
   function set(field, value) {
     setForm(f => ({ ...f, [field]: value }))
@@ -101,6 +114,8 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
   const selectedStatus = consultationStatuses.find(s => s.id === form.consultationStatusId)
   const realizadaRequired = selectedStatus?.name?.toLowerCase().includes('realizada')
   const mainObjectiveRequired = realizadaRequired
+  const willConsume = selectedStatus?.consumesPrepaidSession === true
+  const showPrepaidAlert = prepaidBalance !== null && willConsume && prepaidBalance <= 0
 
   return (
     <Modal
@@ -121,6 +136,15 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
           <div className="flex items-start gap-2 p-3 bg-amber-50 rounded-xl text-xs text-amber-700 border border-amber-200">
             <span className="shrink-0 mt-0.5">⚠️</span>
             Este atendimento está com status <strong>{currentStatus?.name}</strong> (automático) e não pode ser editado.
+          </div>
+        )}
+        {prepaidBalance !== null && (
+          <div className={`flex items-center gap-2 p-3 rounded-xl text-xs border ${showPrepaidAlert ? 'bg-red-50 border-red-200 text-red-700' : 'bg-blue-50 border-blue-100 text-blue-700'}`}>
+            <span className="shrink-0">{showPrepaidAlert ? '⚠️' : 'ℹ️'}</span>
+            <span>
+              Pacote pré-pago — saldo atual: <strong>{prepaidBalance} sessão{prepaidBalance !== 1 ? 'ões' : ''}</strong>.
+              {showPrepaidAlert ? ' Saldo insuficiente para consumir esta sessão.' : willConsume ? ' Este status irá debitar 1 sessão.' : ''}
+            </span>
           </div>
         )}
         {/* Dados do Atendimento */}

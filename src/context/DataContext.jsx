@@ -480,6 +480,48 @@ export function DataProvider({ children }) {
 
   // ─── Consultations ──────────────────────────────────────────────────────────
 
+  async function handlePrepaidConsumption(consultationId, patientId, specialty, newStatusId) {
+    const patient = patients.find(p => p.id === patientId)
+    if (!patient) return
+    const patientSpec = (patient.specialties || []).find(s => s.key === specialty)
+    if (!patientSpec || patientSpec.paymentType !== 'PREPAID_PACKAGE') return
+
+    const status = consultationStatuses.find(s => s.id === newStatusId)
+    const shouldConsume = status?.consumesPrepaidSession === true
+
+    const { data: existingDebit } = await supabase
+      .from('patient_prepaid_ledger')
+      .select('id')
+      .eq('consultation_id', consultationId)
+      .eq('entry_type', 'DEBIT')
+      .maybeSingle()
+
+    const { data: { session } } = await supabase.auth.getSession()
+    const createdBy = session?.user?.id || null
+
+    if (shouldConsume && !existingDebit) {
+      await supabase.from('patient_prepaid_ledger').insert({
+        patient_id: patientId,
+        specialty,
+        consultation_id: consultationId,
+        entry_type: 'DEBIT',
+        sessions_quantity: -1,
+        notes: 'Sessão consumida automaticamente',
+        created_by: createdBy,
+      })
+    } else if (!shouldConsume && existingDebit) {
+      await supabase.from('patient_prepaid_ledger').insert({
+        patient_id: patientId,
+        specialty,
+        consultation_id: consultationId,
+        entry_type: 'ADJUSTMENT',
+        sessions_quantity: 1,
+        notes: 'Estorno automático (status alterado)',
+        created_by: createdBy,
+      })
+    }
+  }
+
   async function addConsultation(data) {
     const { activities, appointmentId, ...rest } = data
 
@@ -531,6 +573,9 @@ export function DataProvider({ children }) {
 
     const newConsultation = { ...mapConsultation(inserted), activities: mappedActivities }
     setConsultations(prev => [newConsultation, ...prev])
+    if (rest.consultationStatusId) {
+      handlePrepaidConsumption(inserted.id, rest.patientId, rest.specialty, rest.consultationStatusId)
+    }
     return newConsultation
   }
 
@@ -572,6 +617,14 @@ export function DataProvider({ children }) {
     }
 
     setConsultations(prev => prev.map(c => c.id === id ? { ...c, ...data } : c))
+    if (rest.consultationStatusId !== undefined) {
+      const existing = consultations.find(c => c.id === id)
+      if (existing) {
+        const patientId = rest.patientId || existing.patientId
+        const specialty = rest.specialty || existing.specialty
+        handlePrepaidConsumption(id, patientId, specialty, rest.consultationStatusId)
+      }
+    }
   }
 
   async function deleteConsultation(id) {
@@ -769,7 +822,7 @@ export function DataProvider({ children }) {
   async function addConsultationStatus(data) {
     const { data: inserted, error } = await supabase
       .from('consultation_statuses')
-      .insert({ name: data.name, color: data.color || 'bg-gray-100 text-gray-700', active: true, automatic: data.automatic || false })
+      .insert({ name: data.name, color: data.color || 'bg-gray-100 text-gray-700', active: true, automatic: data.automatic || false, consumes_prepaid_session: data.consumesPrepaidSession || false })
       .select().single()
     if (error) return dbError(error, toast)
     const item = mapConsultationStatus(inserted)
@@ -783,6 +836,7 @@ export function DataProvider({ children }) {
     if (data.color !== undefined) update.color = data.color
     if (data.active !== undefined) update.active = data.active
     if (data.automatic !== undefined) update.automatic = data.automatic
+    if (data.consumesPrepaidSession !== undefined) update.consumes_prepaid_session = data.consumesPrepaidSession
     await supabase.from('consultation_statuses').update(update).eq('id', id)
     setConsultationStatuses(prev => prev.map(s => s.id === id ? { ...s, ...data } : s))
   }
