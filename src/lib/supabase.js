@@ -42,7 +42,15 @@ export function mapPatient(row) {
     therapistId: row.primary_therapist_id,
     involvedTherapistIds: (row.patient_involved_therapists || []).map(r => r.therapist_id),
     conditionIds: (row.patient_conditions || []).map(r => r.diagnosis_id),
-    specialties: (row.patient_specialties || []).map(r => ({ key: r.specialty, patientValue: r.patient_value ?? null, therapistValue: r.therapist_value ?? null })),
+    specialties: (row.patient_specialties || []).map(r => ({
+      key: r.specialty,
+      patientValue: r.patient_value ?? null,
+      therapistValue: r.therapist_value ?? null,
+      paymentType: r.payment_type || 'POST_PER_SESSION',
+      monthlyPatientValue: r.monthly_patient_value ?? null,
+      monthlyTherapistValue: r.monthly_therapist_value ?? null,
+      paymentNotes: r.payment_notes || '',
+    })),
     externalTherapists: (row.patient_external_therapists || [])
       .sort((a, b) => a.sort_order - b.sort_order)
       .map(r => ({ id: r.id, name: r.name, specialty: r.specialty || '', phone: r.phone || '' })),
@@ -245,6 +253,10 @@ export async function syncPatientRelations(patientId, data) {
             specialty: s.key ?? s,
             patient_value: s.patientValue ?? null,
             therapist_value: s.therapistValue ?? null,
+            payment_type: s.paymentType || 'POST_PER_SESSION',
+            monthly_patient_value: s.monthlyPatientValue ?? null,
+            monthly_therapist_value: s.monthlyTherapistValue ?? null,
+            payment_notes: s.paymentNotes || null,
           }))
         )
       )
