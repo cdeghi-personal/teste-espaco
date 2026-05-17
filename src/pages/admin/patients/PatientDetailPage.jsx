@@ -8,6 +8,7 @@ import Button from '../../../components/ui/Button'
 import PatientFormModal from './PatientFormModal'
 import { calculateAge, formatDateBR, formatDateShort } from '../../../utils/dateUtils'
 import { hexTextColor } from '../../../utils/colorUtils'
+import { PAYMENT_TYPE_LABELS } from '../../../constants/paymentTypes'
 
 
 export default function PatientDetailPage() {
@@ -171,14 +172,19 @@ export default function PatientDetailPage() {
                       <thead className="bg-gray-50">
                         <tr>
                           <th className="text-left px-3 py-2 font-semibold text-gray-500">Especialidade</th>
-                          {isAdmin && <th className="text-left px-3 py-2 font-semibold text-gray-500">Valor Paciente</th>}
-                          {isAdmin && <th className="text-left px-3 py-2 font-semibold text-gray-500">Valor Terapeuta</th>}
+                          {isAdmin && <th className="text-left px-3 py-2 font-semibold text-gray-500">Modalidade</th>}
+                          {isAdmin && <th className="text-left px-3 py-2 font-semibold text-gray-500">Vlr Paciente</th>}
+                          {isAdmin && <th className="text-left px-3 py-2 font-semibold text-gray-500">Vlr Terapeuta</th>}
                         </tr>
                       </thead>
                       <tbody>
                         {patient.specialties.map(s => {
                           const spec = specialtiesData.find(sd => sd.key === s.key)
                           const color = spec?.color || '#6b7280'
+                          const isMonthly = s.paymentType === 'POST_MONTHLY'
+                          const fmtVal = v => (v != null && v !== '') ? `R$ ${Number(v).toFixed(2)}` : '—'
+                          const pv = isMonthly ? s.monthlyPatientValue : s.patientValue
+                          const tv = isMonthly ? s.monthlyTherapistValue : s.therapistValue
                           return (
                             <tr key={s.key} className="border-t border-gray-100">
                               <td className="px-3 py-2">
@@ -186,8 +192,21 @@ export default function PatientDetailPage() {
                                   {spec?.label || s.key}
                                 </span>
                               </td>
-                              {isAdmin && <td className="px-3 py-2 text-gray-700">{s.patientValue != null && s.patientValue !== '' ? `R$ ${Number(s.patientValue).toFixed(2)}` : '—'}</td>}
-                              {isAdmin && <td className="px-3 py-2 text-gray-700">{s.therapistValue != null && s.therapistValue !== '' ? `R$ ${Number(s.therapistValue).toFixed(2)}` : '—'}</td>}
+                              {isAdmin && (
+                                <td className="px-3 py-2 text-gray-500">
+                                  {PAYMENT_TYPE_LABELS[s.paymentType || 'POST_PER_SESSION'] || s.paymentType}
+                                </td>
+                              )}
+                              {isAdmin && (
+                                <td className="px-3 py-2 text-gray-700">
+                                  {fmtVal(pv)}{isMonthly && <span className="text-gray-400 text-[10px] ml-0.5">/mês</span>}
+                                </td>
+                              )}
+                              {isAdmin && (
+                                <td className="px-3 py-2 text-gray-700">
+                                  {fmtVal(tv)}{isMonthly && <span className="text-gray-400 text-[10px] ml-0.5">/mês</span>}
+                                </td>
+                              )}
                             </tr>
                           )
                         })}

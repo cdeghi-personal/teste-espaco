@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { FiPlus, FiTrash2 } from 'react-icons/fi'
+import { FiPlus, FiTrash2, FiRefreshCw } from 'react-icons/fi'
 import { formatCPF, validateCPF } from '../../../utils/validators'
 import Modal from '../../../components/ui/Modal'
 import Button from '../../../components/ui/Button'
@@ -8,6 +8,7 @@ import Select from '../../../components/ui/Select'
 import Textarea from '../../../components/ui/Textarea'
 import { useData } from '../../../context/DataContext'
 import { useAuth } from '../../../context/AuthContext'
+import { PAYMENT_TYPE_OPTIONS } from '../../../constants/paymentTypes'
 
 const EMPTY_EXT = { name: '', specialty: '', phone: '' }
 
@@ -34,7 +35,7 @@ function textColorForBg(hex) {
 }
 
 export default function PatientFormModal({ onClose, initial = {}, readOnly = false }) {
-  const { paymentMethods, therapists, diagnoses, patientStatuses, specialtiesData, addPatient, updatePatient } = useData()
+  const { paymentMethods, therapists, diagnoses, patientStatuses, specialtiesData, addPatient, updatePatient, companySettings } = useData()
   const { user } = useAuth()
   const isAdmin = user?.role === 'admin'
   const isEdit = !!initial.id
@@ -85,9 +86,11 @@ export default function PatientFormModal({ onClose, initial = {}, readOnly = fal
   }
 
   const [newSpecialtyKey, setNewSpecialtyKey] = useState('')
+  const discountPct = parseFloat(companySettings?.therapistDiscountPercent ?? 0)
+
   function addSpecialtyRow(key) {
     if (!key || form.specialties.some(s => s.key === key)) return
-    setForm(f => ({ ...f, specialties: [...f.specialties, { key, patientValue: '', therapistValue: '' }] }))
+    setForm(f => ({ ...f, specialties: [...f.specialties, { key, patientValue: '', therapistValue: '', paymentType: 'POST_PER_SESSION', monthlyPatientValue: '', monthlyTherapistValue: '', paymentNotes: '' }] }))
     setNewSpecialtyKey('')
   }
   function removeSpecialtyRow(key) {
@@ -95,6 +98,33 @@ export default function PatientFormModal({ onClose, initial = {}, readOnly = fal
   }
   function updateSpecialtyValue(key, field, value) {
     setForm(f => ({ ...f, specialties: f.specialties.map(s => s.key === key ? { ...s, [field]: value } : s) }))
+  }
+  function handlePatientValueChange(key, value) {
+    setForm(f => ({
+      ...f,
+      specialties: f.specialties.map(s => {
+        if (s.key !== key) return s
+        const pv = parseFloat(value)
+        const therapistEmpty = s.therapistValue === '' || s.therapistValue == null || Number(s.therapistValue) === 0
+        const suggest = therapistEmpty && !isNaN(pv) && pv > 0 && discountPct >= 0
+        return {
+          ...s,
+          patientValue: value,
+          therapistValue: suggest ? String(+(pv * (1 - discountPct / 100)).toFixed(2)) : s.therapistValue,
+        }
+      }),
+    }))
+  }
+  function recalcTherapistValue(key) {
+    setForm(f => ({
+      ...f,
+      specialties: f.specialties.map(s => {
+        if (s.key !== key) return s
+        const pv = parseFloat(s.patientValue)
+        if (isNaN(pv) || pv <= 0) return s
+        return { ...s, therapistValue: String(+(pv * (1 - discountPct / 100)).toFixed(2)) }
+      }),
+    }))
   }
 
   function validate() {
@@ -259,16 +289,121 @@ export default function PatientFormModal({ onClose, initial = {}, readOnly = fal
             {/* Especialidades em Atendimento */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Especialidades em Atendimento</label>
-              {form.specialties.length > 0 && (
+
+              {/* Admin editando: cards com campos de pagamento */}
+              {isAdmin && !readOnly && form.specialties.length > 0 && (
+                <div className="space-y-3 mb-3">
+                  {form.specialties.map(s => {
+                    const spec = activeSpecialties.find(sp => sp.key === s.key)
+                    const color = spec?.color || '#6b7280'
+                    const isMonthly = s.paymentType === 'POST_MONTHLY'
+                    const fmtVal = v => (v != null && v !== '') ? `R$ ${Number(v).toFixed(2)}` : '—'
+                    const inputCls = 'w-full px-2 py-1 border border-gray-200 rounded-lg text-xs focus:ring-1 focus:ring-brand-blue outline-none'
+                    return (
+                      <div key={s.key} className="border border-gray-200 rounded-xl p-3 space-y-2.5">
+                        <div className="flex items-center justify-between">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium text-white" style={{ backgroundColor: color }}>
+                            {spec?.label || s.key}
+                          </span>
+                          <button type="button" onClick={() => removeSpecialtyRow(s.key)} className="p-1 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors">
+                            <FiTrash2 size={13} />
+                          </button>
+                        </div>
+                        <div>
+                          <label className="block text-xs text-gray-500 mb-1">Modalidade de Pagamento</label>
+                          <select value={s.paymentType || 'POST_PER_SESSION'} onChange={e => updateSpecialtyValue(s.key, 'paymentType', e.target.value)}
+                            className={inputCls}>
+                            {PAYMENT_TYPE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                          </select>
+                        </div>
+                        {!isMonthly && (
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <label className="block text-xs text-gray-500 mb-1">Valor Paciente / sessão</label>
+                              <input type="number" min="0" step="0.01" value={s.patientValue ?? ''} placeholder="0,00"
+                                onChange={e => handlePatientValueChange(s.key, e.target.value)} className={inputCls} />
+                            </div>
+                            <div>
+                              <div className="flex items-center justify-between mb-1">
+                                <label className="text-xs text-gray-500">Valor Terapeuta / sessão</label>
+                                {discountPct > 0 && (
+                                  <button type="button" onClick={() => recalcTherapistValue(s.key)}
+                                    className="flex items-center gap-0.5 text-[10px] text-brand-blue hover:underline">
+                                    <FiRefreshCw size={9} /> {discountPct}%
+                                  </button>
+                                )}
+                              </div>
+                              <input type="number" min="0" step="0.01" value={s.therapistValue ?? ''} placeholder="0,00"
+                                onChange={e => updateSpecialtyValue(s.key, 'therapistValue', e.target.value)} className={inputCls} />
+                            </div>
+                          </div>
+                        )}
+                        {isMonthly && (
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <label className="block text-xs text-gray-500 mb-1">Valor Mensal Paciente</label>
+                              <input type="number" min="0" step="0.01" value={s.monthlyPatientValue ?? ''} placeholder="0,00"
+                                onChange={e => updateSpecialtyValue(s.key, 'monthlyPatientValue', e.target.value)} className={inputCls} />
+                            </div>
+                            <div>
+                              <label className="block text-xs text-gray-500 mb-1">Valor Mensal Terapeuta</label>
+                              <input type="number" min="0" step="0.01" value={s.monthlyTherapistValue ?? ''} placeholder="0,00"
+                                onChange={e => updateSpecialtyValue(s.key, 'monthlyTherapistValue', e.target.value)} className={inputCls} />
+                            </div>
+                          </div>
+                        )}
+                        <div>
+                          <label className="block text-xs text-gray-500 mb-1">Observações de Pagamento</label>
+                          <input type="text" value={s.paymentNotes || ''} placeholder="Notas sobre pagamento..."
+                            onChange={e => updateSpecialtyValue(s.key, 'paymentNotes', e.target.value)} className={inputCls} />
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+
+              {/* Admin visualizando (readOnly): tabela com valores */}
+              {isAdmin && readOnly && form.specialties.length > 0 && (
                 <div className="rounded-xl border border-gray-200 overflow-hidden mb-2">
                   <table className="w-full text-xs">
                     <thead className="bg-gray-50">
                       <tr>
                         <th className="text-left px-3 py-2 font-semibold text-gray-500">Especialidade</th>
-                        {isAdmin && <th className="text-left px-3 py-2 font-semibold text-gray-500">Valor Paciente</th>}
-                        {isAdmin && <th className="text-left px-3 py-2 font-semibold text-gray-500">Valor Terapeuta</th>}
-                        {!readOnly && <th className="w-8" />}
+                        <th className="text-left px-3 py-2 font-semibold text-gray-500">Modalidade</th>
+                        <th className="text-left px-3 py-2 font-semibold text-gray-500">Vlr Paciente</th>
+                        <th className="text-left px-3 py-2 font-semibold text-gray-500">Vlr Terapeuta</th>
                       </tr>
+                    </thead>
+                    <tbody>
+                      {form.specialties.map(s => {
+                        const spec = activeSpecialties.find(sp => sp.key === s.key)
+                        const color = spec?.color || '#6b7280'
+                        const isMonthly = s.paymentType === 'POST_MONTHLY'
+                        const fmtVal = v => (v != null && v !== '') ? `R$ ${Number(v).toFixed(2)}` : '—'
+                        const ptLabel = PAYMENT_TYPE_OPTIONS.find(o => o.value === (s.paymentType || 'POST_PER_SESSION'))?.label || s.paymentType
+                        return (
+                          <tr key={s.key} className="border-t border-gray-100">
+                            <td className="px-3 py-2">
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium text-white" style={{ backgroundColor: color }}>{spec?.label || s.key}</span>
+                            </td>
+                            <td className="px-3 py-2 text-gray-600">{ptLabel}</td>
+                            <td className="px-3 py-2 text-gray-700">{isMonthly ? fmtVal(s.monthlyPatientValue) : fmtVal(s.patientValue)}{isMonthly && <span className="text-gray-400 ml-0.5">/mês</span>}</td>
+                            <td className="px-3 py-2 text-gray-700">{isMonthly ? fmtVal(s.monthlyTherapistValue) : fmtVal(s.therapistValue)}{isMonthly && <span className="text-gray-400 ml-0.5">/mês</span>}</td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {/* Terapeuta: apenas lista de especialidades */}
+              {!isAdmin && form.specialties.length > 0 && (
+                <div className="rounded-xl border border-gray-200 overflow-hidden mb-2">
+                  <table className="w-full text-xs">
+                    <thead className="bg-gray-50">
+                      <tr><th className="text-left px-3 py-2 font-semibold text-gray-500">Especialidade</th></tr>
                     </thead>
                     <tbody>
                       {form.specialties.map(s => {
@@ -277,52 +412,8 @@ export default function PatientFormModal({ onClose, initial = {}, readOnly = fal
                         return (
                           <tr key={s.key} className="border-t border-gray-100">
                             <td className="px-3 py-2">
-                              <span
-                                className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium text-white"
-                                style={{ backgroundColor: color }}
-                              >
-                                {spec?.label || s.key}
-                              </span>
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium text-white" style={{ backgroundColor: color }}>{spec?.label || s.key}</span>
                             </td>
-                            {isAdmin && (
-                              <td className="px-3 py-2">
-                                {readOnly
-                                  ? <span>{s.patientValue != null && s.patientValue !== '' ? `R$ ${Number(s.patientValue).toFixed(2)}` : '—'}</span>
-                                  : <input
-                                      type="number"
-                                      min="0"
-                                      step="0.01"
-                                      value={s.patientValue ?? ''}
-                                      onChange={e => updateSpecialtyValue(s.key, 'patientValue', e.target.value)}
-                                      placeholder="0,00"
-                                      className="w-28 px-2 py-1 border border-gray-200 rounded-lg text-xs focus:ring-1 focus:ring-brand-blue outline-none"
-                                    />
-                                }
-                              </td>
-                            )}
-                            {isAdmin && (
-                              <td className="px-3 py-2">
-                                {readOnly
-                                  ? <span>{s.therapistValue != null && s.therapistValue !== '' ? `R$ ${Number(s.therapistValue).toFixed(2)}` : '—'}</span>
-                                  : <input
-                                      type="number"
-                                      min="0"
-                                      step="0.01"
-                                      value={s.therapistValue ?? ''}
-                                      onChange={e => updateSpecialtyValue(s.key, 'therapistValue', e.target.value)}
-                                      placeholder="0,00"
-                                      className="w-28 px-2 py-1 border border-gray-200 rounded-lg text-xs focus:ring-1 focus:ring-brand-blue outline-none"
-                                    />
-                                }
-                              </td>
-                            )}
-                            {!readOnly && (
-                              <td className="px-2 py-2">
-                                <button type="button" onClick={() => removeSpecialtyRow(s.key)} className="p-1 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors">
-                                  <FiTrash2 size={13} />
-                                </button>
-                              </td>
-                            )}
                           </tr>
                         )
                       })}
@@ -330,25 +421,18 @@ export default function PatientFormModal({ onClose, initial = {}, readOnly = fal
                   </table>
                 </div>
               )}
+
               {!readOnly && (
                 <div className="flex items-center gap-2">
-                  <select
-                    value={newSpecialtyKey}
-                    onChange={e => setNewSpecialtyKey(e.target.value)}
-                    className="flex-1 px-3 py-1.5 border border-gray-200 rounded-lg text-xs focus:ring-1 focus:ring-brand-blue outline-none text-gray-700"
-                  >
+                  <select value={newSpecialtyKey} onChange={e => setNewSpecialtyKey(e.target.value)}
+                    className="flex-1 px-3 py-1.5 border border-gray-200 rounded-lg text-xs focus:ring-1 focus:ring-brand-blue outline-none text-gray-700">
                     <option value="">Selecionar especialidade...</option>
                     {activeSpecialties
                       .filter(sp => !form.specialties.some(s => s.key === sp.key))
-                      .map(sp => <option key={sp.key} value={sp.key}>{sp.label}</option>)
-                    }
+                      .map(sp => <option key={sp.key} value={sp.key}>{sp.label}</option>)}
                   </select>
-                  <button
-                    type="button"
-                    onClick={() => addSpecialtyRow(newSpecialtyKey)}
-                    disabled={!newSpecialtyKey}
-                    className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium bg-brand-blue text-white disabled:opacity-40 hover:bg-brand-blue-dark transition-colors"
-                  >
+                  <button type="button" onClick={() => addSpecialtyRow(newSpecialtyKey)} disabled={!newSpecialtyKey}
+                    className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium bg-brand-blue text-white disabled:opacity-40 hover:bg-brand-blue-dark transition-colors">
                     <FiPlus size={13} /> Adicionar
                   </button>
                 </div>

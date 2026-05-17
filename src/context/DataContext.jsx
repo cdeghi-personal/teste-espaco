@@ -79,7 +79,7 @@ export function DataProvider({ children }) {
   const [consultationStatuses, setConsultationStatuses] = useState([])
   const [appointmentTypes, setAppointmentTypes] = useState([])
   const [ageRanges, setAgeRanges] = useState([])
-  const [companySettings, setCompanySettings] = useState({ razaoSocial: '', cnpj: '', aiSystemPrompt: '', cnes: '' })
+  const [companySettings, setCompanySettings] = useState({ razaoSocial: '', cnpj: '', aiSystemPrompt: '', cnes: '', therapistDiscountPercent: 0 })
   const [isLoading, setIsLoading] = useState(true)
 
   const fetchAll = useCallback(async () => {
@@ -108,7 +108,7 @@ export function DataProvider({ children }) {
       supabase.from('consultation_statuses').select('*').order('name'),
       supabase.from('appointment_types').select('*').order('name'),
       supabase.from('age_ranges').select('*').order('min_age'),
-      supabase.from('company_settings').select('razao_social, cnpj, ai_system_prompt, cnes').eq('id', 1).maybeSingle(),
+      supabase.from('company_settings').select('razao_social, cnpj, ai_system_prompt, cnes, therapist_discount_percent').eq('id', 1).maybeSingle(),
     ])
 
     setPatients((patientsRes.data || []).map(mapPatient))
@@ -127,7 +127,13 @@ export function DataProvider({ children }) {
       id: r.id, name: r.name, minAge: r.min_age, maxAge: r.max_age, color: r.color,
     })))
     if (companyRes.data) {
-      setCompanySettings({ razaoSocial: companyRes.data.razao_social || '', cnpj: companyRes.data.cnpj || '', aiSystemPrompt: companyRes.data.ai_system_prompt || '', cnes: companyRes.data.cnes || '' })
+      setCompanySettings({
+        razaoSocial: companyRes.data.razao_social || '',
+        cnpj: companyRes.data.cnpj || '',
+        aiSystemPrompt: companyRes.data.ai_system_prompt || '',
+        cnes: companyRes.data.cnes || '',
+        therapistDiscountPercent: companyRes.data.therapist_discount_percent ?? 0,
+      })
     }
     setIsLoading(false)
   }, [])
@@ -212,6 +218,42 @@ export function DataProvider({ children }) {
     return newPatient
   }
 
+  async function recordPaymentHistoryIfChanged(patientId, oldSpecs, newSpecs) {
+    const { data: { session } } = await supabase.auth.getSession()
+    const changedBy = session?.user?.id || null
+    const toNum = v => (v != null && v !== '') ? parseFloat(v) : null
+    const rows = []
+    for (const n of newSpecs) {
+      const o = oldSpecs.find(x => x.key === n.key)
+      const changed = !o ||
+        (o.paymentType || 'POST_PER_SESSION') !== (n.paymentType || 'POST_PER_SESSION') ||
+        String(o.patientValue ?? '') !== String(n.patientValue ?? '') ||
+        String(o.therapistValue ?? '') !== String(n.therapistValue ?? '') ||
+        String(o.monthlyPatientValue ?? '') !== String(n.monthlyPatientValue ?? '') ||
+        String(o.monthlyTherapistValue ?? '') !== String(n.monthlyTherapistValue ?? '')
+      if (changed) {
+        rows.push({
+          patient_id: patientId,
+          specialty: n.key,
+          old_payment_type: o?.paymentType || null,
+          new_payment_type: n.paymentType || 'POST_PER_SESSION',
+          old_patient_value: toNum(o?.patientValue),
+          new_patient_value: toNum(n.patientValue),
+          old_therapist_value: toNum(o?.therapistValue),
+          new_therapist_value: toNum(n.therapistValue),
+          old_monthly_patient_value: toNum(o?.monthlyPatientValue),
+          new_monthly_patient_value: toNum(n.monthlyPatientValue),
+          old_monthly_therapist_value: toNum(o?.monthlyTherapistValue),
+          new_monthly_therapist_value: toNum(n.monthlyTherapistValue),
+          changed_by: changedBy,
+        })
+      }
+    }
+    if (rows.length) {
+      await supabase.from('patient_specialty_payment_history').insert(rows)
+    }
+  }
+
   async function updatePatient(id, data) {
     const update = {}
     if (data.fullName !== undefined) update.full_name = data.fullName
@@ -248,6 +290,11 @@ export function DataProvider({ children }) {
     if (Object.keys(update).length) {
       update.updated_at = new Date().toISOString()
       await supabase.from('patients').update(update).eq('id', id)
+    }
+
+    if (data.specialties !== undefined) {
+      const current = patients.find(p => p.id === id)
+      await recordPaymentHistoryIfChanged(id, current?.specialties || [], data.specialties)
     }
 
     await syncPatientRelations(id, {
@@ -940,10 +987,23 @@ export function DataProvider({ children }) {
   async function updateCompanySettings(data) {
     const { error } = await supabase
       .from('company_settings')
-      .update({ razao_social: data.razaoSocial || null, cnpj: data.cnpj || null, ai_system_prompt: data.aiSystemPrompt || null, cnes: data.cnes || null, updated_at: new Date().toISOString() })
+      .update({
+        razao_social: data.razaoSocial || null,
+        cnpj: data.cnpj || null,
+        ai_system_prompt: data.aiSystemPrompt || null,
+        cnes: data.cnes || null,
+        therapist_discount_percent: data.therapistDiscountPercent ?? 0,
+        updated_at: new Date().toISOString(),
+      })
       .eq('id', 1)
     if (error) return dbError(error, toast)
-    setCompanySettings({ razaoSocial: data.razaoSocial || '', cnpj: data.cnpj || '', aiSystemPrompt: data.aiSystemPrompt || '', cnes: data.cnes || '' })
+    setCompanySettings({
+      razaoSocial: data.razaoSocial || '',
+      cnpj: data.cnpj || '',
+      aiSystemPrompt: data.aiSystemPrompt || '',
+      cnes: data.cnes || '',
+      therapistDiscountPercent: data.therapistDiscountPercent ?? 0,
+    })
     return {}
   }
 

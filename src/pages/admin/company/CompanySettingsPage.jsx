@@ -26,6 +26,7 @@ export default function CompanySettingsPage() {
   const [cnpj, setCnpj] = useState('')
   const [cnes, setCnes] = useState('')
   const [aiSystemPrompt, setAiSystemPrompt] = useState('')
+  const [therapistDiscountPercent, setTherapistDiscountPercent] = useState('')
   const [saving, setSaving] = useState(false)
 
   const isAdmin = user?.role === 'admin'
@@ -35,6 +36,7 @@ export default function CompanySettingsPage() {
     setCnpj(companySettings.cnpj || '')
     setCnes(companySettings.cnes || '')
     setAiSystemPrompt(companySettings.aiSystemPrompt || '')
+    setTherapistDiscountPercent(String(companySettings.therapistDiscountPercent ?? ''))
   }, [companySettings])
 
   if (!isAdmin) return <Navigate to={ROUTES.DASHBOARD} replace />
@@ -60,6 +62,7 @@ export default function CompanySettingsPage() {
       cnpj: cnpj.trim(),
       cnes: cnes.trim(),
       aiSystemPrompt: aiSystemPrompt.trim(),
+      therapistDiscountPercent: parseFloat(therapistDiscountPercent) || 0,
     })
     setSaving(false)
     if (result?.error) {
@@ -111,6 +114,30 @@ export default function CompanySettingsPage() {
               placeholder="Ex: 1234567"
               maxLength={20}
             />
+          </div>
+          <div>
+            <label className={labelClass}>
+              Desconto automático do Terapeuta (%)
+              <span className="font-normal text-gray-400 ml-1">— sugerido ao preencher Valor Paciente nas especialidades pós-pago por consulta e pré-pago</span>
+            </label>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                min="0"
+                max="100"
+                step="0.01"
+                className={inputClass + ' w-32'}
+                value={therapistDiscountPercent}
+                onChange={e => setTherapistDiscountPercent(e.target.value)}
+                placeholder="Ex: 20"
+              />
+              <span className="text-sm text-gray-500">%</span>
+              {therapistDiscountPercent && parseFloat(therapistDiscountPercent) > 0 && (
+                <span className="text-xs text-gray-400">
+                  Exemplo: R$ 100,00 → terapeuta recebe R$ {(100 * (1 - parseFloat(therapistDiscountPercent) / 100)).toFixed(2)}
+                </span>
+              )}
+            </div>
           </div>
         </div>
 
