@@ -45,12 +45,18 @@ function resolveAtendimento(e, therapists, consultationStatuses, specialtiesData
   return null
 }
 
-// Tipo descritivo — usa nome do status live quando possível
+// Extrai o nome do status do snapshot frozen em notes.
+// Formato das notes de DEBIT: "Atendimento: ... | Status: NomeDoStatus"
+function frozenStatusFromNotes(notes) {
+  if (!notes) return null
+  const match = notes.match(/\|\s*Status:\s*(.+)$/)
+  return match ? match[1].trim() : null
+}
+
+// Tipo descritivo — usa snapshot frozen em notes (imutável) em vez de liveStatusName
+// para que o label não mude quando o status da consulta for alterado posteriormente
 function entryTypeLabel(e, consultationStatuses) {
   const op = e.operation
-  const liveStatusName = e.consultations?.consultation_status_id
-    ? consultationStatuses.find(s => s.id === e.consultations.consultation_status_id)?.name
-    : null
 
   if (!op) {
     if (e.entry_type === 'CREDIT') return 'Pacote adicionado'
@@ -59,15 +65,20 @@ function entryTypeLabel(e, consultationStatuses) {
   }
   switch (op) {
     case 'PACKAGE_PURCHASE': return 'Pacote adicionado'
-    case 'CONSULTATION_ADD':
-      return liveStatusName ? `Inclusão Atend. — ${liveStatusName}` : 'Inclusão de atendimento'
-    case 'CONSULTATION_UPDATE':
-      return liveStatusName ? `Alteração Atend. — ${liveStatusName}` : 'Alteração de atendimento'
+    case 'CONSULTATION_ADD': {
+      const snap = frozenStatusFromNotes(e.notes)
+      return snap ? `Inclusão Atend. — ${snap}` : 'Inclusão de atendimento'
+    }
+    case 'CONSULTATION_UPDATE': {
+      const snap = frozenStatusFromNotes(e.notes)
+      return snap ? `Alteração Atend. — ${snap}` : 'Alteração de atendimento'
+    }
     case 'MANUAL_ADJUSTMENT': return 'Ajuste manual'
     case 'AUTO_REVERSAL': {
       if (e.notes?.includes('excluído')) return 'Estorno — Atend. excluído'
       if (e.notes?.includes('Paciente/especialidade')) return 'Estorno — Pac./espec. alterado'
-      if (liveStatusName) return `Estorno — Status: ${liveStatusName}`
+      const match = e.notes?.match(/Status alterado para:\s*(.+)/)
+      if (match) return `Estorno — Status: ${match[1]}`
       return 'Estorno automático'
     }
     default: return op

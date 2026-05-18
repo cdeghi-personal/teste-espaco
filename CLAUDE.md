@@ -590,7 +590,7 @@ Não é mais editável. Texto padrão fixo definido em `DESEMPENHO_FIXO` em `gen
   - **Desktop (md+):** tabela com colunas Data/Hora Registro | Tipo | Sessões | Responsável | Atendimento | Observação
   - **Mobile:** cards compactos empilhados
   - Coluna "Atendimento": resolvida via JOIN `consultations(id, date, time, specialty, consultation_status_id, therapist_id)` no `getPrepaidData`; fallback para snapshot em `notes` se consulta foi excluída
-  - Tipo descritivo usa nome do status live (do JOIN) quando disponível: "Inclusão Atend. — Realizada", "Alteração Atend. — Falta do paciente", etc.
+  - Coluna "Tipo": usa snapshot frozen do campo `notes` (regex `| Status: NomeDoStatus` para DEBIT; `Status alterado para: X` para REVERSAL). **Nunca usa o status live** — evita que o label mude quando o status da consulta for alterado futuramente
   - Observação: exibe `notes` apenas quando não é texto auto-gerado (oculta "Atendimento:..." e "Estorno automático...")
 
 ### Flag `consultations.prepaid_session_consumed`
@@ -601,6 +601,20 @@ Não é mais editável. Texto padrão fixo definido em `DESEMPENHO_FIXO` em `gen
 - Exibido como chip read-only no `ConsultationFormModal`
 - Backfill: migration 69 marca `true` para consultas que já possuem DEBIT no ledger
 - Se consulta for excluída com `prepaid_session_consumed = true` → `deleteConsultation` insere estorno `AUTO_REVERSAL` automaticamente
+
+### Princípio append-only do ledger
+
+**CRÍTICO:** `patient_prepaid_ledger` é append-only — jamais fazer UPDATE ou upsert por `consultation_id`.
+
+- `consultation_id` no ledger é **FK de rastreabilidade**, não chave única; uma mesma consulta pode ter múltiplas linhas (DEBIT, depois REVERSAL, depois DEBIT novamente)
+- **Source of truth** para "a consulta está consumindo sessão agora" = `consultations.prepaid_session_consumed` (não uma query ao ledger)
+- `handlePrepaidConsumption` recebe `oldConsumed` como parâmetro e implementa matriz de decisão:
+  - `oldConsumed=false + newShouldConsume=true` → INSERT DEBIT (-1), seta `prepaid_session_consumed = true`
+  - `oldConsumed=true + newShouldConsume=false` → INSERT REVERSAL (+1), seta `prepaid_session_consumed = false`
+  - estados iguais → sem ação
+- **`addConsultation`**: passa `oldConsumed: false` (nova consulta nunca consumiu); `await`s a chamada
+- **`updateConsultation`**: lê `prepaid_session_consumed` do banco ANTES de aplicar o UPDATE principal → passa como `oldConsumed`; `await`s a chamada. Isso evita race condition onde a leitura dentro da função veria o valor desatualizado
+- `handlePrepaidConsumption` **não lê** `prepaid_session_consumed` do banco internamente — usa apenas o `oldConsumed` recebido como parâmetro
 
 ### Relatórios PDF com tipos de pagamento (`generateReportPDF.js`)
 
