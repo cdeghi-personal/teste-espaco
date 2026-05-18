@@ -33,6 +33,95 @@ async function buildReportHeader(doc, subtitle, period, companySettings) {
   return 42
 }
 
+// Resolve valor de paciente para uma consulta segundo a modalidade de pagamento.
+// Retorna { display: string, amount: number, paymentType: string }
+function resolvePatientValue(c, patient, monthlyTracked) {
+  const spec = patient.specialties?.find(s => s.key === c.specialty)
+  const paymentType = spec?.paymentType || 'POST_PER_SESSION'
+
+  if (paymentType === 'POST_MONTHLY') {
+    const month = c.date?.slice(0, 7)
+    const key = `${c.specialty}__${month}`
+    if (month && !monthlyTracked.has(key)) {
+      const mv = spec?.monthlyPatientValue
+      monthlyTracked.set(key, mv != null && mv !== '' ? (parseFloat(mv) || 0) : 0)
+    }
+    return { display: 'Mensal', amount: 0, paymentType }
+  }
+
+  if (paymentType === 'PREPAID_PACKAGE') {
+    return { display: 'Pré-pago', amount: 0, paymentType }
+  }
+
+  // POST_PER_SESSION (default)
+  const pv = spec?.patientValue
+  const amount = pv != null && pv !== '' ? (parseFloat(pv) || 0) : 0
+  return { display: fmtCurrencyPDF(amount), amount, paymentType }
+}
+
+// Resolve valor de terapeuta para uma consulta segundo a modalidade de pagamento.
+function resolveTherapistValue(c, patient, monthlyTracked) {
+  const spec = patient?.specialties?.find(s => s.key === c.specialty)
+  const paymentType = spec?.paymentType || 'POST_PER_SESSION'
+
+  if (paymentType === 'POST_MONTHLY') {
+    const month = c.date?.slice(0, 7)
+    const key = `${c.specialty}__${month}`
+    if (month && !monthlyTracked.has(key)) {
+      const mv = spec?.monthlyTherapistValue
+      monthlyTracked.set(key, mv != null && mv !== '' ? (parseFloat(mv) || 0) : 0)
+    }
+    return { display: 'Mensal', amount: 0, paymentType }
+  }
+
+  if (paymentType === 'PREPAID_PACKAGE') {
+    const tv = spec?.therapistValue
+    const amount = tv != null && tv !== '' ? (parseFloat(tv) || 0) : 0
+    return { display: amount > 0 ? fmtCurrencyPDF(amount) : 'Pré-pago', amount, paymentType }
+  }
+
+  // POST_PER_SESSION
+  const tv = spec?.therapistValue
+  const amount = tv != null && tv !== '' ? (parseFloat(tv) || 0) : 0
+  return { display: fmtCurrencyPDF(amount), amount, paymentType }
+}
+
+// Renderiza o bloco de totais após a tabela de consultas
+function renderTotals(doc, y, pageW, margin, totalCount, totalPostSessao, monthlyTracked, totalPrepago) {
+  const totalMensal = [...monthlyTracked.values()].reduce((a, b) => a + b, 0)
+  const grandTotal = totalPostSessao + totalMensal + totalPrepago
+
+  doc.setFontSize(8)
+  doc.setFont('helvetica', 'bold')
+  doc.setTextColor(...PDF_BLUE)
+  doc.text(`Total de atendimentos: ${totalCount}`, margin, y + 4)
+
+  const hasMixed = (totalPostSessao > 0 || totalMensal > 0 || totalPrepago > 0) &&
+    [totalPostSessao > 0, totalMensal > 0, totalPrepago > 0].filter(Boolean).length > 1
+
+  if (hasMixed) {
+    let lineY = y + 4
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(7.5)
+    if (totalPostSessao > 0) {
+      doc.text(`Por consulta: ${fmtCurrencyPDF(totalPostSessao)}`, pageW - margin, lineY, { align: 'right' })
+      lineY += 4.5
+    }
+    if (totalMensal > 0) {
+      doc.text(`Mensalidades (${monthlyTracked.size} mês/espec.): ${fmtCurrencyPDF(totalMensal)}`, pageW - margin, lineY, { align: 'right' })
+      lineY += 4.5
+    }
+    if (totalPrepago > 0) {
+      doc.text(`Pré-pago: ${fmtCurrencyPDF(totalPrepago)}`, pageW - margin, lineY, { align: 'right' })
+      lineY += 4.5
+    }
+    doc.setFont('helvetica', 'bold')
+    doc.text(`Total do período: ${fmtCurrencyPDF(grandTotal)}`, pageW - margin, lineY, { align: 'right' })
+  } else {
+    doc.text(`Total do período: ${fmtCurrencyPDF(grandTotal)}`, pageW - margin, y + 4, { align: 'right' })
+  }
+}
+
 // ─── Relatório 1: Consultas por Paciente ──────────────────────
 
 export async function generateConsultasPacientePDF({
@@ -86,7 +175,10 @@ export async function generateConsultasPacientePDF({
     doc.text('Nenhum atendimento encontrado no período selecionado.', margin, y + 4)
     y += 12
   } else {
-    let totalValue = 0
+    let totalPostSessao = 0
+    let totalPrepago = 0
+    const monthlyTracked = new Map()
+
     autoTable(doc, {
       startY: y, margin: { left: margin, right: margin },
       head: [['Data', 'Hora', 'Terapeuta', 'Especialidade', 'Conselho', 'Status', 'Tipo', 'Valor (R$)', 'Objetivo da Sessão']],
@@ -96,14 +188,16 @@ export async function generateConsultasPacientePDF({
         const specCredential = therapist?.therapistSpecialties?.find(s => s.specialty === c.specialty)?.credential || '—'
         const status = consultationStatuses.find(s => s.id === c.consultationStatusId)
         const type = appointmentTypes.find(t => t.id === c.appointmentTypeId)
-        const specValue = patient.specialties?.find(s => s.key === c.specialty)?.patientValue
-        const value = specValue != null && specValue !== '' ? parseFloat(specValue) : 0
-        totalValue += isNaN(value) ? 0 : value
+
+        const { display, amount, paymentType } = resolvePatientValue(c, patient, monthlyTracked)
+        if (paymentType === 'POST_PER_SESSION') totalPostSessao += amount
+        else if (paymentType === 'PREPAID_PACKAGE') totalPrepago += amount
+
         return [
           fmtDatePDF(c.date), c.time ? c.time.slice(0, 5) : '—',
           therapist?.name || '—', spec?.label || c.specialty || '—',
           specCredential, status?.name || '—', type?.name || '—',
-          fmtCurrencyPDF(value), c.mainObjective || '—',
+          display, c.mainObjective || '—',
         ]
       }),
       styles: { fontSize: 7, cellPadding: 2 },
@@ -116,9 +210,7 @@ export async function generateConsultasPacientePDF({
       },
     })
     y = doc.lastAutoTable.finalY + 4
-    doc.setFontSize(8); doc.setFont('helvetica', 'bold'); doc.setTextColor(...PDF_BLUE)
-    doc.text(`Total de atendimentos: ${consultations.length}`, margin, y + 4)
-    doc.text(`Total do período: ${fmtCurrencyPDF(totalValue)}`, pageW - margin, y + 4, { align: 'right' })
+    renderTotals(doc, y, pageW, margin, consultations.length, totalPostSessao, monthlyTracked, totalPrepago)
   }
 
   addAllPageFooters(doc)
@@ -166,7 +258,10 @@ export async function generateConsultasTerapeutaPDF({
     doc.text('Nenhum atendimento encontrado no período selecionado.', margin, y + 4)
     y += 12
   } else {
-    let totalValue = 0
+    let totalPostSessao = 0
+    let totalPrepago = 0
+    const monthlyTracked = new Map()
+
     autoTable(doc, {
       startY: y, margin: { left: margin, right: margin },
       head: [['Data', 'Hora', 'Paciente', 'Especialidade', 'Status', 'Tipo', 'Valor (R$)', 'Objetivo da Sessão']],
@@ -175,14 +270,16 @@ export async function generateConsultasTerapeutaPDF({
         const spec = specialtiesData.find(s => s.key === c.specialty)
         const status = consultationStatuses.find(s => s.id === c.consultationStatusId)
         const type = appointmentTypes.find(t => t.id === c.appointmentTypeId)
-        const specValue = patient?.specialties?.find(s => s.key === c.specialty)?.therapistValue
-        const value = specValue != null && specValue !== '' ? parseFloat(specValue) : 0
-        totalValue += isNaN(value) ? 0 : value
+
+        const { display, amount, paymentType } = resolveTherapistValue(c, patient, monthlyTracked)
+        if (paymentType === 'POST_PER_SESSION') totalPostSessao += amount
+        else if (paymentType === 'PREPAID_PACKAGE') totalPrepago += amount
+
         return [
           fmtDatePDF(c.date), c.time ? c.time.slice(0, 5) : '—',
           patient?.fullName || '—', spec?.label || c.specialty || '—',
           status?.name || '—', type?.name || '—',
-          fmtCurrencyPDF(value), c.mainObjective || '—',
+          display, c.mainObjective || '—',
         ]
       }),
       styles: { fontSize: 7, cellPadding: 2 },
@@ -195,9 +292,7 @@ export async function generateConsultasTerapeutaPDF({
       },
     })
     y = doc.lastAutoTable.finalY + 4
-    doc.setFontSize(8); doc.setFont('helvetica', 'bold'); doc.setTextColor(...PDF_BLUE)
-    doc.text(`Total de atendimentos: ${consultations.length}`, margin, y + 4)
-    doc.text(`Total do período: ${fmtCurrencyPDF(totalValue)}`, pageW - margin, y + 4, { align: 'right' })
+    renderTotals(doc, y, pageW, margin, consultations.length, totalPostSessao, monthlyTracked, totalPrepago)
   }
 
   addAllPageFooters(doc)
