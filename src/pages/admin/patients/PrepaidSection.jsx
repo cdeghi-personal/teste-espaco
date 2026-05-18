@@ -3,10 +3,7 @@ import { FiPackage, FiPlus, FiSliders } from 'react-icons/fi'
 import { useData } from '../../../context/DataContext'
 import { useAuth } from '../../../context/AuthContext'
 
-function fmtVal(v) {
-  if (v == null || v === '') return '—'
-  return `R$ ${Number(v).toFixed(2)}`
-}
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function fmtDatetime(isoStr) {
   if (!isoStr) return '—'
@@ -20,8 +17,41 @@ function fmtDatetime(isoStr) {
   return `${dd}/${mm}/${yyyy} ${hh}:${min}`
 }
 
-function entryTypeLabel(e) {
+function fmtDateShort(dateStr) {
+  if (!dateStr) return '—'
+  return dateStr.split('-').reverse().join('/')
+}
+
+// Resolve dados do atendimento relacionado ao lançamento.
+// Usa o JOIN (e.consultations) quando disponível; cai no snapshot em notes quando não.
+function resolveAtendimento(e, therapists, consultationStatuses, specialtiesData) {
+  const c = e.consultations
+  if (c) {
+    const date = fmtDateShort(c.date)
+    const time = c.time ? c.time.slice(0, 5) : null
+    const therapist = therapists.find(t => t.id === c.therapist_id)
+    const specLabel = specialtiesData.find(s => s.key === c.specialty)?.label || c.specialty || ''
+    const status = consultationStatuses.find(s => s.id === c.consultation_status_id)
+    const parts = [`${date}${time ? ' às ' + time : ''}`]
+    if (therapist?.name) parts.push(therapist.name)
+    if (specLabel) parts.push(specLabel)
+    if (status?.name) parts.push(status.name)
+    return parts.join(' | ')
+  }
+  // Fallback: snapshot em notes (consulta excluída ou entrada antiga)
+  if (e.notes?.startsWith('Atendimento:')) {
+    return e.notes.replace(/^Atendimento:\s*/, '')
+  }
+  return null
+}
+
+// Tipo descritivo — usa nome do status live quando possível
+function entryTypeLabel(e, consultationStatuses) {
   const op = e.operation
+  const liveStatusName = e.consultations?.consultation_status_id
+    ? consultationStatuses.find(s => s.id === e.consultations.consultation_status_id)?.name
+    : null
+
   if (!op) {
     if (e.entry_type === 'CREDIT') return 'Pacote adicionado'
     if (e.entry_type === 'DEBIT') return 'Sessão consumida'
@@ -29,30 +59,33 @@ function entryTypeLabel(e) {
   }
   switch (op) {
     case 'PACKAGE_PURCHASE': return 'Pacote adicionado'
-    case 'CONSULTATION_ADD': return 'Inclusão de atendimento'
-    case 'CONSULTATION_UPDATE': return 'Alteração de atendimento'
+    case 'CONSULTATION_ADD':
+      return liveStatusName ? `Inclusão Atend. — ${liveStatusName}` : 'Inclusão de atendimento'
+    case 'CONSULTATION_UPDATE':
+      return liveStatusName ? `Alteração Atend. — ${liveStatusName}` : 'Alteração de atendimento'
     case 'MANUAL_ADJUSTMENT': return 'Ajuste manual'
     case 'AUTO_REVERSAL': {
       if (e.notes?.includes('excluído')) return 'Estorno — Atend. excluído'
       if (e.notes?.includes('Paciente/especialidade')) return 'Estorno — Pac./espec. alterado'
+      if (liveStatusName) return `Estorno — Status: ${liveStatusName}`
       return 'Estorno automático'
     }
     default: return op
   }
 }
 
-function entryQtyColor(e) {
-  if (e.entry_type === 'CREDIT') return 'text-green-600'
-  if (e.entry_type === 'DEBIT') return 'text-red-500'
-  return e.sessions_quantity >= 0 ? 'text-green-600' : 'text-red-500'
+// Observação: mostra apenas notas que não são geradas automaticamente
+function getObservation(e) {
+  if (!e.notes) return null
+  if (e.notes.startsWith('Atendimento:')) return null
+  if (e.notes.startsWith('Estorno automático')) return null
+  return e.notes
 }
 
-function entryBgColor(e) {
-  if (e.entry_type === 'CREDIT') return 'border-l-2 border-green-300'
-  if (e.entry_type === 'DEBIT') return 'border-l-2 border-red-300'
-  return e.sessions_quantity >= 0
-    ? 'border-l-2 border-green-200'
-    : 'border-l-2 border-orange-300'
+function entryQtyColor(e) {
+  if (e.entry_type === 'CREDIT') return 'text-green-600 font-semibold'
+  if (e.entry_type === 'DEBIT') return 'text-red-500 font-semibold'
+  return e.sessions_quantity >= 0 ? 'text-green-600 font-semibold' : 'text-red-500 font-semibold'
 }
 
 // ─── Modal de Novo Pacote ──────────────────────────────────────────────────────
@@ -68,8 +101,7 @@ function PackageModal({ patientId, specialty, defaultPatientValue, defaultTherap
   const [saving, setSaving] = useState(false)
 
   const autoTotal = parseFloat(pvps) > 0 && parseInt(qty) > 0
-    ? (parseFloat(pvps) * parseInt(qty)).toFixed(2)
-    : ''
+    ? (parseFloat(pvps) * parseInt(qty)).toFixed(2) : ''
 
   async function handleSave(e) {
     e.preventDefault()
@@ -80,15 +112,14 @@ function PackageModal({ patientId, specialty, defaultPatientValue, defaultTherap
       patientValuePerSession: pvps !== '' ? parseFloat(pvps) : null,
       therapistValuePerSession: tvps !== '' ? parseFloat(tvps) : null,
       totalPaid: totalPaid !== '' ? parseFloat(totalPaid) : (autoTotal ? parseFloat(autoTotal) : null),
-      notes: notes || null,
-      purchasedAt,
+      notes: notes || null, purchasedAt,
     })
     setSaving(false)
     if (!result?.error) onSaved()
   }
 
-  const inputCls = 'w-full px-3 py-2 text-sm border border-gray-200 rounded-xl bg-white focus:ring-2 focus:ring-brand-blue outline-none'
-  const labelCls = 'block text-xs font-medium text-gray-500 mb-1'
+  const inp = 'w-full px-3 py-2 text-sm border border-gray-200 rounded-xl bg-white focus:ring-2 focus:ring-brand-blue outline-none'
+  const lbl = 'block text-xs font-medium text-gray-500 mb-1'
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
@@ -96,37 +127,23 @@ function PackageModal({ patientId, specialty, defaultPatientValue, defaultTherap
         <h2 className="font-bold text-gray-900 mb-4">Adicionar Pacote</h2>
         <form onSubmit={handleSave} className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className={labelCls}>Qtd de Sessões *</label>
-              <input type="number" min="1" className={inputCls} value={qty} onChange={e => setQty(e.target.value)} required />
-            </div>
-            <div>
-              <label className={labelCls}>Data de Compra</label>
-              <input type="date" className={inputCls} value={purchasedAt} onChange={e => setPurchasedAt(e.target.value)} />
-            </div>
+            <div><label className={lbl}>Qtd de Sessões *</label>
+              <input type="number" min="1" className={inp} value={qty} onChange={e => setQty(e.target.value)} required /></div>
+            <div><label className={lbl}>Data de Compra</label>
+              <input type="date" className={inp} value={purchasedAt} onChange={e => setPurchasedAt(e.target.value)} /></div>
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className={labelCls}>Vlr por sessão (Paciente)</label>
-              <input type="number" min="0" step="0.01" className={inputCls} value={pvps} onChange={e => setPvps(e.target.value)} placeholder="R$" />
-            </div>
-            <div>
-              <label className={labelCls}>Vlr por sessão (Terapeuta)</label>
-              <input type="number" min="0" step="0.01" className={inputCls} value={tvps} onChange={e => setTvps(e.target.value)} placeholder="R$" />
-            </div>
+            <div><label className={lbl}>Vlr por sessão (Paciente)</label>
+              <input type="number" min="0" step="0.01" className={inp} value={pvps} onChange={e => setPvps(e.target.value)} placeholder="R$" /></div>
+            <div><label className={lbl}>Vlr por sessão (Terapeuta)</label>
+              <input type="number" min="0" step="0.01" className={inp} value={tvps} onChange={e => setTvps(e.target.value)} placeholder="R$" /></div>
           </div>
           <div>
-            <label className={labelCls}>
-              Total Pago
-              {autoTotal && <span className="ml-1 font-normal text-gray-400">(sugerido: R$ {autoTotal})</span>}
-            </label>
-            <input type="number" min="0" step="0.01" className={inputCls} value={totalPaid}
-              onChange={e => setTotalPaid(e.target.value)} placeholder={autoTotal ? `R$ ${autoTotal}` : 'R$'} />
+            <label className={lbl}>Total Pago{autoTotal && <span className="ml-1 font-normal text-gray-400">(sugerido: R$ {autoTotal})</span>}</label>
+            <input type="number" min="0" step="0.01" className={inp} value={totalPaid} onChange={e => setTotalPaid(e.target.value)} placeholder={autoTotal ? `R$ ${autoTotal}` : 'R$'} />
           </div>
-          <div>
-            <label className={labelCls}>Observações</label>
-            <input className={inputCls} value={notes} onChange={e => setNotes(e.target.value)} maxLength={200} />
-          </div>
+          <div><label className={lbl}>Observações</label>
+            <input className={inp} value={notes} onChange={e => setNotes(e.target.value)} maxLength={200} /></div>
           <div className="flex justify-end gap-2 pt-2">
             <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-xl">Cancelar</button>
             <button type="submit" disabled={saving} className="px-4 py-2 text-sm bg-brand-blue text-white rounded-xl hover:bg-blue-800 disabled:opacity-50">
@@ -157,22 +174,18 @@ function AdjustmentModal({ patientId, specialty, onClose, onSaved }) {
     if (!result?.error) onSaved()
   }
 
-  const inputCls = 'w-full px-3 py-2 text-sm border border-gray-200 rounded-xl bg-white focus:ring-2 focus:ring-brand-blue outline-none'
-  const labelCls = 'block text-xs font-medium text-gray-500 mb-1'
+  const inp = 'w-full px-3 py-2 text-sm border border-gray-200 rounded-xl bg-white focus:ring-2 focus:ring-brand-blue outline-none'
+  const lbl = 'block text-xs font-medium text-gray-500 mb-1'
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6">
         <h2 className="font-bold text-gray-900 mb-4">Ajuste Manual de Saldo</h2>
         <form onSubmit={handleSave} className="space-y-4">
-          <div>
-            <label className={labelCls}>Quantidade de Sessões (use negativo para deduzir) *</label>
-            <input type="number" className={inputCls} value={qty} onChange={e => setQty(e.target.value)} required placeholder="Ex: -1 ou 3" />
-          </div>
-          <div>
-            <label className={labelCls}>Motivo / Observações</label>
-            <input className={inputCls} value={notes} onChange={e => setNotes(e.target.value)} maxLength={200} />
-          </div>
+          <div><label className={lbl}>Quantidade de Sessões (negativo para deduzir) *</label>
+            <input type="number" className={inp} value={qty} onChange={e => setQty(e.target.value)} required placeholder="Ex: -1 ou 3" /></div>
+          <div><label className={lbl}>Motivo / Observações</label>
+            <input className={inp} value={notes} onChange={e => setNotes(e.target.value)} maxLength={200} /></div>
           <div className="flex justify-end gap-2 pt-2">
             <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-xl">Cancelar</button>
             <button type="submit" disabled={saving} className="px-4 py-2 text-sm bg-brand-blue text-white rounded-xl hover:bg-blue-800 disabled:opacity-50">
@@ -188,7 +201,7 @@ function AdjustmentModal({ patientId, specialty, onClose, onSaved }) {
 // ─── PrepaidSection ───────────────────────────────────────────────────────────
 
 export default function PrepaidSection({ patientId, specialty, specialtyLabel, defaultPatientValue, defaultTherapistValue }) {
-  const { getPrepaidData } = useData()
+  const { getPrepaidData, consultationStatuses, therapists, specialtiesData } = useData()
   const { user } = useAuth()
   const isAdmin = user?.role === 'admin'
 
@@ -227,16 +240,12 @@ export default function PrepaidSection({ patientId, specialty, specialtyLabel, d
         </div>
         {isAdmin && (
           <div className="flex gap-2">
-            <button
-              onClick={() => setShowAdjModal(true)}
-              className="flex items-center gap-1 text-xs px-2.5 py-1.5 text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50"
-            >
+            <button onClick={() => setShowAdjModal(true)}
+              className="flex items-center gap-1 text-xs px-2.5 py-1.5 text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50">
               <FiSliders size={11} /> Ajuste
             </button>
-            <button
-              onClick={() => setShowPackageModal(true)}
-              className="flex items-center gap-1 text-xs px-2.5 py-1.5 bg-brand-blue text-white rounded-xl hover:bg-blue-800"
-            >
+            <button onClick={() => setShowPackageModal(true)}
+              className="flex items-center gap-1 text-xs px-2.5 py-1.5 bg-brand-blue text-white rounded-xl hover:bg-blue-800">
               <FiPlus size={11} /> Adicionar Pacote
             </button>
           </div>
@@ -250,41 +259,86 @@ export default function PrepaidSection({ patientId, specialty, specialtyLabel, d
         <span className="text-xs text-gray-400">{Math.abs(balance) === 1 ? 'sessão' : 'sessões'}</span>
       </div>
 
-      {/* Extrato enriquecido */}
+      {/* Extrato */}
       {ledger.length > 0 && (
-        <div className="space-y-1.5">
-          <div className="text-xs font-semibold text-gray-500 px-1">Extrato</div>
-          {ledger.map(e => (
-            <div key={e.id} className={`rounded-xl bg-gray-50 px-3 py-2.5 ${entryBgColor(e)}`}>
-              {/* Linha principal */}
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-xs font-medium text-gray-800">{entryTypeLabel(e)}</span>
-                    <span className={`text-xs font-bold ${entryQtyColor(e)}`}>
+        <>
+          <div className="text-xs font-semibold text-gray-500 px-1 pt-1">Extrato</div>
+
+          {/* Desktop: tabela */}
+          <div className="hidden md:block overflow-x-auto rounded-xl border border-gray-100">
+            <table className="w-full text-xs">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="text-left px-3 py-2 font-semibold text-gray-500 whitespace-nowrap">Data/Hora Registro</th>
+                  <th className="text-left px-3 py-2 font-semibold text-gray-500">Tipo</th>
+                  <th className="text-center px-3 py-2 font-semibold text-gray-500">Sessões</th>
+                  <th className="text-left px-3 py-2 font-semibold text-gray-500 whitespace-nowrap">Responsável</th>
+                  <th className="text-left px-3 py-2 font-semibold text-gray-500">Atendimento</th>
+                  <th className="text-left px-3 py-2 font-semibold text-gray-500">Observação</th>
+                </tr>
+              </thead>
+              <tbody>
+                {ledger.map((e, i) => {
+                  const atendimento = resolveAtendimento(e, therapists, consultationStatuses, specialtiesData)
+                  const obs = getObservation(e)
+                  const isEven = i % 2 === 0
+                  return (
+                    <tr key={e.id} className={`border-t border-gray-100 ${isEven ? '' : 'bg-gray-50/50'} hover:bg-blue-50/30 transition-colors`}>
+                      <td className="px-3 py-2.5 text-gray-500 whitespace-nowrap">{fmtDatetime(e.created_at)}</td>
+                      <td className="px-3 py-2.5 text-gray-700 max-w-[160px]">
+                        {entryTypeLabel(e, consultationStatuses)}
+                      </td>
+                      <td className={`px-3 py-2.5 text-center ${entryQtyColor(e)}`}>
+                        {e.sessions_quantity > 0 ? `+${e.sessions_quantity}` : e.sessions_quantity}
+                      </td>
+                      <td className="px-3 py-2.5 text-gray-600 whitespace-nowrap">
+                        {e.created_by_name || (e.created_by ? 'Sistema' : '—')}
+                      </td>
+                      <td className="px-3 py-2.5 text-gray-500 max-w-[220px]">
+                        {atendimento
+                          ? <span className="leading-snug">{atendimento}</span>
+                          : <span className="text-gray-300">—</span>}
+                      </td>
+                      <td className="px-3 py-2.5 text-gray-400 max-w-[140px]">
+                        {obs || <span className="text-gray-300">—</span>}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Mobile: cards compactos */}
+          <div className="md:hidden space-y-2">
+            {ledger.map(e => {
+              const atendimento = resolveAtendimento(e, therapists, consultationStatuses, specialtiesData)
+              const obs = getObservation(e)
+              return (
+                <div key={e.id} className="rounded-xl bg-gray-50 px-3 py-2.5 space-y-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-medium text-gray-800 flex-1">{entryTypeLabel(e, consultationStatuses)}</span>
+                    <span className={`text-xs ${entryQtyColor(e)}`}>
                       {e.sessions_quantity > 0 ? `+${e.sessions_quantity}` : e.sessions_quantity}
                     </span>
                   </div>
-                  <div className="flex items-center gap-3 mt-0.5 flex-wrap">
-                    <span className="text-[11px] text-gray-400">{fmtDatetime(e.created_at)}</span>
-                    {(e.created_by_name) && (
-                      <span className="text-[11px] text-gray-400">por <span className="font-medium text-gray-500">{e.created_by_name}</span></span>
-                    )}
-                    {!e.created_by_name && e.created_by && (
-                      <span className="text-[11px] text-gray-400">por <span className="font-medium text-gray-500">Sistema</span></span>
+                  <div className="text-[11px] text-gray-400 flex items-center gap-2 flex-wrap">
+                    <span>{fmtDatetime(e.created_at)}</span>
+                    {(e.created_by_name || e.created_by) && (
+                      <span>· {e.created_by_name || 'Sistema'}</span>
                     )}
                   </div>
+                  {atendimento && (
+                    <div className="text-[11px] text-gray-500 leading-snug">{atendimento}</div>
+                  )}
+                  {obs && (
+                    <div className="text-[11px] text-gray-400">{obs}</div>
+                  )}
                 </div>
-              </div>
-              {/* Detalhes (notes) */}
-              {e.notes && (
-                <div className="mt-1.5 text-[11px] text-gray-500 bg-white/80 rounded-lg px-2 py-1 leading-snug">
-                  {e.notes}
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
+              )
+            })}
+          </div>
+        </>
       )}
 
       {ledger.length === 0 && (
@@ -293,20 +347,15 @@ export default function PrepaidSection({ patientId, specialty, specialtyLabel, d
 
       {showPackageModal && (
         <PackageModal
-          patientId={patientId}
-          specialty={specialty}
-          defaultPatientValue={defaultPatientValue}
-          defaultTherapistValue={defaultTherapistValue}
-          onClose={() => setShowPackageModal(false)}
-          onSaved={handleSaved}
+          patientId={patientId} specialty={specialty}
+          defaultPatientValue={defaultPatientValue} defaultTherapistValue={defaultTherapistValue}
+          onClose={() => setShowPackageModal(false)} onSaved={handleSaved}
         />
       )}
       {showAdjModal && (
         <AdjustmentModal
-          patientId={patientId}
-          specialty={specialty}
-          onClose={() => setShowAdjModal(false)}
-          onSaved={handleSaved}
+          patientId={patientId} specialty={specialty}
+          onClose={() => setShowAdjModal(false)} onSaved={handleSaved}
         />
       )}
     </div>

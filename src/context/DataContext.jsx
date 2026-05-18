@@ -1149,7 +1149,7 @@ export function DataProvider({ children }) {
         .eq('specialty', specialty)
         .order('purchased_at', { ascending: false }),
       supabase.from('patient_prepaid_ledger')
-        .select('*')
+        .select('*, consultations(id, date, time, specialty, consultation_status_id, therapist_id)')
         .eq('patient_id', patientId)
         .eq('specialty', specialty)
         .order('created_at', { ascending: true }),

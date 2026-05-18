@@ -586,7 +586,12 @@ Não é mais editável. Texto padrão fixo definido em `DESEMPENHO_FIXO` em `gen
 - **Saldo** = soma de `sessions_quantity` em todos os registros (CREDIT=+N, DEBIT=-1, ADJUSTMENT=±N)
 - **`created_by_name`** = snapshot do nome do responsável no momento do lançamento (via `therapists.name` onde `user_id = auth.uid()`)
 - **`notes`** nos DEBITs automáticos contém: `Atendimento: DD/MM/YYYY às HH:MM | Terapeuta: X | Especialidade: Y | Status: Z`
-- **Extrato** exibido em `PrepaidSection.jsx` (cartões com data/hora, tipo, sessões, responsável, notas)
+- **Extrato** exibido em `PrepaidSection.jsx`:
+  - **Desktop (md+):** tabela com colunas Data/Hora Registro | Tipo | Sessões | Responsável | Atendimento | Observação
+  - **Mobile:** cards compactos empilhados
+  - Coluna "Atendimento": resolvida via JOIN `consultations(id, date, time, specialty, consultation_status_id, therapist_id)` no `getPrepaidData`; fallback para snapshot em `notes` se consulta foi excluída
+  - Tipo descritivo usa nome do status live (do JOIN) quando disponível: "Inclusão Atend. — Realizada", "Alteração Atend. — Falta do paciente", etc.
+  - Observação: exibe `notes` apenas quando não é texto auto-gerado (oculta "Atendimento:..." e "Estorno automático...")
 
 ### Flag `consultations.prepaid_session_consumed`
 
