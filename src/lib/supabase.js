@@ -163,6 +163,7 @@ export function mapConsultation(row) {
         description: a.description || '',
         outcome: a.outcome,
       })),
+    prepaidSessionConsumed: row.prepaid_session_consumed || false,
     createdAt: row.created_at,
   }
 }

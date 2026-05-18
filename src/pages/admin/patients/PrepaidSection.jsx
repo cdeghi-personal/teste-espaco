@@ -2,23 +2,57 @@ import { useState, useEffect, useCallback } from 'react'
 import { FiPackage, FiPlus, FiSliders } from 'react-icons/fi'
 import { useData } from '../../../context/DataContext'
 import { useAuth } from '../../../context/AuthContext'
-import { formatDateBR } from '../../../utils/dateUtils'
 
 function fmtVal(v) {
   if (v == null || v === '') return '—'
   return `R$ ${Number(v).toFixed(2)}`
 }
 
-function entryLabel(e) {
-  if (e.entry_type === 'CREDIT') return 'Pacote adicionado'
-  if (e.entry_type === 'DEBIT') return 'Sessão consumida'
-  return 'Ajuste manual'
+function fmtDatetime(isoStr) {
+  if (!isoStr) return '—'
+  const d = new Date(isoStr)
+  if (isNaN(d)) return '—'
+  const dd = String(d.getDate()).padStart(2, '0')
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const yyyy = d.getFullYear()
+  const hh = String(d.getHours()).padStart(2, '0')
+  const min = String(d.getMinutes()).padStart(2, '0')
+  return `${dd}/${mm}/${yyyy} ${hh}:${min}`
 }
 
-function entryColor(e) {
+function entryTypeLabel(e) {
+  const op = e.operation
+  if (!op) {
+    if (e.entry_type === 'CREDIT') return 'Pacote adicionado'
+    if (e.entry_type === 'DEBIT') return 'Sessão consumida'
+    return 'Ajuste'
+  }
+  switch (op) {
+    case 'PACKAGE_PURCHASE': return 'Pacote adicionado'
+    case 'CONSULTATION_ADD': return 'Inclusão de atendimento'
+    case 'CONSULTATION_UPDATE': return 'Alteração de atendimento'
+    case 'MANUAL_ADJUSTMENT': return 'Ajuste manual'
+    case 'AUTO_REVERSAL': {
+      if (e.notes?.includes('excluído')) return 'Estorno — Atend. excluído'
+      if (e.notes?.includes('Paciente/especialidade')) return 'Estorno — Pac./espec. alterado'
+      return 'Estorno automático'
+    }
+    default: return op
+  }
+}
+
+function entryQtyColor(e) {
   if (e.entry_type === 'CREDIT') return 'text-green-600'
   if (e.entry_type === 'DEBIT') return 'text-red-500'
   return e.sessions_quantity >= 0 ? 'text-green-600' : 'text-red-500'
+}
+
+function entryBgColor(e) {
+  if (e.entry_type === 'CREDIT') return 'border-l-2 border-green-300'
+  if (e.entry_type === 'DEBIT') return 'border-l-2 border-red-300'
+  return e.sessions_quantity >= 0
+    ? 'border-l-2 border-green-200'
+    : 'border-l-2 border-orange-300'
 }
 
 // ─── Modal de Novo Pacote ──────────────────────────────────────────────────────
@@ -186,7 +220,7 @@ export default function PrepaidSection({ patientId, specialty, specialtyLabel, d
   return (
     <div className="bg-white rounded-2xl border border-gray-100 p-5 space-y-3">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-2">
           <FiPackage size={14} className="text-gray-400" />
           <span className="text-sm font-semibold text-gray-900">Pacote Pré-pago — {specialtyLabel}</span>
@@ -213,34 +247,43 @@ export default function PrepaidSection({ patientId, specialty, specialtyLabel, d
       <div className="flex items-center gap-3 bg-gray-50 rounded-xl px-4 py-3">
         <span className="text-xs text-gray-500">Saldo disponível</span>
         <span className={`text-2xl font-bold ${balanceColor}`}>{balance}</span>
-        <span className="text-xs text-gray-400">sessão{Math.abs(balance) !== 1 ? 'ões' : ''}</span>
+        <span className="text-xs text-gray-400">{Math.abs(balance) === 1 ? 'sessão' : 'sessões'}</span>
       </div>
 
-      {/* Ledger */}
+      {/* Extrato enriquecido */}
       {ledger.length > 0 && (
-        <div className="rounded-xl border border-gray-100 overflow-hidden">
-          <table className="w-full text-xs">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="text-left px-3 py-2 font-semibold text-gray-500">Data</th>
-                <th className="text-left px-3 py-2 font-semibold text-gray-500">Tipo</th>
-                <th className="text-right px-3 py-2 font-semibold text-gray-500">Sessões</th>
-                <th className="text-left px-3 py-2 font-semibold text-gray-500">Obs.</th>
-              </tr>
-            </thead>
-            <tbody>
-              {ledger.map(e => (
-                <tr key={e.id} className="border-t border-gray-100">
-                  <td className="px-3 py-2 text-gray-500">{formatDateBR(e.created_at?.slice(0, 10))}</td>
-                  <td className="px-3 py-2 text-gray-700">{entryLabel(e)}</td>
-                  <td className={`px-3 py-2 text-right font-semibold ${entryColor(e)}`}>
-                    {e.sessions_quantity > 0 ? `+${e.sessions_quantity}` : e.sessions_quantity}
-                  </td>
-                  <td className="px-3 py-2 text-gray-400 truncate max-w-[120px]">{e.notes || ''}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="space-y-1.5">
+          <div className="text-xs font-semibold text-gray-500 px-1">Extrato</div>
+          {ledger.map(e => (
+            <div key={e.id} className={`rounded-xl bg-gray-50 px-3 py-2.5 ${entryBgColor(e)}`}>
+              {/* Linha principal */}
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs font-medium text-gray-800">{entryTypeLabel(e)}</span>
+                    <span className={`text-xs font-bold ${entryQtyColor(e)}`}>
+                      {e.sessions_quantity > 0 ? `+${e.sessions_quantity}` : e.sessions_quantity}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-3 mt-0.5 flex-wrap">
+                    <span className="text-[11px] text-gray-400">{fmtDatetime(e.created_at)}</span>
+                    {(e.created_by_name) && (
+                      <span className="text-[11px] text-gray-400">por <span className="font-medium text-gray-500">{e.created_by_name}</span></span>
+                    )}
+                    {!e.created_by_name && e.created_by && (
+                      <span className="text-[11px] text-gray-400">por <span className="font-medium text-gray-500">Sistema</span></span>
+                    )}
+                  </div>
+                </div>
+              </div>
+              {/* Detalhes (notes) */}
+              {e.notes && (
+                <div className="mt-1.5 text-[11px] text-gray-500 bg-white/80 rounded-lg px-2 py-1 leading-snug">
+                  {e.notes}
+                </div>
+              )}
+            </div>
+          ))}
         </div>
       )}
 

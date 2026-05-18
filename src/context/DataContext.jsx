@@ -56,7 +56,7 @@ const GUARDIAN_SELECT = `
 
 const CONSULTATION_SELECT = `
   id, patient_id, therapist_id, specialty, date, time, room_id, session_number,
-  consultation_status_id, appointment_type_id,
+  consultation_status_id, appointment_type_id, prepaid_session_consumed,
   main_objective, evolution_notes, next_objectives, guardian_feedback,
   session_quality, created_at,
   consultation_activities(id, name, description, outcome, sort_order)
@@ -480,11 +480,50 @@ export function DataProvider({ children }) {
 
   // ─── Consultations ──────────────────────────────────────────────────────────
 
-  async function handlePrepaidConsumption(consultationId, patientId, specialty, newStatusId) {
-    const patient = patients.find(p => p.id === patientId)
+  // operation: 'CONSULTATION_ADD' | 'CONSULTATION_UPDATE'
+  async function handlePrepaidConsumption(consultationId, {
+    oldPatientId, oldSpecialty,
+    newPatientId, newSpecialty, newStatusId,
+    operation, date, time, therapistName, statusName,
+  }) {
+    const { data: { session } } = await supabase.auth.getSession()
+    const createdBy = session?.user?.id || null
+    const resolvedTherapist = therapists.find(t => t.userId === createdBy)
+    const createdByName = resolvedTherapist?.name || null
+
+    const fmtD = d => d ? d.split('-').reverse().join('/') : ''
+    const atendNotes = `Atendimento: ${fmtD(date)}${time ? ' às ' + time.slice(0, 5) : ''} | Terapeuta: ${therapistName || '—'} | Especialidade: ${newSpecialty} | Status: ${statusName || '—'}`
+
+    // Se paciente/especialidade mudou, estornar consumo anterior
+    const patientChanged = oldPatientId && (oldPatientId !== newPatientId || oldSpecialty !== newSpecialty)
+    if (patientChanged) {
+      const { data: oldDebit } = await supabase
+        .from('patient_prepaid_ledger')
+        .select('id')
+        .eq('consultation_id', consultationId)
+        .eq('patient_id', oldPatientId)
+        .eq('entry_type', 'DEBIT')
+        .maybeSingle()
+      if (oldDebit) {
+        await supabase.from('patient_prepaid_ledger').insert({
+          patient_id: oldPatientId, specialty: oldSpecialty,
+          consultation_id: consultationId, entry_type: 'ADJUSTMENT',
+          sessions_quantity: 1, operation: 'AUTO_REVERSAL',
+          notes: 'Estorno automático - Paciente/especialidade alterado',
+          created_by: createdBy, created_by_name: createdByName,
+        })
+        await supabase.from('consultations').update({ prepaid_session_consumed: false }).eq('id', consultationId)
+      }
+    }
+
+    // Verificar se novo paciente+especialidade é pré-pago
+    const patient = patients.find(p => p.id === newPatientId)
     if (!patient) return
-    const patientSpec = (patient.specialties || []).find(s => s.key === specialty)
-    if (!patientSpec || patientSpec.paymentType !== 'PREPAID_PACKAGE') return
+    const patientSpec = (patient.specialties || []).find(s => s.key === newSpecialty)
+    if (!patientSpec || patientSpec.paymentType !== 'PREPAID_PACKAGE') {
+      await supabase.from('consultations').update({ prepaid_session_consumed: false }).eq('id', consultationId)
+      return
+    }
 
     const status = consultationStatuses.find(s => s.id === newStatusId)
     const shouldConsume = status?.consumesPrepaidSession === true
@@ -493,32 +532,28 @@ export function DataProvider({ children }) {
       .from('patient_prepaid_ledger')
       .select('id')
       .eq('consultation_id', consultationId)
+      .eq('patient_id', newPatientId)
       .eq('entry_type', 'DEBIT')
       .maybeSingle()
 
-    const { data: { session } } = await supabase.auth.getSession()
-    const createdBy = session?.user?.id || null
-
     if (shouldConsume && !existingDebit) {
       await supabase.from('patient_prepaid_ledger').insert({
-        patient_id: patientId,
-        specialty,
-        consultation_id: consultationId,
-        entry_type: 'DEBIT',
-        sessions_quantity: -1,
-        notes: 'Sessão consumida automaticamente',
-        created_by: createdBy,
+        patient_id: newPatientId, specialty: newSpecialty,
+        consultation_id: consultationId, entry_type: 'DEBIT',
+        sessions_quantity: -1, operation,
+        notes: atendNotes,
+        created_by: createdBy, created_by_name: createdByName,
       })
+      await supabase.from('consultations').update({ prepaid_session_consumed: true }).eq('id', consultationId)
     } else if (!shouldConsume && existingDebit) {
       await supabase.from('patient_prepaid_ledger').insert({
-        patient_id: patientId,
-        specialty,
-        consultation_id: consultationId,
-        entry_type: 'ADJUSTMENT',
-        sessions_quantity: 1,
-        notes: 'Estorno automático (status alterado)',
-        created_by: createdBy,
+        patient_id: newPatientId, specialty: newSpecialty,
+        consultation_id: consultationId, entry_type: 'ADJUSTMENT',
+        sessions_quantity: 1, operation: 'AUTO_REVERSAL',
+        notes: `Estorno automático - Status alterado para: ${statusName || '—'}`,
+        created_by: createdBy, created_by_name: createdByName,
       })
+      await supabase.from('consultations').update({ prepaid_session_consumed: false }).eq('id', consultationId)
     }
   }
 
@@ -574,7 +609,15 @@ export function DataProvider({ children }) {
     const newConsultation = { ...mapConsultation(inserted), activities: mappedActivities }
     setConsultations(prev => [newConsultation, ...prev])
     if (rest.consultationStatusId) {
-      handlePrepaidConsumption(inserted.id, rest.patientId, rest.specialty, rest.consultationStatusId)
+      const status = consultationStatuses.find(s => s.id === rest.consultationStatusId)
+      const therapist = therapists.find(t => t.id === rest.therapistId)
+      handlePrepaidConsumption(inserted.id, {
+        newPatientId: rest.patientId, newSpecialty: rest.specialty,
+        newStatusId: rest.consultationStatusId,
+        operation: 'CONSULTATION_ADD',
+        date: rest.date, time: rest.time,
+        therapistName: therapist?.name, statusName: status?.name,
+      })
     }
     return newConsultation
   }
@@ -620,14 +663,44 @@ export function DataProvider({ children }) {
     if (rest.consultationStatusId !== undefined) {
       const existing = consultations.find(c => c.id === id)
       if (existing) {
-        const patientId = rest.patientId || existing.patientId
-        const specialty = rest.specialty || existing.specialty
-        handlePrepaidConsumption(id, patientId, specialty, rest.consultationStatusId)
+        const newPatientId = rest.patientId || existing.patientId
+        const newSpecialty = rest.specialty || existing.specialty
+        const status = consultationStatuses.find(s => s.id === rest.consultationStatusId)
+        const therapist = therapists.find(t => t.id === (rest.therapistId || existing.therapistId))
+        handlePrepaidConsumption(id, {
+          oldPatientId: existing.patientId, oldSpecialty: existing.specialty,
+          newPatientId, newSpecialty,
+          newStatusId: rest.consultationStatusId,
+          operation: 'CONSULTATION_UPDATE',
+          date: rest.date || existing.date, time: rest.time || existing.time,
+          therapistName: therapist?.name, statusName: status?.name,
+        })
       }
     }
   }
 
   async function deleteConsultation(id) {
+    const existing = consultations.find(c => c.id === id)
+    if (existing?.prepaidSessionConsumed) {
+      const { data: debit } = await supabase
+        .from('patient_prepaid_ledger')
+        .select('id, patient_id, specialty')
+        .eq('consultation_id', id)
+        .eq('entry_type', 'DEBIT')
+        .maybeSingle()
+      if (debit) {
+        const { data: { session } } = await supabase.auth.getSession()
+        const createdBy = session?.user?.id || null
+        const resolvedTherapist = therapists.find(t => t.userId === createdBy)
+        await supabase.from('patient_prepaid_ledger').insert({
+          patient_id: debit.patient_id, specialty: debit.specialty,
+          consultation_id: id, entry_type: 'ADJUSTMENT',
+          sessions_quantity: 1, operation: 'AUTO_REVERSAL',
+          notes: 'Estorno automático - Atendimento excluído',
+          created_by: createdBy, created_by_name: resolvedTherapist?.name || null,
+        })
+      }
+    }
     await supabase.from('consultations').delete().eq('id', id)
     setConsultations(prev => prev.filter(c => c.id !== id))
   }
@@ -1041,11 +1114,12 @@ export function DataProvider({ children }) {
   async function addPrepaidPackage(patientId, specialty, data) {
     const { data: { session } } = await supabase.auth.getSession()
     const createdBy = session?.user?.id || null
+    const resolvedTherapist = therapists.find(t => t.userId === createdBy)
+    const createdByName = resolvedTherapist?.name || null
     const { data: pkg, error } = await supabase
       .from('patient_prepaid_packages')
       .insert({
-        patient_id: patientId,
-        specialty,
+        patient_id: patientId, specialty,
         sessions_quantity: data.sessionsQuantity,
         patient_value_per_session: data.patientValuePerSession ?? null,
         therapist_value_per_session: data.therapistValuePerSession ?? null,
@@ -1056,15 +1130,13 @@ export function DataProvider({ children }) {
       })
       .select().single()
     if (error) return dbError(error, toast)
-    // Registra CREDIT no ledger
     await supabase.from('patient_prepaid_ledger').insert({
-      patient_id: patientId,
-      specialty,
-      package_id: pkg.id,
-      entry_type: 'CREDIT',
+      patient_id: patientId, specialty,
+      package_id: pkg.id, entry_type: 'CREDIT',
       sessions_quantity: data.sessionsQuantity,
+      operation: 'PACKAGE_PURCHASE',
       notes: data.notes || null,
-      created_by: createdBy,
+      created_by: createdBy, created_by_name: createdByName,
     })
     return pkg
   }
@@ -1091,13 +1163,15 @@ export function DataProvider({ children }) {
   async function addLedgerAdjustment(patientId, specialty, sessionsQty, notes) {
     const { data: { session } } = await supabase.auth.getSession()
     const createdBy = session?.user?.id || null
+    const resolvedTherapist = therapists.find(t => t.userId === createdBy)
     const { error } = await supabase.from('patient_prepaid_ledger').insert({
-      patient_id: patientId,
-      specialty,
+      patient_id: patientId, specialty,
       entry_type: 'ADJUSTMENT',
       sessions_quantity: sessionsQty,
+      operation: 'MANUAL_ADJUSTMENT',
       notes: notes || null,
       created_by: createdBy,
+      created_by_name: resolvedTherapist?.name || null,
     })
     if (error) return dbError(error, toast)
     return {}

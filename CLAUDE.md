@@ -550,6 +550,59 @@ Não é mais editável. Texto padrão fixo definido em `DESEMPENHO_FIXO` em `gen
 
 - Flag `automatic = true` → não aparece no Select do `ConsultationFormModal`, mas **aparece** nos filtros de relatório e no prontuário
 - Ações em lote do prontuário mostram **todos os status ativos** (incluindo automáticos)
+- Flag `consumes_prepaid_session = true` → ao salvar/atualizar consulta com este status, debita automaticamente 1 sessão do pacote pré-pago do paciente (se especialidade for `PREPAID_PACKAGE`); exibido como chip verde "Consome pré-paga" na listagem de status
+
+## Gestão Financeira / Pacotes Pré-pagos
+
+### Modalidades de Pagamento (`patient_specialties.payment_type`)
+
+| Valor | Label | Campos usados |
+|---|---|---|
+| `POST_PER_SESSION` | Pós-pago por consulta | `patient_value`, `therapist_value` |
+| `POST_MONTHLY` | Pós-pago mensal fixo | `monthly_patient_value`, `monthly_therapist_value` |
+| `PREPAID_PACKAGE` | Pré-pago por pacote | `patient_value`, `therapist_value` (por sessão do pacote) |
+
+- Configuração admin-only no `PatientFormModal` (seção de especialidades — cards)
+- `companySettings.therapistDiscountPercent` → desconto sugerido ao preencher Valor Paciente
+- `src/constants/paymentTypes.js` exporta `PAYMENT_TYPES`, `PAYMENT_TYPE_LABELS`, `PAYMENT_TYPE_OPTIONS`
+
+### Tabelas do sistema pré-pago
+
+| Tabela | Descrição |
+|---|---|
+| `patient_prepaid_packages` | Pacotes comprados — qty, valores, data, notas |
+| `patient_prepaid_ledger` | Movimentações — CREDIT/DEBIT/ADJUSTMENT com `operation`, `created_by_name`, `consultation_id` |
+
+### Operações do Ledger (`patient_prepaid_ledger.operation`)
+
+| Valor | Origem | Tipo de entrada |
+|---|---|---|
+| `PACKAGE_PURCHASE` | Admin compra pacote | CREDIT (+N) |
+| `CONSULTATION_ADD` | Nova consulta salva com status consumidor | DEBIT (-1) |
+| `CONSULTATION_UPDATE` | Atualização de consulta que passou a ter status consumidor | DEBIT (-1) |
+| `MANUAL_ADJUSTMENT` | Admin usa modal "Ajuste" | ADJUSTMENT (±N) |
+| `AUTO_REVERSAL` | Status mudou para não-consumidor; ou consulta excluída; ou paciente/especialidade alterado | ADJUSTMENT (+1) |
+
+- **Saldo** = soma de `sessions_quantity` em todos os registros (CREDIT=+N, DEBIT=-1, ADJUSTMENT=±N)
+- **`created_by_name`** = snapshot do nome do responsável no momento do lançamento (via `therapists.name` onde `user_id = auth.uid()`)
+- **`notes`** nos DEBITs automáticos contém: `Atendimento: DD/MM/YYYY às HH:MM | Terapeuta: X | Especialidade: Y | Status: Z`
+- **Extrato** exibido em `PrepaidSection.jsx` (cartões com data/hora, tipo, sessões, responsável, notas)
+
+### Flag `consultations.prepaid_session_consumed`
+
+- `true` = aquela consulta efetivamente debitou 1 sessão do pacote pré-pago
+- Atualizado automaticamente por `handlePrepaidConsumption` no DataContext
+- Nunca editável manualmente
+- Exibido como chip read-only no `ConsultationFormModal`
+- Backfill: migration 69 marca `true` para consultas que já possuem DEBIT no ledger
+- Se consulta for excluída com `prepaid_session_consumed = true` → `deleteConsultation` insere estorno `AUTO_REVERSAL` automaticamente
+
+### Relatórios PDF com tipos de pagamento (`generateReportPDF.js`)
+
+- `POST_PER_SESSION`: coluna Valor mostra valor por consulta; totalizado no rodapé
+- `POST_MONTHLY`: coluna Valor mostra "Mensal"; total calculado por pares únicos (especialidade × mês) × `monthlyValue`
+- `PREPAID_PACKAGE`: coluna Valor mostra "Pré-pago" (relatório do terapeuta usa `therapistValue` se definido)
+- Rodapé com totais detalhados quando há mix de modalidades no período
 
 ## Consultas (`/admin/consultas`)
 

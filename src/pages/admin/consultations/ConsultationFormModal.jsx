@@ -116,6 +116,7 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
   const mainObjectiveRequired = realizadaRequired
   const willConsume = selectedStatus?.consumesPrepaidSession === true
   const showPrepaidAlert = prepaidBalance !== null && willConsume && prepaidBalance <= 0
+  const showConsumedChip = isEdit && initial.prepaidSessionConsumed !== undefined
 
   return (
     <Modal
@@ -138,11 +139,19 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
             Este atendimento está com status <strong>{currentStatus?.name}</strong> (automático) e não pode ser editado.
           </div>
         )}
+        {showConsumedChip && (
+          <div className="flex items-center gap-2">
+            {initial.prepaidSessionConsumed
+              ? <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">Consumiu sessão pré-paga</span>
+              : <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-500">Não consumiu sessão pré-paga</span>
+            }
+          </div>
+        )}
         {prepaidBalance !== null && (
           <div className={`flex items-center gap-2 p-3 rounded-xl text-xs border ${showPrepaidAlert ? 'bg-red-50 border-red-200 text-red-700' : 'bg-blue-50 border-blue-100 text-blue-700'}`}>
             <span className="shrink-0">{showPrepaidAlert ? '⚠️' : 'ℹ️'}</span>
             <span>
-              Pacote pré-pago — saldo atual: <strong>{prepaidBalance} sessão{prepaidBalance !== 1 ? 'ões' : ''}</strong>.
+              Pacote pré-pago — saldo atual: <strong>{prepaidBalance} {Math.abs(prepaidBalance) === 1 ? 'sessão' : 'sessões'}</strong>.
               {showPrepaidAlert ? ' Saldo insuficiente para consumir esta sessão.' : willConsume ? ' Este status irá debitar 1 sessão.' : ''}
             </span>
           </div>
