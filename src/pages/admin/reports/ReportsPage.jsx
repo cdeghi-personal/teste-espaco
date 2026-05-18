@@ -179,7 +179,7 @@ export default function ReportsPage() {
           <p className="text-sm text-gray-500 mt-1">Gere relatórios de atendimentos por paciente ou terapeuta.</p>
         </div>
         <HelpButton title="Como gerar Relatórios">
-          <p><strong>Tipo de relatório:</strong> escolha entre <em>Consultas por Paciente</em> (mostra o valor cobrado do paciente por atendimento) ou <em>Consultas por Terapeuta</em> (mostra o valor do repasse ao terapeuta).</p>
+          <p><strong>Tipo de relatório:</strong> escolha entre <em>Demonstrativo de Pagamento</em> (mostra o valor cobrado do paciente por atendimento) ou <em>Consultas por Terapeuta</em> (mostra o valor do repasse ao terapeuta).</p>
           <p><strong>Selecionar:</strong> use o campo de busca para encontrar o paciente ou terapeuta desejado.</p>
           <p><strong>Período:</strong> selecione <em>Por mês</em> para escolher um mês específico, ou <em>Intervalo de datas</em> para definir um período personalizado.</p>
           <p><strong>Status:</strong> filtre por um ou mais status de atendimento para incluir apenas os registros desejados. Deixe em branco para incluir todos.</p>
@@ -205,7 +205,7 @@ export default function ReportsPage() {
                 }`}
               >
                 <FiUser size={18} />
-                Consultas por Paciente
+                Demonstrativo de Pagamento
               </button>
             )}
             <button

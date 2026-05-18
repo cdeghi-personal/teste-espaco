@@ -53,7 +53,7 @@ function resolvePatientValue(c, patient, monthlyTracked) {
     return { display: 'Pré-pago', amount: 0, paymentType }
   }
 
-  // POST_PER_SESSION (default)
+  // POST_PER_SESSION | PAY_PER_SESSION (default)
   const pv = spec?.patientValue
   const amount = pv != null && pv !== '' ? (parseFloat(pv) || 0) : 0
   return { display: fmtCurrencyPDF(amount), amount, paymentType }
@@ -80,7 +80,7 @@ function resolveTherapistValue(c, patient, monthlyTracked) {
     return { display: amount > 0 ? fmtCurrencyPDF(amount) : 'Pré-pago', amount, paymentType }
   }
 
-  // POST_PER_SESSION
+  // POST_PER_SESSION | PAY_PER_SESSION
   const tv = spec?.therapistValue
   const amount = tv != null && tv !== '' ? (parseFloat(tv) || 0) : 0
   return { display: fmtCurrencyPDF(amount), amount, paymentType }
@@ -122,7 +122,7 @@ function renderTotals(doc, y, pageW, margin, totalCount, totalPostSessao, monthl
   }
 }
 
-// ─── Relatório 1: Consultas por Paciente ──────────────────────
+// ─── Relatório 1: Demonstrativo de Pagamento ──────────────────
 
 export async function generateConsultasPacientePDF({
   patient, guardians, consultations, therapists,
@@ -134,7 +134,7 @@ export async function generateConsultasPacientePDF({
   const margin = 14
   const period = formatPeriod(filter)
 
-  let y = await buildReportHeader(doc, 'Relatório de Consultas por Paciente', period, companySettings)
+  let y = await buildReportHeader(doc, 'Demonstrativo de Pagamento', period, companySettings)
 
   // ── Dados do Paciente ──
   y = sectionBlock(doc, 'Dados do Paciente', y)
@@ -190,7 +190,7 @@ export async function generateConsultasPacientePDF({
         const type = appointmentTypes.find(t => t.id === c.appointmentTypeId)
 
         const { display, amount, paymentType } = resolvePatientValue(c, patient, monthlyTracked)
-        if (paymentType === 'POST_PER_SESSION') totalPostSessao += amount
+        if (paymentType === 'POST_PER_SESSION' || paymentType === 'PAY_PER_SESSION') totalPostSessao += amount
         else if (paymentType === 'PREPAID_PACKAGE') totalPrepago += amount
 
         return [
@@ -214,7 +214,7 @@ export async function generateConsultasPacientePDF({
   }
 
   addAllPageFooters(doc)
-  const fileName = `consultas_${patient.fullName.replace(/\s+/g, '_').toLowerCase()}_${period.replace(/\//g, '-').replace(/\s/g, '_')}.pdf`
+  const fileName = `demonstrativo_${patient.fullName.replace(/\s+/g, '_').toLowerCase()}_${period.replace(/\//g, '-').replace(/\s/g, '_')}.pdf`
   doc.save(fileName)
 }
 
@@ -272,7 +272,7 @@ export async function generateConsultasTerapeutaPDF({
         const type = appointmentTypes.find(t => t.id === c.appointmentTypeId)
 
         const { display, amount, paymentType } = resolveTherapistValue(c, patient, monthlyTracked)
-        if (paymentType === 'POST_PER_SESSION') totalPostSessao += amount
+        if (paymentType === 'POST_PER_SESSION' || paymentType === 'PAY_PER_SESSION') totalPostSessao += amount
         else if (paymentType === 'PREPAID_PACKAGE') totalPrepago += amount
 
         return [

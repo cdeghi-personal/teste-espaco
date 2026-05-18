@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { FiPlus, FiTrash2, FiEdit2, FiCheck, FiX, FiSearch, FiChevronLeft, FiChevronRight, FiCalendar, FiFileText } from 'react-icons/fi'
 import HelpButton from '../../../components/ui/HelpButton'
 import { useData } from '../../../context/DataContext'
@@ -253,6 +253,18 @@ export default function MedicalRecordsPage() {
   const [showConsultationModal, setShowConsultationModal] = useState(false)
   const [editConsultation, setEditConsultation] = useState(null)
   const [selectedConsultIds, setSelectedConsultIds] = useState(new Set())
+  const selectAllRef = useRef(null)
+
+  // Limpa seleção quando período ou filtro de status mudam
+  useEffect(() => { setSelectedConsultIds(new Set()) }, [periodMode, rangeFrom, rangeTo, filterStatusIds])
+
+  // Atualiza estado indeterminate do checkbox "selecionar todos"
+  useEffect(() => {
+    if (!selectAllRef.current) return
+    const allIds = displayConsultations.map(c => c.id)
+    const selectedCount = allIds.filter(id => selectedConsultIds.has(id)).length
+    selectAllRef.current.indeterminate = selectedCount > 0 && selectedCount < allIds.length
+  })
 
   const activePatients = patients.filter(p => !p.deleted)
   const filtered = search
@@ -401,6 +413,12 @@ export default function MedicalRecordsPage() {
       next.has(id) ? next.delete(id) : next.add(id)
       return next
     })
+  }
+
+  function toggleSelectAll() {
+    const allIds = displayConsultations.map(c => c.id)
+    const allSelected = allIds.length > 0 && allIds.every(id => selectedConsultIds.has(id))
+    setSelectedConsultIds(allSelected ? new Set() : new Set(allIds))
   }
 
   const [pdfLoading, setPdfLoading] = useState(false)
@@ -751,6 +769,19 @@ export default function MedicalRecordsPage() {
                     {filterStatusIds.length > 0 && (
                       <button onClick={() => setFilterStatusIds([])} className="text-xs text-gray-400 hover:text-gray-600 underline ml-1">limpar</button>
                     )}
+                  </div>
+                )}
+
+                {user?.role === 'admin' && displayConsultations.length > 0 && (
+                  <div className="flex items-center gap-2 mb-2">
+                    <input
+                      ref={selectAllRef}
+                      type="checkbox"
+                      checked={displayConsultations.length > 0 && displayConsultations.every(c => selectedConsultIds.has(c.id))}
+                      onChange={toggleSelectAll}
+                      className="w-4 h-4 rounded accent-brand-blue shrink-0"
+                    />
+                    <span className="text-xs text-gray-500">Selecionar todos ({displayConsultations.length})</span>
                   </div>
                 )}
 

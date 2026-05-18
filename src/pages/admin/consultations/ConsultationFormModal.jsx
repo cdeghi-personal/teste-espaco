@@ -122,6 +122,10 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
   const showPrepaidAlert = prepaidBalance !== null && willConsume && prepaidBalance <= 0
   const showConsumedChip = isEdit && initial.prepaidSessionConsumed !== undefined
 
+  const payPerSessionSpec = form.patientId && form.specialty
+    ? patients.find(p => p.id === form.patientId)?.specialties?.find(s => s.key === form.specialty && s.paymentType === 'PAY_PER_SESSION')
+    : null
+
   return (
     <Modal
       title={title}
@@ -149,6 +153,12 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
               ? <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">Consumiu sessão pré-paga</span>
               : <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-500">Não consumiu sessão pré-paga</span>
             }
+          </div>
+        )}
+        {payPerSessionSpec && (
+          <div className="flex items-center gap-2 p-3 rounded-xl text-xs border bg-amber-50 border-amber-200 text-amber-800">
+            <span className="shrink-0">ℹ️</span>
+            <span>Modalidade <strong>Por Sessão</strong> — cobrança individual por atendimento.</span>
           </div>
         )}
         {prepaidBalance !== null && (
