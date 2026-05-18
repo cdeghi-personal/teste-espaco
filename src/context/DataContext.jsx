@@ -26,7 +26,7 @@ const PATIENT_SELECT = `
   school_name, school_phone, school_address, school_neighborhood,
   school_city, school_state, school_zip, school_coordinator,
   doctor_insurance, doctor_name, doctor_specialty, doctor_phone,
-  diagnosis, notes, deleted,
+  diagnosis, notes, deleted, needs_convenio_report,
   status_id, payment_method_id, primary_therapist_id, created_at, updated_at,
   patient_specialties(specialty, patient_value, therapist_value, payment_type, monthly_patient_value, monthly_therapist_value, payment_notes),
   patient_conditions(diagnosis_id),
@@ -41,7 +41,7 @@ const PATIENT_SELECT_FALLBACK = `
   school_name, school_phone, school_address, school_neighborhood,
   school_city, school_state, school_zip, school_coordinator,
   doctor_insurance, doctor_name, doctor_specialty, doctor_phone,
-  diagnosis, notes, deleted,
+  diagnosis, notes, deleted, needs_convenio_report,
   status_id, payment_method_id, primary_therapist_id, created_at, updated_at,
   patient_specialties(specialty, patient_value, therapist_value, payment_type, monthly_patient_value, monthly_therapist_value, payment_notes),
   patient_conditions(diagnosis_id),
@@ -183,6 +183,7 @@ export function DataProvider({ children }) {
         doctor_phone: data.doctorPhone || null,
         diagnosis: data.diagnosis || null,
         notes: data.notes || null,
+        needs_convenio_report: data.needsConvenioReport || false,
         status_id: data.statusId || null,
         payment_method_id: data.paymentMethodId || null,
         primary_therapist_id: data.therapistId || null,
@@ -283,6 +284,7 @@ export function DataProvider({ children }) {
     if (data.doctorPhone !== undefined) update.doctor_phone = data.doctorPhone || null
     if (data.diagnosis !== undefined) update.diagnosis = data.diagnosis || null
     if (data.notes !== undefined) update.notes = data.notes || null
+    if (data.needsConvenioReport !== undefined) update.needs_convenio_report = data.needsConvenioReport
     if (data.statusId !== undefined) update.status_id = data.statusId || null
     if (data.paymentMethodId !== undefined) update.payment_method_id = data.paymentMethodId || null
     if (data.therapistId !== undefined) update.primary_therapist_id = data.therapistId || null
@@ -917,7 +919,7 @@ export function DataProvider({ children }) {
   async function addConsultationStatus(data) {
     const { data: inserted, error } = await supabase
       .from('consultation_statuses')
-      .insert({ name: data.name, color: data.color || 'bg-gray-100 text-gray-700', active: true, automatic: data.automatic || false, consumes_prepaid_session: data.consumesPrepaidSession || false })
+      .insert({ name: data.name, color: data.color || 'bg-gray-100 text-gray-700', active: true, automatic: data.automatic || false, consumes_prepaid_session: data.consumesPrepaidSession || false, requires_objective_note: data.requiresObjectiveNote || false })
       .select().single()
     if (error) return dbError(error, toast)
     const item = mapConsultationStatus(inserted)
@@ -932,6 +934,7 @@ export function DataProvider({ children }) {
     if (data.active !== undefined) update.active = data.active
     if (data.automatic !== undefined) update.automatic = data.automatic
     if (data.consumesPrepaidSession !== undefined) update.consumes_prepaid_session = data.consumesPrepaidSession
+    if (data.requiresObjectiveNote !== undefined) update.requires_objective_note = data.requiresObjectiveNote
     await supabase.from('consultation_statuses').update(update).eq('id', id)
     setConsultationStatuses(prev => prev.map(s => s.id === id ? { ...s, ...data } : s))
   }

@@ -88,6 +88,9 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
       if (!form.evolutionNotes.trim()) e.evolutionNotes = 'Informe o relato da sessão / evolução'
       if (!form.nextObjectives.trim()) e.nextObjectives = 'Informe o objetivo da próxima sessão'
     }
+    if (selectedStatus?.requiresObjectiveNote && !form.mainObjective.trim()) {
+      e.mainObjective = 'Este status exige uma observação no Objetivo da Sessão'
+    }
     return e
   }
 
@@ -113,7 +116,8 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
   const title = readOnly ? 'Visualizar Atendimento' : isEdit ? 'Editar Registro de Atendimento' : 'Novo Registro de Atendimento'
   const selectedStatus = consultationStatuses.find(s => s.id === form.consultationStatusId)
   const realizadaRequired = selectedStatus?.name?.toLowerCase().includes('realizada')
-  const mainObjectiveRequired = realizadaRequired
+  const requiresNote = selectedStatus?.requiresObjectiveNote === true
+  const mainObjectiveRequired = realizadaRequired || requiresNote
   const willConsume = selectedStatus?.consumesPrepaidSession === true
   const showPrepaidAlert = prepaidBalance !== null && willConsume && prepaidBalance <= 0
   const showConsumedChip = isEdit && initial.prepaidSessionConsumed !== undefined
@@ -222,6 +226,12 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
 
         {/* Objetivo principal */}
         <section>
+          {requiresNote && !readOnly && (
+            <div className="flex items-start gap-2 p-3 mb-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800">
+              <span className="shrink-0 mt-0.5">⚠️</span>
+              <span>Este status exige uma observação. Informe no Objetivo da Sessão as razões ou contexto da alteração do status do atendimento.</span>
+            </div>
+          )}
           <Textarea
             label={mainObjectiveRequired ? 'Objetivo Principal da Sessão *' : 'Objetivo Principal da Sessão'}
             value={form.mainObjective}

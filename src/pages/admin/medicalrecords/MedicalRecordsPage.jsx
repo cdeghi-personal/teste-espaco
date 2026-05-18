@@ -19,7 +19,10 @@ const CONDUCT_STATUS = {
   cancelada:    { label: 'Cancelada',     color: 'bg-red-100 text-red-700' },
 }
 
-function currentYearMonth() { return isoToday().slice(0, 7) }
+function currentYearMonth() {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
 
 function monthLabel(ym) {
   const [y, m] = ym.split('-')
@@ -28,15 +31,17 @@ function monthLabel(ym) {
 }
 
 function prevMonth(ym) {
-  const d = new Date(`${ym}-01`)
+  const [y, m] = ym.split('-').map(Number)
+  const d = new Date(y, m - 1, 1)
   d.setMonth(d.getMonth() - 1)
-  return d.toISOString().slice(0, 7)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
 }
 
 function nextMonth(ym) {
-  const d = new Date(`${ym}-01`)
+  const [y, m] = ym.split('-').map(Number)
+  const d = new Date(y, m - 1, 1)
   d.setMonth(d.getMonth() + 1)
-  return d.toISOString().slice(0, 7)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
 }
 
 // ─── Exam row ─────────────────────────────────────────────────
@@ -241,7 +246,7 @@ export default function MedicalRecordsPage() {
   const [conductDraft, setConductDraft] = useState(null)
 
   // Period + status filter for history
-  const [periodMode, setPeriodMode] = useState('current') // 'prev2'|'prev1'|'current'|'next'|'range'
+  const [periodMode, setPeriodMode] = useState('current') // 'prev2'|'prev1'|'current'|'range'
   const [rangeFrom, setRangeFrom] = useState('')
   const [rangeTo, setRangeTo] = useState('')
   const [filterStatusIds, setFilterStatusIds] = useState([])
@@ -278,7 +283,6 @@ export default function MedicalRecordsPage() {
     prev2:   prevMonth(prevMonth(todayYM)),
     prev1:   prevMonth(todayYM),
     current: todayYM,
-    next:    nextMonth(todayYM),
   }
 
   const displayConsultations = patientConsultations.filter(c => {
@@ -425,6 +429,10 @@ export default function MedicalRecordsPage() {
   }
 
   async function batchSetStatus(status) {
+    if (status.requiresObjectiveNote) {
+      alert(`O status "${status.name}" exige uma observação no Objetivo da Sessão. Use a edição individual para atribuí-lo.`)
+      return
+    }
     const ids = [...selectedConsultIds]
     if (!confirm(`Alterar status para "${status.name}" em ${ids.length} atendimento(s)?`)) return
     await Promise.all(ids.map(id => updateConsultation(id, { consultationStatusId: status.id })))
@@ -443,7 +451,7 @@ export default function MedicalRecordsPage() {
           <p><strong>Exames Complementares:</strong> registre exames realizados com data, link/anexo e observações. Clique em <em>+ Adicionar exame</em>.</p>
           <p><strong>Medicamentos:</strong> registre medicamentos em uso ou interrompidos com data e observações.</p>
           <p><strong>Conduta & Objetivo Terapêutico:</strong> registre a conduta de cada terapeuta com objetivos, datas e status de andamento.</p>
-          <p><strong>Histórico de Atendimentos:</strong> navegue pelo histórico usando os filtros de período (Mês -2, Mês Anterior, Mês Corrente, Mês Seguinte ou Período personalizado) e filtre por status. Clique no lápis (✏) para editar um atendimento.</p>
+          <p><strong>Histórico de Atendimentos:</strong> navegue pelo histórico usando os filtros de período (Mês -2, Mês Anterior, Mês Corrente ou Período personalizado) e filtre por status. Clique no lápis (✏) para editar um atendimento.</p>
           <p><strong>Ações em lote:</strong> admin pode selecionar múltiplos atendimentos e alterar o status em massa.</p>
           <p><strong>PDF:</strong> admin pode gerar o prontuário completo em PDF pelo botão no topo.</p>
         </HelpButton>
@@ -677,11 +685,10 @@ export default function MedicalRecordsPage() {
                 <div className="mb-3">
                   <div className="flex flex-wrap gap-1.5 mb-2">
                     {[
-                      { key: 'prev2',   label: 'Mês -2',        sub: monthLabel(periodMonthMap.prev2) },
-                      { key: 'prev1',   label: 'Mês Anterior',  sub: monthLabel(periodMonthMap.prev1) },
-                      { key: 'current', label: 'Mês Corrente',  sub: monthLabel(periodMonthMap.current) },
-                      { key: 'next',    label: 'Mês Seguinte',  sub: monthLabel(periodMonthMap.next) },
-                      { key: 'range',   label: 'Período',       sub: 'De & Até' },
+                      { key: 'prev2',   label: 'Mês -2',       sub: monthLabel(periodMonthMap.prev2) },
+                      { key: 'prev1',   label: 'Mês Anterior', sub: monthLabel(periodMonthMap.prev1) },
+                      { key: 'current', label: 'Mês Corrente', sub: monthLabel(periodMonthMap.current) },
+                      { key: 'range',   label: 'Período',      sub: 'De & Até' },
                     ].map(opt => (
                       <button
                         key={opt.key}

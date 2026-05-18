@@ -66,6 +66,7 @@ export default function ConsultationStatusPage() {
                       <span className="font-medium text-sm text-gray-900">{s.name}</span>
                       {s.automatic && <span className="px-1.5 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-700">Automático</span>}
                       {s.consumesPrepaidSession && <span className="px-1.5 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700">Consome pré-paga</span>}
+                      {s.requiresObjectiveNote && <span className="px-1.5 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-700">Exige observação</span>}
                     </div>
                     <div className="text-xs text-gray-400 mt-0.5">{count} atendimento(s) (últimos 30 dias)</div>
                   </div>

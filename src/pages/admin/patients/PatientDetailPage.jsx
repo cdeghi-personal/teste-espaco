@@ -129,6 +129,11 @@ export default function PatientDetailPage() {
               <span className="text-gray-500">Forma de Pagamento</span>
               <span className="font-medium text-gray-900">{paymentMethod?.name || '—'}</span>
             </div>
+            {patient.needsConvenioReport && (
+              <div className="flex items-center gap-2 pt-1">
+                <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700">Relatório de convênio</span>
+              </div>
+            )}
           </div>
 
           {/* Terapeutas */}

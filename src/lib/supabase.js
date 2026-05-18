@@ -54,6 +54,7 @@ export function mapPatient(row) {
     externalTherapists: (row.patient_external_therapists || [])
       .sort((a, b) => a.sort_order - b.sort_order)
       .map(r => ({ id: r.id, name: r.name, specialty: r.specialty || '', phone: r.phone || '' })),
+    needsConvenioReport: row.needs_convenio_report || false,
     deleted: row.deleted,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -169,7 +170,7 @@ export function mapConsultation(row) {
 }
 
 export function mapConsultationStatus(row) {
-  return { id: row.id, name: row.name, color: row.color, active: row.active, automatic: row.automatic || false, consumesPrepaidSession: row.consumes_prepaid_session || false }
+  return { id: row.id, name: row.name, color: row.color, active: row.active, automatic: row.automatic || false, consumesPrepaidSession: row.consumes_prepaid_session || false, requiresObjectiveNote: row.requires_objective_note || false }
 }
 
 export function mapAppointmentType(row) {

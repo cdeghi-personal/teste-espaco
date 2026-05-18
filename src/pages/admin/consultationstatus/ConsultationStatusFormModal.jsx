@@ -15,7 +15,7 @@ const COLOR_OPTIONS = [
   { value: 'bg-purple-100 text-purple-700', label: 'Roxo' },
 ]
 
-const EMPTY = { name: '', color: 'bg-green-100 text-green-700', active: true, automatic: false, consumesPrepaidSession: false }
+const EMPTY = { name: '', color: 'bg-green-100 text-green-700', active: true, automatic: false, consumesPrepaidSession: false, requiresObjectiveNote: false }
 
 export default function ConsultationStatusFormModal({ onClose, initial = {} }) {
   const { addConsultationStatus, updateConsultationStatus } = useData()
@@ -93,6 +93,19 @@ export default function ConsultationStatusFormModal({ onClose, initial = {} }) {
           <div>
             <label htmlFor="cs-consumes" className="text-sm font-medium text-gray-700">Consome sessão pré-paga</label>
             <p className="text-xs text-gray-400 mt-0.5">Ao atribuir este status, debita automaticamente 1 sessão do pacote pré-pago</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
+          <input
+            id="cs-requires-note"
+            type="checkbox"
+            checked={form.requiresObjectiveNote}
+            onChange={e => set('requiresObjectiveNote', e.target.checked)}
+            className="w-4 h-4 rounded accent-brand-blue"
+          />
+          <div>
+            <label htmlFor="cs-requires-note" className="text-sm font-medium text-gray-700">Exige observação no objetivo da sessão</label>
+            <p className="text-xs text-gray-400 mt-0.5">Ao atribuir este status, o campo "Objetivo da Sessão" passa a ser obrigatório</p>
           </div>
         </div>
         {isEdit && (

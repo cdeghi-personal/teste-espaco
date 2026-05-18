@@ -22,6 +22,7 @@ const EMPTY = {
   involvedTherapistIds: [],
   paymentMethodId: '', notes: '', statusId: '',
   externalTherapists: [],
+  needsConvenioReport: false,
 }
 
 // Retorna 'white' ou 'black' dependendo da luminância da cor hex
@@ -560,6 +561,23 @@ export default function PatientFormModal({ onClose, initial = {}, readOnly = fal
             </div>
 
           </div>
+
+          {isAdmin && (
+            <div className="flex items-center gap-3 p-3 mt-3 bg-gray-50 rounded-xl">
+              <input
+                id="pat-needs-convenio"
+                type="checkbox"
+                checked={form.needsConvenioReport}
+                onChange={e => set('needsConvenioReport', e.target.checked)}
+                className="w-4 h-4 rounded accent-brand-blue"
+                disabled={readOnly}
+              />
+              <div>
+                <label htmlFor="pat-needs-convenio" className="text-sm font-medium text-gray-700">Precisa de relatório do convênio</label>
+                <p className="text-xs text-gray-400 mt-0.5">Paciente aparecerá na lista do Relatório de Convênio</p>
+              </div>
+            </div>
+          )}
         </section>
 
         {/* Observações */}

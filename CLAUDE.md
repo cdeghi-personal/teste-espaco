@@ -384,6 +384,7 @@ Authentication → URL Configuration:
 - **Terapeutas externos:** tabela `patient_external_therapists` — lista N por paciente, com `name`, `specialty`, `phone`
 - **Diagnóstico Principal:** campo `diagnosis` (texto livre via Select)
 - **Comorbidades:** tabela `patient_conditions` — exclui o diagnóstico principal da lista
+- **Flag `needs_convenio_report`:** boolean, default false; visível/editável apenas por admin (seção Informações Clínicas do `PatientFormModal`); exibida como chip azul no `PatientDetailPage`; filtra a lista de pacientes no Relatório de Convênio — somente pacientes com `needs_convenio_report = true` aparecem na seleção
 - **Tag de Faixa Etária:** exibida nos cards/tabela de PatientsPage, calculada dinamicamente a partir de `dateOfBirth` + tabela `age_ranges`
 
 ## Campos do Responsável
@@ -404,7 +405,7 @@ Authentication → URL Configuration:
 4 seções colapsáveis: Exames Complementares, Medicamentos, Conduta & Objetivo Terapêutico, Histórico de Atendimentos.
 
 **Histórico de Atendimentos — filtros:**
-- **Período:** 5 botões fixos — Mês -2, Mês Anterior, Mês Corrente (default), Mês Seguinte, Período (De & Até)
+- **Período:** 4 botões fixos — Mês -2, Mês Anterior, Mês Corrente (default), Período (De & Até). "Mês Seguinte" foi removido — não faz sentido prontuário futuro. Cálculo usa `new Date(y, m-1, 1)` (local) para evitar bug de timezone UTC-3.
 - **Status:** chips de múltipla seleção; vazio = todos
 - **Ações em lote (admin):** checkbox por atendimento + botões de status dinâmicos (todos os status ativos)
 
@@ -491,6 +492,7 @@ Não é mais editável. Texto padrão fixo definido em `DESEMPENHO_FIXO` em `gen
 - **Versionamento:** `versionLabel` impresso no cabeçalho do PDF; histórico gravado em `convenio_reports`.
 - **companySettings:** passado para ambas as funções PDF; exibe Razão Social, CNPJ e CNES (se configurado) no cabeçalho.
 - **Horários por sessão:** cada sessão tem campo `time` individual. Campo "Horário padrão" + botão "aplicar a todas". O PDF produz uma linha única via `buildSessionsLine(sessions, fallbackHorario)` — formato: `"02 às 17:00, 15 às 18:00 e 27 às 11:00"`.
+- **Lista de pacientes:** somente pacientes com `needs_convenio_report = true` aparecem no select. Admin vê todos os elegíveis; terapeuta vê apenas os seus (gerente do caso ou envolvido). Filtro aplicado em `accessiblePatients` na `ConvenioReportPage`.
 - **Busca de atendimentos:** filtra `consultations` por `patientId + therapistId (emissor) + specialty + date range`. Admin recebe erro se não tiver terapeuta emissor selecionado.
 - **Auto-refresh do histórico:** após "Baixar e Registrar", seção recarrega via `historyRefreshKey`.
 - **Sugestão com IA:** botão "Sugerir com IA" (⚡ violeta), posicionado inline ao lado da label "Objetivos de Intervenção". Sugere apenas `objetivos`; encaminhamento e desempenho não são sugeridos pela IA. Requer `OPENAI_API_KEY` no Supabase + JWT Verification **DESATIVADO**.
@@ -551,6 +553,7 @@ Não é mais editável. Texto padrão fixo definido em `DESEMPENHO_FIXO` em `gen
 - Flag `automatic = true` → não aparece no Select do `ConsultationFormModal`, mas **aparece** nos filtros de relatório e no prontuário
 - Ações em lote do prontuário mostram **todos os status ativos** (incluindo automáticos)
 - Flag `consumes_prepaid_session = true` → ao salvar/atualizar consulta com este status, debita automaticamente 1 sessão do pacote pré-pago do paciente (se especialidade for `PREPAID_PACKAGE`); exibido como chip verde "Consome pré-paga" na listagem de status
+- Flag `requires_objective_note = true` → torna o campo "Objetivo da Sessão" obrigatório ao criar/editar consulta com este status; exibe card âmbar de alerta acima do campo no `ConsultationFormModal`; **bloqueia ação em lote** no prontuário (usuário deve editar individualmente)
 
 ## Gestão Financeira / Pacotes Pré-pagos
 

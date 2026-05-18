@@ -190,7 +190,7 @@ export default function ConvenioReportPage() {
   const selectedTherapist = useMemo(() => therapists.find(t => t.id === therapistId), [therapists, therapistId])
 
   const accessiblePatients = useMemo(() => {
-    const base = patients.filter(p => !p.deleted)
+    const base = patients.filter(p => !p.deleted && p.needsConvenioReport === true)
     if (isAdmin) return base
     return base.filter(p =>
       p.therapistId === therapistId ||
