@@ -31,6 +31,7 @@ export const ROUTES = {
   REPORTS:              '/admin/relatorios',
   CONVENIO_REPORT:      '/admin/relatorios/convenio',
   SUPPORT:              '/admin/suporte',
+  PAYMENTS:             '/admin/pagamentos',
   COMPANY_SETTINGS:     '/admin/empresa',
   GUIDE:                '/admin/guia',
 }

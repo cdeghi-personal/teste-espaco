@@ -45,6 +45,7 @@ import ConvenioReportPage from './pages/admin/reports/ConvenioReportPage'
 import SupportPage from './pages/admin/support/SupportPage'
 import AgeRangesPage from './pages/admin/ageranges/AgeRangesPage'
 import CompanySettingsPage from './pages/admin/company/CompanySettingsPage'
+import PaymentsPage from './pages/admin/payments/PaymentsPage'
 import GuidePage from './pages/admin/guide/GuidePageV2'
 
 // Common
@@ -106,6 +107,7 @@ export default function App() {
                 <Route path={ROUTES.CONVENIO_REPORT} element={<ConvenioReportPage />} />
                 <Route path={ROUTES.REPORTS} element={<ReportsPage />} />
                 <Route path={ROUTES.SUPPORT} element={<SupportPage />} />
+                <Route path={ROUTES.PAYMENTS} element={<PaymentsPage />} />
                 <Route path={ROUTES.COMPANY_SETTINGS} element={<CompanySettingsPage />} />
                 <Route path={ROUTES.GUIDE} element={<GuidePage />} />
               </Route>
