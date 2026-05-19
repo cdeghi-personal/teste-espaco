@@ -5,6 +5,7 @@ import {
   MONTHS, loadLogo, addPageHeader, addAllPageFooters,
   sectionBlock, labelValue, fmtDatePDF, fmtCurrencyPDF,
 } from './pdfShared'
+import { PAYMENT_TYPE_LABELS } from '../constants/paymentTypes'
 
 function formatPeriod(filter) {
   if (filter.type === 'month') {
@@ -179,37 +180,129 @@ export async function generateConsultasPacientePDF({
     let totalPrepago = 0
     const monthlyTracked = new Map()
 
-    autoTable(doc, {
-      startY: y, margin: { left: margin, right: margin },
-      head: [['Data', 'Hora', 'Terapeuta', 'Especialidade', 'Conselho', 'Status', 'Tipo', 'Valor (R$)', 'Objetivo da Sessão']],
-      body: consultations.map(c => {
-        const therapist = therapists.find(t => t.id === c.therapistId)
-        const spec = specialtiesData.find(s => s.key === c.specialty)
-        const specCredential = therapist?.therapistSpecialties?.find(s => s.specialty === c.specialty)?.credential || '—'
-        const status = consultationStatuses.find(s => s.id === c.consultationStatusId)
-        const type = appointmentTypes.find(t => t.id === c.appointmentTypeId)
+    const pageH = doc.internal.pageSize.height
+    const contentW = pageW - margin * 2
+    const leftW = Math.round(contentW * 0.38)
+    const divX = margin + leftW
+    const rightW = contentW - leftW
+    const CARD_PAD = 3
+    const ROW_H = 7
+    const SEP_H = 1.5
+    const RIGHT_LINE_H = 4.2
+    const CARD_GAP = 3
 
-        const { display, amount, paymentType } = resolvePatientValue(c, patient, monthlyTracked)
-        if (paymentType === 'POST_PER_SESSION' || paymentType === 'PAY_PER_SESSION') totalPostSessao += amount
-        else if (paymentType === 'PREPAID_PACKAGE') totalPrepago += amount
+    for (const c of consultations) {
+      const therapist = therapists.find(t => t.id === c.therapistId)
+      const spec = specialtiesData.find(s => s.key === c.specialty)
+      const specCredential = therapist?.therapistSpecialties?.find(s => s.specialty === c.specialty)?.credential || '—'
+      const status = consultationStatuses.find(s => s.id === c.consultationStatusId)
+      const type = appointmentTypes.find(t => t.id === c.appointmentTypeId)
 
-        return [
-          fmtDatePDF(c.date), c.time ? c.time.slice(0, 5) : '—',
-          therapist?.name || '—', spec?.label || c.specialty || '—',
-          specCredential, status?.name || '—', type?.name || '—',
-          display, c.mainObjective || '—',
-        ]
-      }),
-      styles: { fontSize: 7, cellPadding: 2 },
-      headStyles: { fillColor: PDF_BLUE, textColor: 255, fontStyle: 'bold', fontSize: 7.5 },
-      alternateRowStyles: { fillColor: PDF_LIGHT },
-      columnStyles: {
-        0: { cellWidth: 16 }, 1: { cellWidth: 12 }, 2: { cellWidth: 28 },
-        3: { cellWidth: 22 }, 4: { cellWidth: 18 }, 5: { cellWidth: 20 },
-        6: { cellWidth: 20 }, 7: { cellWidth: 20, halign: 'right' }, 8: { cellWidth: 'auto' },
-      },
-    })
-    y = doc.lastAutoTable.finalY + 4
+      const { display: valueDisplay, amount, paymentType } = resolvePatientValue(c, patient, monthlyTracked)
+      if (paymentType === 'POST_PER_SESSION' || paymentType === 'PAY_PER_SESSION') totalPostSessao += amount
+      else if (paymentType === 'PREPAID_PACKAGE') totalPrepago += amount
+
+      const sections = [
+        [
+          { label: 'Data', value: fmtDatePDF(c.date) + (c.time ? '   ' + c.time.slice(0, 5) : '') },
+          { label: 'Status', value: status?.name || '—' },
+          { label: 'Tipo', value: type?.name || '—' },
+        ],
+        [
+          { label: 'Terapeuta', value: therapist?.name || '—' },
+          { label: 'Especialidade', value: spec?.label || c.specialty || '—' },
+          { label: 'Conselho', value: specCredential },
+        ],
+        [
+          { label: 'Modalidade', value: PAYMENT_TYPE_LABELS[paymentType] || paymentType },
+          { label: 'Valor', value: valueDisplay },
+        ],
+      ]
+
+      // Left column height
+      let leftH = CARD_PAD
+      sections.forEach((sec, si) => {
+        if (si > 0) leftH += SEP_H
+        leftH += sec.length * ROW_H
+      })
+      leftH += CARD_PAD
+
+      // Right column height (objective)
+      const objective = c.mainObjective || '—'
+      const rightTextW = rightW - CARD_PAD * 2 - 2
+      const objLines = doc.splitTextToSize(objective, rightTextW)
+      const rightH = CARD_PAD + 4.5 + 2 + objLines.length * RIGHT_LINE_H + CARD_PAD
+
+      const cardH = Math.max(leftH, rightH)
+
+      // Page break
+      if (y + cardH > pageH - 18) {
+        doc.addPage()
+        y = 18
+      }
+
+      // 1. Card background (left area)
+      doc.setFillColor(250, 251, 253)
+      doc.roundedRect(margin, y, contentW, cardH, 1.5, 1.5, 'F')
+
+      // 2. Right column background
+      doc.setFillColor(243, 246, 255)
+      doc.rect(divX + 0.3, y + 0.3, rightW - 0.3, cardH - 0.6, 'F')
+
+      // 3. Card border (drawn on top)
+      doc.setDrawColor(210, 215, 228)
+      doc.setLineWidth(0.3)
+      doc.roundedRect(margin, y, contentW, cardH, 1.5, 1.5, 'S')
+
+      // 4. Vertical divider
+      doc.setLineWidth(0.3)
+      doc.line(divX, y, divX, y + cardH)
+
+      // Left column
+      let ly = y + CARD_PAD
+      sections.forEach((section, si) => {
+        if (si > 0) {
+          doc.setDrawColor(218, 222, 233)
+          doc.setLineWidth(0.2)
+          doc.line(margin + 1, ly, divX - 1, ly)
+          ly += SEP_H
+        }
+        section.forEach(({ label, value }) => {
+          doc.setFontSize(5.5)
+          doc.setFont('helvetica', 'normal')
+          doc.setTextColor(150, 155, 172)
+          doc.text(label.toUpperCase(), margin + CARD_PAD, ly + 3)
+
+          doc.setFontSize(7.5)
+          doc.setFont('helvetica', 'bold')
+          doc.setTextColor(20, 25, 42)
+          const maxVW = leftW - CARD_PAD * 2
+          doc.text(doc.splitTextToSize(value, maxVW)[0] || value, margin + CARD_PAD, ly + 6)
+          ly += ROW_H
+        })
+      })
+
+      // Right column
+      const rightTextX = divX + CARD_PAD + 1.5
+      let ry = y + CARD_PAD + 3.5
+
+      doc.setFontSize(5.5)
+      doc.setFont('helvetica', 'bold')
+      doc.setTextColor(...PDF_BLUE)
+      doc.text('OBJETIVO DA SESSÃO', rightTextX, ry)
+      ry += 4 + 2
+
+      doc.setFontSize(7.5)
+      doc.setFont('helvetica', 'normal')
+      doc.setTextColor(20, 25, 42)
+      objLines.forEach(line => {
+        doc.text(line, rightTextX, ry)
+        ry += RIGHT_LINE_H
+      })
+
+      y += cardH + CARD_GAP
+    }
+
     renderTotals(doc, y, pageW, margin, consultations.length, totalPostSessao, monthlyTracked, totalPrepago)
   }
 
