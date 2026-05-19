@@ -337,6 +337,15 @@ export function DataProvider({ children }) {
     return patients.find(p => p.id === id)
   }
 
+  async function fetchInactivePatients() {
+    const { data } = await supabase
+      .from('patients')
+      .select(PATIENT_SELECT)
+      .eq('deleted', true)
+      .order('full_name')
+    return (data || []).map(mapPatient)
+  }
+
   // ─── Guardians ──────────────────────────────────────────────────────────────
 
   async function addGuardian(data) {
@@ -1253,6 +1262,10 @@ export function DataProvider({ children }) {
 
   async function addPaymentDemonstrativo(data) {
     const { data: { session } } = await supabase.auth.getSession()
+    const formDataWithTotal = {
+      ...(data.formData || {}),
+      ...(data.totalAmount != null ? { totalAmount: data.totalAmount } : {}),
+    }
     const { data: inserted, error } = await supabase
       .from('payment_demonstratives')
       .insert({
@@ -1263,13 +1276,23 @@ export function DataProvider({ children }) {
         nf_number:        data.nfNumber || null,
         nf_date:          data.nfDate || null,
         consultation_ids: data.consultationIds || [],
-        form_data:        data.formData || null,
+        form_data:        Object.keys(formDataWithTotal).length ? formDataWithTotal : null,
         created_by:       session?.user?.id || null,
       })
       .select()
       .single()
     if (error) throw new Error(error.message)
     return inserted
+  }
+
+  async function getPaymentDemonstrativos(patientId) {
+    const { data, error } = await supabase
+      .from('payment_demonstratives')
+      .select('*')
+      .eq('patient_id', patientId)
+      .order('created_at', { ascending: false })
+    if (error) throw new Error(error.message)
+    return data || []
   }
 
   // ─── Audit Log ───────────────────────────────────────────────────────────────
@@ -1290,7 +1313,7 @@ export function DataProvider({ children }) {
 
   const value = {
     isLoading,
-    patients, addPatient, updatePatient, deletePatient, restorePatient, getPatientById,
+    patients, addPatient, updatePatient, deletePatient, restorePatient, getPatientById, fetchInactivePatients,
     guardians, addGuardian, updateGuardian, deleteGuardian, restoreGuardian, getGuardianById, getGuardiansForPatient,
     appointments, addAppointment, updateAppointment, deleteAppointment,
     consultations, addConsultation, updateConsultation, deleteConsultation,
@@ -1311,7 +1334,7 @@ export function DataProvider({ children }) {
     logAudit,
     companySettings, updateCompanySettings,
     addPrepaidPackage, getPrepaidData, addLedgerAdjustment,
-    batchFaturarConsultations, addPaymentDemonstrativo,
+    batchFaturarConsultations, addPaymentDemonstrativo, getPaymentDemonstrativos,
   }
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>

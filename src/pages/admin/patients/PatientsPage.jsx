@@ -13,13 +13,15 @@ import { hexTextColor } from '../../../utils/colorUtils'
 import { ROUTES } from '../../../constants/routes'
 
 export default function PatientsPage() {
-  const { patients, deletePatient, restorePatient, patientStatuses, specialtiesData, ageRanges, logAudit } = useData()
+  const { patients, deletePatient, restorePatient, fetchInactivePatients, patientStatuses, specialtiesData, ageRanges, logAudit } = useData()
   const { user } = useAuth()
   const navigate = useNavigate()
   const [search, setSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState('')
   const [filterSpecialty, setFilterSpecialty] = useState('')
   const [showDeleted, setShowDeleted] = useState(false)
+  const [inactivePatients, setInactivePatients] = useState([])
+  const [inactiveLoading, setInactiveLoading] = useState(false)
   const [showModal, setShowModal] = useState(false)
   const [editPatient, setEditPatient] = useState(null)
   const [viewPatient, setViewPatient] = useState(null)
@@ -33,23 +35,38 @@ export default function PatientsPage() {
         (p.involvedTherapistIds || []).includes(user?.id)
       )
 
-  const filtered = accessiblePatients.filter(p => {
-    const matchDeleted = showDeleted ? p.deleted === true : !p.deleted
+  const sourcePatients = showDeleted ? inactivePatients : accessiblePatients
+  const filtered = sourcePatients.filter(p => {
     const matchSearch = !search ||
       p.fullName.toLowerCase().includes(search.toLowerCase()) ||
       p.cpf?.includes(search) ||
       p.diagnosis?.toLowerCase().includes(search.toLowerCase())
+    if (showDeleted) return matchSearch
     const matchStatus = !filterStatus || (p.statusId || p.status) === filterStatus
     const matchSpecialty = !filterSpecialty || p.specialties?.includes(filterSpecialty)
-    return matchDeleted && matchSearch && matchStatus && matchSpecialty
+    return matchSearch && matchStatus && matchSpecialty
   })
+
+  async function handleToggleDeleted() {
+    const newVal = !showDeleted
+    setShowDeleted(newVal)
+    if (newVal) {
+      setInactiveLoading(true)
+      const data = await fetchInactivePatients()
+      setInactivePatients(data)
+      setInactiveLoading(false)
+    }
+  }
 
   function handleDelete(id, name) {
     if (confirm(`Desativar "${name}"?`)) deletePatient(id)
   }
 
   function handleRestore(id, name) {
-    if (confirm(`Restaurar "${name}"?`)) restorePatient(id)
+    if (confirm(`Restaurar "${name}"?`)) {
+      restorePatient(id)
+      setInactivePatients(prev => prev.filter(p => p.id !== id))
+    }
   }
 
   function getAgeRange(dateOfBirth) {
@@ -85,7 +102,7 @@ export default function PatientsPage() {
             <p><strong>Especialidades:</strong> na edição, a seção Terapeutas permite adicionar as especialidades em atendimento com valores por especialidade.</p>
           </HelpButton>
           <button
-            onClick={() => setShowDeleted(v => !v)}
+            onClick={handleToggleDeleted}
             className={`p-2 rounded-xl border transition-all ${
               showDeleted ? 'bg-red-50 text-red-700 border-red-200' : 'bg-white text-gray-500 border-gray-200'
             }`}
@@ -138,7 +155,9 @@ export default function PatientsPage() {
 
       {/* List */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-        {filtered.length === 0 ? (
+        {inactiveLoading ? (
+          <div className="py-12 text-center text-gray-400 text-sm">Carregando...</div>
+        ) : filtered.length === 0 ? (
           <EmptyState
             icon={FiUser}
             title={showDeleted ? 'Nenhum paciente inativo' : 'Nenhum paciente encontrado'}

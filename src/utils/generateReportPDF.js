@@ -292,6 +292,7 @@ export async function generateConsultasPacientePDF({
   consultationStatuses, appointmentTypes, specialtiesData,
   filter, companySettings = null,
   draftMode = false, nfNumber = null, nfDate = null,
+  returnBlob = false,
 }) {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
   const pageW = doc.internal.pageSize.width
@@ -347,15 +348,16 @@ export async function generateConsultasPacientePDF({
 
   y = sectionBlock(doc, `Atendimentos Realizados no Período: ${period}`, y)
 
+  let totalPostSessao = 0
+  let totalPrepago = 0
+  let hasUnconfigured = false
+  const monthlyTracked = new Map()
+
   if (consultations.length === 0) {
     doc.setFontSize(8); doc.setTextColor(...PDF_GRAY)
     doc.text('Nenhum atendimento encontrado no período selecionado.', margin, y + 4)
     y += 12
   } else {
-    let totalPostSessao = 0
-    let totalPrepago = 0
-    let hasUnconfigured = false
-    const monthlyTracked = new Map()
     const pageH = doc.internal.pageSize.height
 
     for (const c of consultations) {
@@ -406,6 +408,15 @@ export async function generateConsultasPacientePDF({
 
   const suffix = draftMode ? '_RASCUNHO' : ''
   const fileName = `demonstrativo_${patient.fullName.replace(/\s+/g, '_').toLowerCase()}_${period.replace(/\//g, '-').replace(/\s/g, '_')}${suffix}.pdf`
+
+  const totalMensal = [...monthlyTracked.values()].reduce((a, b) => a + b, 0)
+  const totalAmount = totalPostSessao + totalMensal + totalPrepago
+
+  if (returnBlob) {
+    const blob = doc.output('blob')
+    return { blob, filename: fileName, totalAmount }
+  }
+
   doc.save(fileName)
 }
 
