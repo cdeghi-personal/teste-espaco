@@ -761,7 +761,21 @@ Não é mais editável. Texto padrão fixo definido em `DESEMPENHO_FIXO` em `gen
 ### UX
 
 - Criar série: modal separado `SeriesFormModal` (não embutido no `ConsultationFormModal`).
-- Ao editar atendimento de série: pergunta "Apenas este" vs "Este e os próximos" antes de abrir o form.
+- Botão "Série" na Agenda (`FiRepeat`) — visível para admin e membros da equipe (`isAdminOrTeam`).
+- Ao editar atendimento de série: pergunta "Apenas este" vs "Este e os próximos" antes de abrir o form (Fase 3).
+
+### `addConsultationSeries` (DataContext)
+
+- Gera datas via `generateSeriesDates` (`src/utils/dateUtils.js`)
+- Cria `consultation_series` → bulk insert `consultations` (com `series_id`) → bulk insert `consultation_therapists` (terapeuta principal, `is_primary = true`) → fetch completo com `CONSULTATION_SELECT` → atualiza estado local
+- **Não chama `handlePrepaidConsumption`** — criação de série nunca consome pré-pago
+- Retorna `{ series, consultations, count }` ou `{ error }`
+
+### `generateSeriesDates` (`src/utils/dateUtils.js`)
+
+- Parâmetros: `{ recurrenceType, recurrenceDays, startDate, endDate, sessionCount }`
+- Cap de 500 datas e 5 anos à frente de `startDate`
+- Dias passados são incluídos (UI avisa mas não bloqueia)
 
 ## Múltiplos Terapeutas por Atendimento
 

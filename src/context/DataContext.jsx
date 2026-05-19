@@ -1,13 +1,14 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import {
   supabase,
-  mapPatient, mapGuardian, mapTherapist, mapAppointment, mapConsultation,
+  mapPatient, mapGuardian, mapTherapist, mapAppointment, mapConsultation, mapConsultationSeries,
   mapSpecialty, mapPaymentMethod, mapDiagnosis, mapPatientStatus, mapRoom,
   mapConsultationStatus, mapAppointmentType, mapExam, mapMedication, mapConduct,
   syncPatientRelations, syncGuardianPatients,
   syncTherapistSpecialties, syncExternalTherapists, syncInvolvedTherapists,
 } from '../lib/supabase'
 import { useToast } from '../components/ui/Toast'
+import { generateSeriesDates } from '../utils/dateUtils'
 
 function dbError(error, toast) {
   const msg = error?.message || 'Erro ao salvar. Tente novamente.'
@@ -1447,6 +1448,93 @@ export function DataProvider({ children }) {
     return data || []
   }
 
+  // ─── Consultation Series ─────────────────────────────────────────────────────
+
+  async function addConsultationSeries(data) {
+    const {
+      patientId, primaryTherapistId, specialty,
+      consultationStatusId, appointmentTypeId, roomId,
+      time, recurrenceType, recurrenceDays, startDate, endDate, sessionCount, notes,
+    } = data
+
+    const { data: { session } } = await supabase.auth.getSession()
+    const createdBy = session?.user?.id || null
+
+    // 1. Gera datas das ocorrências
+    const dates = generateSeriesDates({ recurrenceType, recurrenceDays, startDate, endDate, sessionCount })
+    if (dates.length === 0) return { error: 'Nenhuma data gerada com os parâmetros informados.' }
+
+    // 2. Cria o registro da série
+    const { data: series, error: seriesErr } = await supabase
+      .from('consultation_series')
+      .insert({
+        patient_id:             patientId,
+        primary_therapist_id:   primaryTherapistId,
+        specialty,
+        appointment_type_id:    appointmentTypeId || null,
+        consultation_status_id: consultationStatusId || null,
+        room_id:                roomId || null,
+        time:                   time || null,
+        recurrence_type:        recurrenceType,
+        recurrence_days:        recurrenceDays,
+        start_date:             startDate,
+        end_date:               endDate || null,
+        session_count:          sessionCount || null,
+        notes:                  notes || null,
+        created_by:             createdBy,
+      })
+      .select()
+      .single()
+    if (seriesErr) return dbError(seriesErr, toast)
+
+    // 3. Bulk insert das consultas — sem chamar handlePrepaidConsumption (série não consome pré-pago)
+    const consultationRows = dates.map(date => ({
+      patient_id:             patientId,
+      therapist_id:           primaryTherapistId,
+      specialty,
+      date,
+      time:                   time || null,
+      room_id:                roomId || null,
+      consultation_status_id: consultationStatusId || null,
+      appointment_type_id:    appointmentTypeId || null,
+      series_id:              series.id,
+      series_original_date:   date,
+      is_series_exception:    false,
+    }))
+
+    const { data: insertedIds, error: consultErr } = await supabase
+      .from('consultations')
+      .insert(consultationRows)
+      .select('id')
+    if (consultErr) {
+      await supabase.from('consultation_series').delete().eq('id', series.id)
+      return dbError(consultErr, toast)
+    }
+
+    // 4. Bulk insert de participation (terapeuta principal em cada consulta)
+    const { error: ctErr } = await supabase
+      .from('consultation_therapists')
+      .insert(insertedIds.map(c => ({
+        consultation_id: c.id,
+        therapist_id:    primaryTherapistId,
+        specialty,
+        is_primary:      true,
+      })))
+    if (ctErr) console.error('[addConsultationSeries] consultation_therapists error:', ctErr)
+
+    // 5. Busca registros completos para atualizar estado local
+    const { data: full } = await supabase
+      .from('consultations')
+      .select(CONSULTATION_SELECT)
+      .in('id', insertedIds.map(c => c.id))
+      .order('date', { ascending: true })
+
+    const mapped = (full || []).map(mapConsultation)
+    setConsultations(prev => [...mapped, ...prev])
+
+    return { series: mapConsultationSeries(series), consultations: mapped, count: mapped.length }
+  }
+
   // ─── Audit Log ───────────────────────────────────────────────────────────────
 
   async function logAudit(action, resourceType, resourceId, resourceName = '') {
@@ -1468,7 +1556,7 @@ export function DataProvider({ children }) {
     patients, addPatient, updatePatient, deletePatient, restorePatient, getPatientById, fetchInactivePatients,
     guardians, addGuardian, updateGuardian, deleteGuardian, restoreGuardian, getGuardianById, getGuardiansForPatient,
     appointments, addAppointment, updateAppointment, deleteAppointment,
-    consultations, addConsultation, updateConsultation, deleteConsultation,
+    consultations, addConsultation, updateConsultation, deleteConsultation, addConsultationSeries,
     therapists, addTherapist, updateTherapist, deleteTherapist, getTherapistById,
     specialtiesData, addSpecialtyData, updateSpecialtyData,
     paymentMethods, addPaymentMethod, updatePaymentMethod,

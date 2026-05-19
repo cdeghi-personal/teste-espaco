@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { FiPlus, FiChevronLeft, FiChevronRight, FiSearch, FiCalendar, FiEdit2 } from 'react-icons/fi'
+import { FiPlus, FiChevronLeft, FiChevronRight, FiSearch, FiCalendar, FiEdit2, FiRepeat } from 'react-icons/fi'
 import HelpButton from '../../../components/ui/HelpButton'
 import { addDays, startOfWeek, format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
@@ -7,6 +7,7 @@ import { useData } from '../../../context/DataContext'
 import { useAuth } from '../../../context/AuthContext'
 import Button from '../../../components/ui/Button'
 import ConsultationFormModal from '../consultations/ConsultationFormModal'
+import SeriesFormModal from '../consultations/SeriesFormModal'
 import { formatMonthYear } from '../../../utils/dateUtils'
 
 function textColorForBg(hex) {
@@ -43,6 +44,7 @@ export default function AgendaPage() {
   const [filterTherapist, setFilterTherapist] = useState('')
   const [showModal, setShowModal] = useState(false)
   const [editItem, setEditItem] = useState(null)
+  const [showSeriesModal, setShowSeriesModal] = useState(false)
   const [selectedDayIdx, setSelectedDayIdx] = useState(() => {
     const d = new Date().getDay()
     // 0=Dom→5(FDS), 1=Seg→0, ..., 5=Sex→4, 6=Sáb→5(FDS)
@@ -130,14 +132,21 @@ export default function AgendaPage() {
           <HelpButton title="Como usar a Agenda">
             <p><strong>Visualização semanal:</strong> a agenda exibe os atendimentos da semana atual. Use as setas para navegar entre semanas. No mobile, as abas mostram os dias separadamente.</p>
             <p><strong>Criar atendimento:</strong> clique em <em>Novo Atendimento</em> e preencha paciente, terapeuta, especialidade, data e horário.</p>
+            <p><strong>Criar série:</strong> clique em <em>Série</em> para criar atendimentos recorrentes (ex.: toda segunda por 10 semanas).</p>
             <p><strong>Editar:</strong> clique no lápis (✏) no card do atendimento para abrir o formulário de edição.</p>
             <p><strong>Filtro "Minha Agenda":</strong> terapeutas veem apenas seus próprios atendimentos. Admins veem todos.</p>
             <p><strong>Legenda:</strong> as cores na legenda inferior identificam cada terapeuta.</p>
           </HelpButton>
+          {isAdminOrTeam && (
+            <Button variant="ghost" onClick={() => setShowSeriesModal(true)}>
+              <FiRepeat size={15} />
+              <span className="hidden sm:inline">Série</span>
+            </Button>
+          )}
           <Button variant="primary" onClick={() => { setEditItem(null); setShowModal(true) }}>
             <FiPlus size={16} />
             <span className="hidden sm:inline">Novo Atendimento</span>
-          <span className="sm:hidden">Novo</span>
+            <span className="sm:hidden">Novo</span>
           </Button>
         </div>
       </div>
@@ -456,6 +465,10 @@ export default function AgendaPage() {
           onClose={() => setShowModal(false)}
           initial={editItem || {}}
         />
+      )}
+
+      {showSeriesModal && (
+        <SeriesFormModal onClose={() => setShowSeriesModal(false)} />
       )}
     </div>
   )

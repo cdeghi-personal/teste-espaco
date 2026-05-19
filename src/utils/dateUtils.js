@@ -71,3 +71,36 @@ export function isoToday() {
 export function formatMonthYear(date) {
   return format(date, "MMMM 'de' yyyy", { locale: ptBR })
 }
+
+/**
+ * Gera array de datas ISO para uma série recorrente.
+ * recurrenceDays: ISO weekday (1=Seg … 7=Dom)
+ * recurrenceType: 'by_count' | 'by_date'
+ */
+export function generateSeriesDates({ recurrenceType, recurrenceDays, startDate, endDate, sessionCount }) {
+  const MAX = 500
+  const dates = []
+  const [sy, sm, sd] = startDate.split('-').map(Number)
+  const cur = new Date(sy, sm - 1, sd)
+  const isoOf = d =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+
+  if (recurrenceType === 'by_count') {
+    const target = Math.min(Number(sessionCount) || 0, MAX)
+    while (dates.length < target) {
+      const dow = cur.getDay() === 0 ? 7 : cur.getDay()
+      if (recurrenceDays.includes(dow)) dates.push(isoOf(cur))
+      cur.setDate(cur.getDate() + 1)
+      if (cur.getFullYear() > sy + 5) break
+    }
+  } else {
+    const [ey, em, ed] = endDate.split('-').map(Number)
+    const end = new Date(ey, em - 1, ed)
+    while (cur <= end && dates.length < MAX) {
+      const dow = cur.getDay() === 0 ? 7 : cur.getDay()
+      if (recurrenceDays.includes(dow)) dates.push(isoOf(cur))
+      cur.setDate(cur.getDate() + 1)
+    }
+  }
+  return dates
+}
