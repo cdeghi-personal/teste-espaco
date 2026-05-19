@@ -1553,6 +1553,7 @@ export function DataProvider({ children }) {
         .eq('series_id', seriesId)
         .gt('date', fromDate)
         .is('nf_number', null)
+        .eq('is_series_exception', false)
       if (error) { toast.show(error.message); return { error: error.message } }
     }
 
@@ -1569,7 +1570,7 @@ export function DataProvider({ children }) {
     }
 
     setConsultations(prev => prev.map(c => {
-      if (c.seriesId !== seriesId || c.date <= fromDate || c.nfNumber) return c
+      if (c.seriesId !== seriesId || c.date <= fromDate || c.nfNumber || c.isSeriesException) return c
       const patch = {}
       if (data.time !== undefined) patch.time = data.time
       if (data.roomId !== undefined) patch.roomId = data.roomId
