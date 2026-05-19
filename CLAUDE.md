@@ -192,7 +192,7 @@ Encontrar em: Supabase Dashboard → Project Settings → API.
 | `audit_logs` | Log de auditoria — registra VIEW/INSERT/UPDATE/DELETE com user_id, user_email, user_name, action, resource_type, resource_id, resource_name; retém apenas 90 dias |
 | `audit_logs_history` | Arquivo do log de auditoria — mesmo schema + coluna archived_at; retém de 90 dias a 1 ano; manutenção via pg_cron (maintain_audit_logs) |
 | `contact_leads` | Contatos do site público — name, phone, email, specialty, how_found, message, status, internal_note, assigned_to, last_contact_at, patient_name, contact_reason, referred_by |
-| `payment_demonstratives` | Histórico de demonstrativos de pagamento definitivos — patient_id, period_start, period_end, mes_label, nf_number, nf_date, consultation_ids (UUID[]), form_data (JSONB), created_by; admin only |
+| `payment_demonstratives` | Histórico de demonstrativos de pagamento definitivos — patient_id, period_start, period_end, mes_label, nf_number, nf_date, consultation_ids (UUID[]), form_data (JSONB — inclui `totalAmount`, `patientName`, `periodType`), created_by; admin only |
 | `support_tickets` | Chamados de suporte — subject, type, author, description, solution, status, nova_resposta (BOOLEAN), created_by_id |
 | `support_ticket_history` | Histórico de status dos chamados — ticket_id, status, changed_at, changed_by, note (TEXT) |
 | `age_ranges` | Faixas etárias — name, min_age, max_age, color; critério: min_age ≤ idade < max_age |
@@ -214,6 +214,8 @@ Todos em `src/lib/supabase.js`. Convertem snake_case do banco para camelCase do 
 - `syncGuardianPatients(guardianId, patientIds)`
 - `syncTherapistSpecialties(therapistId, [{ specialty, credential }])`
 - `syncExternalTherapists(patientId, [{ name, specialty, phone }])`
+- `fetchInactivePatients()` — busca pacientes com `deleted=true` sob demanda (não carregado no estado global); usado pela `PatientsPage` ao ativar o toggle "Ver Inativos"
+- `getPaymentDemonstrativos(patientId)` — busca registros de `payment_demonstratives` por paciente, `ORDER BY created_at DESC`; usado pelo `HistoricoSection` em `ReportsPage`
 
 ### RLS — padrão para verificação de admin
 
@@ -428,16 +430,18 @@ Authentication → URL Configuration:
 ## Relatórios PDF (`/admin/relatorios`)
 
 - **Acesso:** todos os autenticados. Terapeutas veem apenas "Consultas por Terapeuta", com campo Terapeuta pré-preenchido (read-only) com seu próprio nome (`user.id`).
-- **Demonstrativo de Pagamento (admin only):** ao clicar "Gerar PDF", admin entra em modo preview com 3 botões:
-  - **Baixar e Gerar Demonstrativo:** abre modal de NF (número + data emissão, ambos opcionais) → salva em `payment_demonstratives` → atualiza status das consultas para "Faturado" via `batchFaturarConsultations` (sem tocar no ledger pré-pago) → gera PDF com banner verde de NF
-  - **Gerar DRAFT:** gera PDF com marca d'água "RASCUNHO" diagonal, sem salvar histórico nem alterar status
-  - **Fechar:** volta ao formulário sem ação
+- **Demonstrativo de Pagamento (admin only):** ao clicar "Gerar PDF", o sistema gera o PDF e exibe em um modal com `<iframe>` (mesmo padrão do Relatório de Convênio). Rodapé do modal tem 3 botões:
+  - **Fechar:** fecha o modal; "Gerar PDF" reaparece no formulário
+  - **Gerar DRAFT:** baixa o PDF com marca d'água "RASCUNHO" diagonal (sem salvar histórico nem alterar status); modal permanece aberto
+  - **Faturar:** fecha o modal e exibe o formulário inline de NF (número + data emissão, ambos opcionais) → ao confirmar: salva em `payment_demonstratives` (com `totalAmount` em `form_data`) → atualiza status para "Faturado" via `batchFaturarConsultations` → gera e baixa PDF definitivo com banner verde de NF
 - **Sequência de operações definitivas (quasi-transactional):** salva histórico PRIMEIRO; se falhar, nada mais é executado; se `batchFaturarConsultations` falhar após salvar, alerta que o status deve ser corrigido manualmente
+- **Histórico de Demonstrativos Faturados:** seção abaixo do formulário (admin, quando paciente selecionado) mostra registros de `payment_demonstratives` ordenados por data; clicar no `>` abre modal de detalhes com período, NF, total e data de geração. Atualizado automaticamente após cada faturamento via `historyRefreshKey`.
 - **`batchFaturarConsultations(ids, statusId)`** no DataContext: update direto em `consultations.consultation_status_id` SEM chamar `handlePrepaidConsumption` — ledger pré-pago não é afetado
+- **`getPaymentDemonstrativos(patientId)`** no DataContext: busca registros de `payment_demonstratives` por paciente, ordenados por `created_at DESC`
 - **Consultas por Terapeuta:** coluna Valor (R$) usa `patient.specialties.find(s => s.key === c.specialty)?.therapistValue`
 - Ambos exibem total de atendimentos + total do período no rodapé
 - Filtros: tipo de relatório, paciente/terapeuta (searchable), período (mês ou De/Até), status (múltipla seleção — inclui automáticos)
-- Funções: `generateConsultasPacientePDF({ ..., draftMode, nfNumber, nfDate })`, `generateConsultasTerapeutaPDF()` em `src/utils/generateReportPDF.js`
+- Funções: `generateConsultasPacientePDF({ ..., draftMode, nfNumber, nfDate, returnBlob })` — quando `returnBlob=true` retorna `{ blob, filename, totalAmount }` em vez de fazer `doc.save()`; `generateConsultasTerapeutaPDF()` em `src/utils/generateReportPDF.js`
 - Card de acesso rápido ao "Relatório de Convênio" na parte superior da página
 
 ## Relatório de Convênio (`/admin/relatorios/convenio`)
