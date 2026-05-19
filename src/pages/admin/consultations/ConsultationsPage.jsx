@@ -5,12 +5,13 @@ import { useData } from '../../../context/DataContext'
 import { useAuth } from '../../../context/AuthContext'
 import Badge from '../../../components/ui/Badge'
 import Button from '../../../components/ui/Button'
+import Modal from '../../../components/ui/Modal'
 import EmptyState from '../../../components/ui/EmptyState'
 import ConsultationFormModal from './ConsultationFormModal'
 import { formatDateShort } from '../../../utils/dateUtils'
 
 export default function ConsultationsPage() {
-  const { consultations, patients, therapists, rooms, specialtiesData, consultationStatuses, appointmentTypes, deleteConsultation, logAudit } = useData()
+  const { consultations, patients, therapists, rooms, specialtiesData, consultationStatuses, appointmentTypes, deleteConsultation, deleteConsultationSeries, logAudit } = useData()
   const { user } = useAuth()
   const [search, setSearch] = useState('')
   const [filterSpecialty, setFilterSpecialty] = useState('')
@@ -18,6 +19,9 @@ export default function ConsultationsPage() {
   const [editConsultation, setEditConsultation] = useState(null)
   const [viewConsultation, setViewConsultation] = useState(null)
   const [expanded, setExpanded] = useState(null)
+  const [seriesDeleteConfirm, setSeriesDeleteConfirm] = useState(null) // { id, seriesId, date }
+
+  const isAdmin = user?.role === 'admin'
 
   function getPatient(id) { return patients.find(p => p.id === id) }
   function getTherapist(id) { return therapists.find(t => t.id === id) }
@@ -38,8 +42,12 @@ export default function ConsultationsPage() {
     })
     .sort((a, b) => b.date.localeCompare(a.date))
 
-  function handleDelete(id) {
-    if (confirm('Excluir este registro de atendimento?')) deleteConsultation(id)
+  function handleDelete(consultation) {
+    if (consultation.seriesId && isAdmin) {
+      setSeriesDeleteConfirm({ id: consultation.id, seriesId: consultation.seriesId, date: consultation.date })
+      return
+    }
+    if (confirm('Excluir este registro de atendimento?')) deleteConsultation(consultation.id)
   }
 
   const outcomeColors = {
@@ -156,7 +164,7 @@ export default function ConsultationsPage() {
                     <FiEdit2 size={15} />
                   </button>
                   <button
-                    onClick={() => handleDelete(c.id)}
+                    onClick={() => handleDelete(c)}
                     className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
                   >
                     <FiTrash2 size={15} />
@@ -231,6 +239,22 @@ export default function ConsultationsPage() {
           initial={viewConsultation}
           readOnly
         />
+      )}
+      {seriesDeleteConfirm && (
+        <Modal
+          title="Excluir da Série"
+          onClose={() => setSeriesDeleteConfirm(null)}
+          size="sm"
+          footer={
+            <>
+              <Button variant="ghost" onClick={() => setSeriesDeleteConfirm(null)}>Cancelar</Button>
+              <Button variant="outline" onClick={() => { deleteConsultation(seriesDeleteConfirm.id); setSeriesDeleteConfirm(null) }}>Apenas este</Button>
+              <Button variant="danger" onClick={() => { deleteConsultationSeries(seriesDeleteConfirm.seriesId, seriesDeleteConfirm.date); setSeriesDeleteConfirm(null) }}>Este e os próximos</Button>
+            </>
+          }
+        >
+          <p className="text-sm text-gray-700">Esta consulta faz parte de uma série recorrente. Deseja excluir apenas este atendimento ou este e todos os atendimentos futuros não faturados da série?</p>
+        </Modal>
       )}
     </div>
   )

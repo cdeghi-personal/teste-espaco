@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { FiPlus, FiTrash2 } from 'react-icons/fi'
+import { FiPlus, FiTrash2, FiRepeat } from 'react-icons/fi'
 import Modal from '../../../components/ui/Modal'
 import Button from '../../../components/ui/Button'
 import Input from '../../../components/ui/Input'
@@ -21,7 +21,7 @@ const EMPTY = {
 }
 
 export default function ConsultationFormModal({ onClose, initial = {}, readOnly = false }) {
-  const { patients, therapists, specialtiesData, rooms, consultationStatuses, appointmentTypes, appointments, addConsultation, updateConsultation, getPrepaidData } = useData()
+  const { patients, therapists, specialtiesData, rooms, consultationStatuses, appointmentTypes, appointments, addConsultation, updateConsultation, updateConsultationSeries, getPrepaidData } = useData()
   const { user } = useAuth()
   const isEdit = !!initial.id
 
@@ -39,6 +39,9 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
   })
   const [errors, setErrors] = useState({})
   const [prepaidBalance, setPrepaidBalance] = useState(null)
+  const [confirmSeriesEdit, setConfirmSeriesEdit] = useState(false)
+
+  const hasSeries = isEdit && !!initial.seriesId
 
   useEffect(() => {
     if (!form.patientId || !form.specialty) { setPrepaidBalance(null); return }
@@ -97,8 +100,33 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
   function handleSave() {
     const e = validate()
     if (Object.keys(e).length) { setErrors(e); return }
-    if (isEdit) updateConsultation(initial.id, form)
-    else addConsultation(form)
+    if (hasSeries && isAdmin) {
+      setConfirmSeriesEdit(true)
+      return
+    }
+    const saveData = hasSeries ? { ...form, isSeriesException: true } : form
+    if (isEdit) updateConsultation(initial.id, saveData)
+    else addConsultation(saveData)
+    onClose()
+  }
+
+  function doSave(scope) {
+    const saveData = { ...form }
+    if (scope === 'single') saveData.isSeriesException = true
+    if (isEdit) {
+      updateConsultation(initial.id, saveData)
+      if (scope === 'forward') {
+        updateConsultationSeries(initial.seriesId, initial.date, {
+          time: form.time,
+          roomId: form.roomId,
+          appointmentTypeId: form.appointmentTypeId,
+          therapistId: form.therapistId,
+          specialty: form.specialty,
+        })
+      }
+    } else {
+      addConsultation(saveData)
+    }
     onClose()
   }
 
@@ -135,6 +163,12 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
       footer={
         readOnly
           ? <Button variant="ghost" onClick={onClose}>Fechar</Button>
+          : confirmSeriesEdit
+          ? <>
+              <Button variant="ghost" onClick={() => setConfirmSeriesEdit(false)}>Voltar</Button>
+              <Button variant="outline" onClick={() => doSave('single')}>Apenas esta</Button>
+              <Button variant="primary" onClick={() => doSave('forward')}>Esta e as próximas</Button>
+            </>
           : <>
               <Button variant="ghost" onClick={onClose}>Cancelar</Button>
               {!isBlocked && <Button variant="primary" onClick={handleSave}>{isEdit ? 'Salvar' : 'Registrar Atendimento'}</Button>}
@@ -142,6 +176,18 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
       }
     >
       <div className="space-y-6">
+        {hasSeries && (
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-purple-50 text-purple-700 border border-purple-200">
+            <FiRepeat size={11} />
+            Consulta recorrente
+          </div>
+        )}
+        {confirmSeriesEdit && (
+          <div className="flex items-start gap-2 p-3 bg-blue-50 border border-blue-100 rounded-xl text-sm text-blue-700">
+            <FiRepeat size={15} className="shrink-0 mt-0.5" />
+            <span>Esta consulta faz parte de uma série. <strong>Apenas esta</strong> salva só este registro (marca como exceção). <strong>Esta e as próximas</strong> aplica horário, sala, terapeuta, especialidade e tipo de atendimento aos atendimentos futuros não faturados da série.</span>
+          </div>
+        )}
         {isBlocked && (
           <div className="flex items-start gap-2 p-3 bg-amber-50 rounded-xl text-xs text-amber-700 border border-amber-200">
             <span className="shrink-0 mt-0.5">⚠️</span>

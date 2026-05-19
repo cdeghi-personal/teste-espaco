@@ -699,6 +699,7 @@ export function DataProvider({ children }) {
     if (rest.sessionQuality !== undefined) update.session_quality = rest.sessionQuality
     if (rest.nfNumber !== undefined) update.nf_number = rest.nfNumber || null
     if (rest.nfIssueDate !== undefined) update.nf_issue_date = rest.nfIssueDate || null
+    if (rest.isSeriesException !== undefined) update.is_series_exception = rest.isSeriesException
 
     if (Object.keys(update).length) {
       await supabase.from('consultations').update(update).eq('id', id)
@@ -1535,6 +1536,84 @@ export function DataProvider({ children }) {
     return { series: mapConsultationSeries(series), consultations: mapped, count: mapped.length }
   }
 
+  // Atualiza campos estruturais das consultas futuras da série (não faturadas).
+  // Nunca altera status, campos clínicos ou NF — mantém ledger intacto.
+  async function updateConsultationSeries(seriesId, fromDate, data) {
+    const update = {}
+    if (data.time !== undefined) update.time = data.time || null
+    if (data.roomId !== undefined) update.room_id = data.roomId || null
+    if (data.appointmentTypeId !== undefined) update.appointment_type_id = data.appointmentTypeId || null
+    if (data.therapistId !== undefined) update.therapist_id = data.therapistId || null
+    if (data.specialty !== undefined) update.specialty = data.specialty
+
+    if (Object.keys(update).length) {
+      const { error } = await supabase
+        .from('consultations')
+        .update(update)
+        .eq('series_id', seriesId)
+        .gt('date', fromDate)
+        .is('nf_number', null)
+      if (error) { toast.show(error.message); return { error: error.message } }
+    }
+
+    // Atualiza metadados da série
+    const seriesUpd = {}
+    if (data.time !== undefined) seriesUpd.time = data.time || null
+    if (data.roomId !== undefined) seriesUpd.room_id = data.roomId || null
+    if (data.appointmentTypeId !== undefined) seriesUpd.appointment_type_id = data.appointmentTypeId || null
+    if (data.therapistId !== undefined) seriesUpd.primary_therapist_id = data.therapistId || null
+    if (data.specialty !== undefined) seriesUpd.specialty = data.specialty
+    if (Object.keys(seriesUpd).length) {
+      seriesUpd.updated_at = new Date().toISOString()
+      await supabase.from('consultation_series').update(seriesUpd).eq('id', seriesId)
+    }
+
+    setConsultations(prev => prev.map(c => {
+      if (c.seriesId !== seriesId || c.date <= fromDate || c.nfNumber) return c
+      const patch = {}
+      if (data.time !== undefined) patch.time = data.time
+      if (data.roomId !== undefined) patch.roomId = data.roomId
+      if (data.appointmentTypeId !== undefined) patch.appointmentTypeId = data.appointmentTypeId
+      if (data.therapistId !== undefined) patch.therapistId = data.therapistId
+      if (data.specialty !== undefined) patch.specialty = data.specialty
+      return { ...c, ...patch }
+    }))
+  }
+
+  // Exclui consultas futuras da série não faturadas, com estorno de pré-pago.
+  async function deleteConsultationSeries(seriesId, fromDate) {
+    const { data: targets, error: fetchErr } = await supabase
+      .from('consultations')
+      .select('id, patient_id, specialty, prepaid_session_consumed')
+      .eq('series_id', seriesId)
+      .gt('date', fromDate)
+      .is('nf_number', null)
+    if (fetchErr) { toast.show(fetchErr.message); return }
+    if (!targets?.length) return
+
+    const ids = targets.map(c => c.id)
+    const { data: { session } } = await supabase.auth.getSession()
+    const createdBy = session?.user?.id || null
+    const resolvedTherapist = therapists.find(t => t.userId === createdBy)
+
+    const consumed = targets.filter(c => c.prepaid_session_consumed)
+    if (consumed.length) {
+      await Promise.all(consumed.map(c =>
+        supabase.from('patient_prepaid_ledger').insert({
+          patient_id: c.patient_id, specialty: c.specialty,
+          consultation_id: c.id, entry_type: 'ADJUSTMENT',
+          sessions_quantity: 1, operation: 'AUTO_REVERSAL',
+          notes: 'Estorno automático - Atendimento excluído (série)',
+          created_by: createdBy, created_by_name: resolvedTherapist?.name || null,
+        })
+      ))
+    }
+
+    const { error } = await supabase.from('consultations').delete().in('id', ids)
+    if (error) { toast.show(error.message); return }
+    setConsultations(prev => prev.filter(c => !ids.includes(c.id)))
+  }
+
   // ─── Audit Log ───────────────────────────────────────────────────────────────
 
   async function logAudit(action, resourceType, resourceId, resourceName = '') {
@@ -1556,7 +1635,7 @@ export function DataProvider({ children }) {
     patients, addPatient, updatePatient, deletePatient, restorePatient, getPatientById, fetchInactivePatients,
     guardians, addGuardian, updateGuardian, deleteGuardian, restoreGuardian, getGuardianById, getGuardiansForPatient,
     appointments, addAppointment, updateAppointment, deleteAppointment,
-    consultations, addConsultation, updateConsultation, deleteConsultation, addConsultationSeries,
+    consultations, addConsultation, updateConsultation, deleteConsultation, addConsultationSeries, updateConsultationSeries, deleteConsultationSeries,
     therapists, addTherapist, updateTherapist, deleteTherapist, getTherapistById,
     specialtiesData, addSpecialtyData, updateSpecialtyData,
     paymentMethods, addPaymentMethod, updatePaymentMethod,
