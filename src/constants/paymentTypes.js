@@ -16,5 +16,4 @@ export const PAYMENT_TYPE_OPTIONS = [
   { value: 'POST_PER_SESSION', label: 'Pós-pago por consulta' },
   { value: 'POST_MONTHLY', label: 'Pós-pago mensal fixo' },
   { value: 'PREPAID_PACKAGE', label: 'Pré-pago por pacote' },
-  { value: 'PAY_PER_SESSION', label: 'Por Sessão' },
 ]
