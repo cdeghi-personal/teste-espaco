@@ -147,6 +147,7 @@ supabase/
   77_audit_consultation_rich_name.sql  # fn_audit_log: consultations → "Paciente: X | Data/Hora: DD/MM/YYYY HH:MM | Especialidade: Y | Terapeuta: Z | Tipo: W | Sala: K | Status: S" — recria apenas fn_audit_log, NÃO toca log_view_audit
   78_consultations_nf_fields.sql       # Adiciona nf_number, nf_issue_date, previous_status_before_invoice em consultations; índice parcial em nf_number
   79_payment_invoices.sql              # Tabela payment_invoices (ISSUED/PAID/CANCELLED) — NF global única via índice parcial; RLS admin only
+  80_series_and_multi_therapist.sql    # Tabelas consultation_series + consultation_therapists; ADD series_id/series_original_date/is_series_exception em consultations; RLS e GRANTs
   functions/
     invite-therapist/index.ts    # Edge Function — envia convite por e-mail ao criar terapeuta
     suggest-convenio/index.ts    # Edge Function — gera sugestões de texto para relatório de convênio via OpenAI gpt-4o-mini
@@ -177,7 +178,7 @@ Encontrar em: Supabase Dashboard → Project Settings → API.
 | `guardians` | Responsáveis — soft delete com `active = false`; tem campo `neighborhood` |
 | `patient_guardians` | Relação N:N paciente ↔ responsável |
 | `appointments` | Agendamentos — hard delete; campos `time` (HH:MM), `room_id` |
-| `consultations` | Consultas/evolução — hard delete; tem `appointment_type_id`, `time` (HH:MM), `room_id`, `nf_number`, `nf_issue_date`, `previous_status_before_invoice` |
+| `consultations` | Consultas/evolução — hard delete; tem `appointment_type_id`, `time` (HH:MM), `room_id`, `nf_number`, `nf_issue_date`, `previous_status_before_invoice`, `series_id`, `series_original_date`, `is_series_exception` |
 | `consultation_activities` | Atividades dentro de uma consulta |
 | `specialties` | Tabela de config — toggle `active` |
 | `payment_methods` | Tabela de config — toggle `active` |
@@ -204,6 +205,8 @@ Encontrar em: Supabase Dashboard → Project Settings → API.
 | `patient_specialty_report_settings` | Desafios relacionados do Encaminhamento por paciente + especialidade — unique(patient_id, specialty), referral_challenges |
 | `company_settings` | Configurações da empresa — linha única (id=1, CHECK constraint); razao_social, cnpj, cnes, ai_system_prompt, updated_at |
 | `payment_invoices` | Notas fiscais / faturas — nf_number (globalmente único via índice parcial), patient_id, nf_issue_date, status (ISSUED/PAID/CANCELLED), total_amount, payment_demonstrative_id, consultation_ids (UUID[]), snapshot (JSONB), created_by, cancelled_at, cancelled_by, paid_at, paid_by; admin only |
+| `consultation_series` | Séries recorrentes — patient_id, primary_therapist_id, specialty, appointment_type_id, consultation_status_id, room_id, time, duration, recurrence_type ('by_count'/'by_date'), recurrence_days (integer[] ISO 1=Seg…7=Dom), start_date, end_date, session_count, active, notes, created_by; RLS: admin tudo; terapeuta SELECT das próprias séries |
+| `consultation_therapists` | Participantes por consulta — consultation_id, therapist_id, specialty, is_primary; UNIQUE (consultation_id, therapist_id); sempre deve existir exatamente 1 is_primary=true; ON DELETE CASCADE de consultations |
 
 ### Mappers (DB → App)
 
@@ -212,7 +215,8 @@ Todos em `src/lib/supabase.js`. Convertem snake_case do banco para camelCase do 
 - `mapTherapist` — `therapistSpecialties` agora é `[{ specialty, credential, canBeRt }]`
 - `mapGuardian` (inclui `neighborhood`), `mapTherapist`, `mapAppointment` (inclui `startTime`, `endTime` calculado via duration), `mapConsultation` (inclui `time`, `roomId`)
 - `mapSpecialty`, `mapPaymentMethod`, `mapDiagnosis`, `mapPatientStatus`, `mapRoom`
-- `mapConsultation` também inclui `nfNumber`, `nfIssueDate`, `previousStatusBeforeInvoice`
+- `mapConsultation` também inclui `nfNumber`, `nfIssueDate`, `previousStatusBeforeInvoice`, `seriesId`, `seriesOriginalDate`, `isSeriesException`, `consultationTherapists[{id, therapistId, specialty, isPrimary}]`
+- `mapConsultationSeries` — novo mapper para `consultation_series`
 - `mapConsultationStatus` (inclui `automatic`), `mapAppointmentType`, `mapExam`, `mapMedication`, `mapConduct`
 - `age_ranges` mapeado inline no DataContext: `{ id, name, minAge, maxAge, color }`
 - `company_settings` exposto como `companySettings` (`{ razaoSocial, cnpj, aiSystemPrompt }`) via `useData()`; função `updateCompanySettings({ razaoSocial, cnpj, aiSystemPrompt })` faz `.update().eq('id', 1)`
@@ -728,10 +732,64 @@ Não é mais editável. Texto padrão fixo definido em `DESEMPENHO_FIXO` em `gen
 - **Status Atendimento:** `N atendimento(s) (últimos 30 dias)` — conta `consultations` com `consultationStatusId === status.id` e `date >= hoje-30d`
 - **Salas:** `N atendimento(s) nos últimos 30 dias` — conta `consultations` com `roomId === room.id` e `date >= hoje-30d`
 
+## Recorrência de Atendimentos
+
+### Modelo de dados
+
+- **`consultation_series`** — metadados da série; cada atendimento gerado tem `series_id` apontando para ela.
+- **`consultations.series_id`** — FK para a série (nullable; NULL = atendimento avulso).
+- **`consultations.series_original_date`** — data original planejada pela série; preservada mesmo se o atendimento for reagendado.
+- **`consultations.is_series_exception`** — `true` quando o atendimento foi editado individualmente e não reflete mais os dados da série.
+
+### Tipos de recorrência (`recurrence_type`)
+
+| Valor | Termina quando |
+|---|---|
+| `by_count` | Após `session_count` ocorrências |
+| `by_date` | Quando `date > end_date` |
+
+- `recurrence_days` — array ISO weekday (1=Seg, 2=Ter, 3=Qua, 4=Qui, 5=Sex, 6=Sáb, 7=Dom).
+- Um dia único = recorrência semanal; múltiplos dias = duas ou mais vezes por semana.
+
+### Regras de edição de série
+
+- **"Apenas este atendimento"** — altera somente aquela ocorrência; marca `is_series_exception = true`.
+- **"Este e os próximos"** — altera ocorrências com `date >= data_da_ocorrência_selecionada`; admin only na Fase 1.
+- Atendimentos passados nunca são alterados em lote.
+- Atendimentos com `nf_number` preenchido são protegidos de edição em lote.
+
+### UX
+
+- Criar série: modal separado `SeriesFormModal` (não embutido no `ConsultationFormModal`).
+- Ao editar atendimento de série: pergunta "Apenas este" vs "Este e os próximos" antes de abrir o form.
+
+## Múltiplos Terapeutas por Atendimento
+
+### Modelo de dados
+
+- **`consultation_therapists`** — participantes de um atendimento; sempre existe exatamente 1 `is_primary = true`.
+- **`consultations.therapist_id`** — mantido por compatibilidade; espelha o `therapist_id` do registro `is_primary = true`.
+- **`consultations.specialty`** — mantido por compatibilidade; espelha a `specialty` do participante primário.
+- `consultationTherapists[]` no app = todos os participantes mapeados de `consultation_therapists`.
+
+### Regras
+
+- O terapeuta principal define a cor do card na agenda e permanece em `consultations.therapist_id`.
+- A especialidade de cada participante fica em `consultation_therapists.specialty`; impacta valor do paciente e cálculo do demonstrativo.
+- Múltiplas especialidades `PREPAID_PACKAGE` no mesmo atendimento são bloqueadas na Fase 1 (UI impede).
+- `handlePrepaidConsumption` opera apenas sobre `consultations.specialty` (especialidade principal) por enquanto.
+
+### Impactos futuros (implementar nas Fases 4–6)
+
+- **Agenda:** filtro por terapeuta deve incluir participações em `consultation_therapists`, não só `therapist_id`.
+- **Relatório por terapeuta:** busca deve incluir consultas onde o terapeuta é participante secundário; valor usa a especialidade desse terapeuta no atendimento.
+- **Demonstrativo:** atendimento com múltiplas especialidades gera sublinhas por especialidade/valor no PDF.
+- **Pré-pago com múltiplas especialidades:** debitar 1 sessão por especialidade PREPAID participante (Fase 6).
+
 ## Atenção — SELECTs explícitos no DataContext
 
 `CONSULTATION_SELECT` lista colunas explicitamente. Ao adicionar novas colunas ao banco, **sempre incluir no SELECT** correspondente.
-Constantes: `PATIENT_SELECT` (inclui `patient_specialties(specialty, patient_value, therapist_value)`), `GUARDIAN_SELECT`, `CONSULTATION_SELECT`.
+Constantes: `PATIENT_SELECT` (inclui `patient_specialties(specialty, patient_value, therapist_value)`), `GUARDIAN_SELECT`, `CONSULTATION_SELECT` (inclui `consultation_activities(...)` e `consultation_therapists(id, therapist_id, specialty, is_primary)`).
 
 ## Especialidades (tabela `specialties` no banco)
 

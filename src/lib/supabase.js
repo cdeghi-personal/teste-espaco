@@ -168,7 +168,42 @@ export function mapConsultation(row) {
     nfNumber: row.nf_number || null,
     nfIssueDate: row.nf_issue_date || null,
     previousStatusBeforeInvoice: row.previous_status_before_invoice || null,
+    // Série recorrente
+    seriesId: row.series_id || null,
+    seriesOriginalDate: row.series_original_date || null,
+    isSeriesException: row.is_series_exception || false,
+    // Terapeutas participantes (inclui o principal com isPrimary=true)
+    consultationTherapists: (row.consultation_therapists || []).map(t => ({
+      id: t.id,
+      therapistId: t.therapist_id,
+      specialty: t.specialty,
+      isPrimary: t.is_primary || false,
+    })),
     createdAt: row.created_at,
+  }
+}
+
+export function mapConsultationSeries(row) {
+  return {
+    id: row.id,
+    patientId: row.patient_id,
+    primaryTherapistId: row.primary_therapist_id,
+    specialty: row.specialty,
+    appointmentTypeId: row.appointment_type_id,
+    consultationStatusId: row.consultation_status_id,
+    roomId: row.room_id || null,
+    time: row.time || '',
+    duration: row.duration || null,
+    recurrenceType: row.recurrence_type,
+    recurrenceDays: row.recurrence_days || [],
+    startDate: row.start_date,
+    endDate: row.end_date || null,
+    sessionCount: row.session_count || null,
+    active: row.active !== false,
+    notes: row.notes || '',
+    createdBy: row.created_by,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
   }
 }
 

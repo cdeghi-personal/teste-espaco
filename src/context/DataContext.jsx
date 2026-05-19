@@ -58,9 +58,11 @@ const CONSULTATION_SELECT = `
   id, patient_id, therapist_id, specialty, date, time, room_id, session_number,
   consultation_status_id, appointment_type_id, prepaid_session_consumed,
   nf_number, nf_issue_date, previous_status_before_invoice,
+  series_id, series_original_date, is_series_exception,
   main_objective, evolution_notes, next_objectives, guardian_feedback,
   session_quality, created_at,
-  consultation_activities(id, name, description, outcome, sort_order)
+  consultation_activities(id, name, description, outcome, sort_order),
+  consultation_therapists(id, therapist_id, specialty, is_primary)
 `
 
 // ─── Provider ─────────────────────────────────────────────────────────────────
