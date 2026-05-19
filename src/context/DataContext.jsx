@@ -57,6 +57,7 @@ const GUARDIAN_SELECT = `
 const CONSULTATION_SELECT = `
   id, patient_id, therapist_id, specialty, date, time, room_id, session_number,
   consultation_status_id, appointment_type_id, prepaid_session_consumed,
+  nf_number, nf_issue_date, previous_status_before_invoice,
   main_objective, evolution_notes, next_objectives, guardian_feedback,
   session_quality, created_at,
   consultation_activities(id, name, description, outcome, sort_order)
@@ -1251,16 +1252,160 @@ export function DataProvider({ children }) {
 
   // Atualiza status de consultas em lote SEM acionar handlePrepaidConsumption.
   // Usado exclusivamente no fluxo de faturamento (Demonstrativo Definitivo).
-  async function batchFaturarConsultations(ids, statusId) {
+  // Atualiza status de consultas em lote SEM acionar handlePrepaidConsumption.
+  // Também salva previous_status_before_invoice e campos NF quando fornecidos.
+  async function batchFaturarConsultations(ids, statusId, { nfNumber, nfDate } = {}) {
     if (!ids?.length) return
-    const { error } = await supabase
+
+    // Lê status atual ANTES de sobrescrever para salvar previous_status_before_invoice
+    const { data: existing } = await supabase
       .from('consultations')
-      .update({ consultation_status_id: statusId })
+      .select('id, consultation_status_id, previous_status_before_invoice')
       .in('id', ids)
+
+    // Salva o status anterior individualmente para quem ainda não tem
+    const needsPrev = (existing || []).filter(c => !c.previous_status_before_invoice && c.consultation_status_id)
+    if (needsPrev.length) {
+      await Promise.all(needsPrev.map(c =>
+        supabase.from('consultations')
+          .update({ previous_status_before_invoice: c.consultation_status_id })
+          .eq('id', c.id)
+      ))
+    }
+
+    // Aplica status + campos NF
+    const update = { consultation_status_id: statusId }
+    if (nfNumber) update.nf_number = nfNumber
+    if (nfDate)   update.nf_issue_date = nfDate
+
+    const { error } = await supabase.from('consultations').update(update).in('id', ids)
     if (error) throw new Error(error.message)
-    setConsultations(prev => prev.map(c =>
-      ids.includes(c.id) ? { ...c, consultationStatusId: statusId } : c
-    ))
+
+    setConsultations(prev => prev.map(c => {
+      if (!ids.includes(c.id)) return c
+      const prev_status = existing?.find(e => e.id === c.id)?.consultation_status_id || null
+      return {
+        ...c,
+        consultationStatusId: statusId,
+        nfNumber: nfNumber || c.nfNumber,
+        nfIssueDate: nfDate || c.nfIssueDate,
+        previousStatusBeforeInvoice: c.previousStatusBeforeInvoice || prev_status,
+      }
+    }))
+  }
+
+  async function createPaymentInvoice(data) {
+    const { data: { session } } = await supabase.auth.getSession()
+    const { data: inserted, error } = await supabase
+      .from('payment_invoices')
+      .insert({
+        nf_number:                data.nfNumber || null,
+        patient_id:               data.patientId,
+        nf_issue_date:            data.nfDate || null,
+        total_amount:             data.totalAmount || null,
+        payment_demonstrative_id: data.demonstrativoId || null,
+        consultation_ids:         data.consultationIds || [],
+        snapshot:                 data.snapshot || null,
+        created_by:               session?.user?.id || null,
+      })
+      .select()
+      .single()
+    if (error) throw new Error(error.message)
+    return inserted
+  }
+
+  async function getPaymentInvoices({ patientId, status, nfNumber, dateFrom, dateTo, search } = {}) {
+    let q = supabase
+      .from('payment_invoices')
+      .select('*, patients(full_name)')
+      .order('created_at', { ascending: false })
+    if (patientId)  q = q.eq('patient_id', patientId)
+    if (status)     q = q.eq('status', status)
+    if (nfNumber)   q = q.ilike('nf_number', `%${nfNumber}%`)
+    if (dateFrom)   q = q.gte('nf_issue_date', dateFrom)
+    if (dateTo)     q = q.lte('nf_issue_date', dateTo)
+    const { data, error } = await q
+    if (error) throw new Error(error.message)
+    const rows = data || []
+    if (search) {
+      const s = search.toLowerCase()
+      return rows.filter(r =>
+        r.nf_number?.toLowerCase().includes(s) ||
+        r.patients?.full_name?.toLowerCase().includes(s)
+      )
+    }
+    return rows
+  }
+
+  async function cancelPaymentInvoice(invoiceId, consultationIds) {
+    const { data: { session } } = await supabase.auth.getSession()
+    const userId = session?.user?.id || null
+
+    // Restaura status anterior + limpa campos NF
+    if (consultationIds?.length) {
+      const { data: rows } = await supabase
+        .from('consultations')
+        .select('id, previous_status_before_invoice')
+        .in('id', consultationIds)
+
+      await Promise.all(consultationIds.map(id => {
+        const row = rows?.find(r => r.id === id)
+        const upd = { nf_number: null, nf_issue_date: null }
+        if (row?.previous_status_before_invoice) {
+          upd.consultation_status_id = row.previous_status_before_invoice
+        }
+        return supabase.from('consultations').update(upd).eq('id', id)
+      }))
+
+      const prevMap = Object.fromEntries((rows || []).map(r => [r.id, r.previous_status_before_invoice]))
+      setConsultations(prev => prev.map(c => {
+        if (!consultationIds.includes(c.id)) return c
+        return {
+          ...c,
+          nfNumber: null,
+          nfIssueDate: null,
+          consultationStatusId: prevMap[c.id] || c.consultationStatusId,
+        }
+      }))
+    }
+
+    const { error } = await supabase
+      .from('payment_invoices')
+      .update({
+        status:       'CANCELLED',
+        cancelled_at: new Date().toISOString(),
+        cancelled_by: userId,
+        updated_at:   new Date().toISOString(),
+      })
+      .eq('id', invoiceId)
+    if (error) throw new Error(error.message)
+  }
+
+  async function markInvoicePaid(invoiceId, consultationIds, paidStatusId) {
+    const { data: { session } } = await supabase.auth.getSession()
+    const userId = session?.user?.id || null
+
+    if (consultationIds?.length && paidStatusId) {
+      const { error: cErr } = await supabase
+        .from('consultations')
+        .update({ consultation_status_id: paidStatusId })
+        .in('id', consultationIds)
+      if (cErr) throw new Error(cErr.message)
+      setConsultations(prev => prev.map(c =>
+        consultationIds.includes(c.id) ? { ...c, consultationStatusId: paidStatusId } : c
+      ))
+    }
+
+    const { error } = await supabase
+      .from('payment_invoices')
+      .update({
+        status:    'PAID',
+        paid_at:   new Date().toISOString(),
+        paid_by:   userId,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', invoiceId)
+    if (error) throw new Error(error.message)
   }
 
   async function addPaymentDemonstrativo(data) {
@@ -1338,6 +1483,7 @@ export function DataProvider({ children }) {
     companySettings, updateCompanySettings,
     addPrepaidPackage, getPrepaidData, addLedgerAdjustment,
     batchFaturarConsultations, addPaymentDemonstrativo, getPaymentDemonstrativos,
+    createPaymentInvoice, getPaymentInvoices, cancelPaymentInvoice, markInvoicePaid,
   }
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>

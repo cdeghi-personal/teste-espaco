@@ -181,6 +181,7 @@ export default function ReportsPage() {
     batchFaturarConsultations,
     addPaymentDemonstrativo,
     getPaymentDemonstrativos,
+    createPaymentInvoice,
   } = useData()
 
   const isAdmin = user?.role === 'admin'
@@ -411,7 +412,7 @@ export default function ReportsPage() {
     try {
       // 1. Salva histórico PRIMEIRO — se falhar, nada mais acontece
       const { periodStart, periodEnd, mesLabel } = buildDemonstrativoPeriod()
-      await addPaymentDemonstrativo({
+      const demonstrativo = await addPaymentDemonstrativo({
         patientId: selectedPatientId,
         periodStart, periodEnd, mesLabel,
         nfNumber: nfNumber || null,
@@ -421,9 +422,12 @@ export default function ReportsPage() {
         formData: { patientName: selectedPatient?.fullName, periodType, periodMonth, periodFrom, periodTo },
       })
 
-      // 2. Altera status das consultas — bypass do ledger pré-pago intencional
+      // 2. Altera status + campos NF das consultas — bypass do ledger pré-pago intencional
       try {
-        await batchFaturarConsultations(ids, faturadoStatus.id)
+        await batchFaturarConsultations(ids, faturadoStatus.id, {
+          nfNumber: nfNumber || null,
+          nfDate: nfDate || null,
+        })
       } catch (statusErr) {
         console.error('[handleFaturar] status update failed', statusErr)
         toast.show(`Histórico salvo, mas erro ao atualizar status: ${statusErr?.message || ''}. Verifique as consultas manualmente.`, 'error')
@@ -431,7 +435,54 @@ export default function ReportsPage() {
         return
       }
 
-      // 3. Gera e baixa o PDF definitivo
+      // 3. Cria fatura em payment_invoices
+      try {
+        const specialtiesArr = specialtiesData || []
+        const snapshot = {
+          patientName: selectedPatient?.fullName,
+          patientId: selectedPatientId,
+          period: `${periodStart?.split('-').reverse().join('/')} – ${periodEnd?.split('-').reverse().join('/')}`,
+          mesLabel,
+          periodType,
+          nfNumber: nfNumber || null,
+          nfDate: nfDate || null,
+          totalAmount: previewTotalAmount,
+          consultations: pendingConsultations.map(c => {
+            const therapist = (activeTherapists || []).find(t => t.id === c.therapistId)
+            const status = (consultationStatuses || []).find(s => s.id === c.consultationStatusId)
+            const specLabel = specialtiesArr.find(s => s.key === c.specialty)?.label || c.specialty
+            const patSpec = selectedPatient?.specialties?.find(s => s.key === c.specialty)
+            return {
+              id: c.id,
+              date: c.date,
+              time: c.time,
+              specialty: c.specialty,
+              specialtyLabel: specLabel,
+              therapistName: therapist?.name || '',
+              statusName: status?.name || '',
+              patientValue: patSpec?.patientValue,
+              therapistValue: patSpec?.therapistValue,
+              monthlyPatientValue: patSpec?.monthlyPatientValue,
+              monthlyTherapistValue: patSpec?.monthlyTherapistValue,
+              paymentType: patSpec?.paymentType,
+            }
+          }),
+        }
+        await createPaymentInvoice({
+          nfNumber: nfNumber || null,
+          patientId: selectedPatientId,
+          nfDate: nfDate || null,
+          totalAmount: previewTotalAmount,
+          demonstrativoId: demonstrativo?.id || null,
+          consultationIds: ids,
+          snapshot,
+        })
+      } catch (invoiceErr) {
+        // Não bloqueia o fluxo principal — log apenas
+        console.error('[handleFaturar] invoice create failed', invoiceErr)
+      }
+
+      // 4. Gera e baixa o PDF definitivo
       const finalArgs = await buildPDFArgs(pendingConsultations, {
         nfNumber: nfNumber || null,
         nfDate: nfDate || null,

@@ -165,6 +165,9 @@ export function mapConsultation(row) {
         outcome: a.outcome,
       })),
     prepaidSessionConsumed: row.prepaid_session_consumed || false,
+    nfNumber: row.nf_number || null,
+    nfIssueDate: row.nf_issue_date || null,
+    previousStatusBeforeInvoice: row.previous_status_before_invoice || null,
     createdAt: row.created_at,
   }
 }
