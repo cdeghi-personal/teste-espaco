@@ -39,6 +39,17 @@ async function buildReportHeader(doc, subtitle, period, companySettings) {
 function resolvePatientValue(c, patient, monthlyTracked) {
   const spec = patient.specialties?.find(s => s.key === c.specialty)
   const paymentType = spec?.paymentType || 'POST_PER_SESSION'
+  // DEBUG — remover após confirmar diagnóstico
+  console.log('[DEMO_VALOR]', {
+    consultationId: c.id,
+    consultationDate: c.date,
+    consultationSpecialty: c.specialty,
+    patientSpecialties: patient.specialties,
+    specEncontrado: spec,
+    paymentType,
+    patientValue: spec?.patientValue,
+    monthlyPatientValue: spec?.monthlyPatientValue,
+  })
 
   if (paymentType === 'POST_MONTHLY') {
     const month = c.date?.slice(0, 7)
