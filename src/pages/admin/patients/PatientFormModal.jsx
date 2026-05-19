@@ -52,6 +52,7 @@ export default function PatientFormModal({ onClose, initial = {}, readOnly = fal
   const [form, setForm] = useState({
     ...EMPTY,
     ...initial,
+    specialties: initial.specialties ?? [],
     conditionIds: initial.conditionIds || [],
     involvedTherapistIds: initial.involvedTherapistIds || [],
     statusId: initial.statusId || initial.status || defaultStatusId,
@@ -59,6 +60,7 @@ export default function PatientFormModal({ onClose, initial = {}, readOnly = fal
     externalTherapists: initial.externalTherapists || [],
   })
   const [errors, setErrors] = useState({})
+  const [saving, setSaving] = useState(false)
 
   function set(field, value) {
     setForm(f => ({ ...f, [field]: value }))
@@ -141,13 +143,18 @@ export default function PatientFormModal({ onClose, initial = {}, readOnly = fal
     return e
   }
 
-  function handleSave() {
+  async function handleSave() {
     const e = validate()
     if (Object.keys(e).length) { setErrors(e); return }
-    if (isEdit) {
-      updatePatient(initial.id, form)
-    } else {
-      addPatient(form)
+    setSaving(true)
+    try {
+      if (isEdit) {
+        await updatePatient(initial.id, form)
+      } else {
+        await addPatient(form)
+      }
+    } finally {
+      setSaving(false)
     }
     onClose()
   }
@@ -170,8 +177,8 @@ export default function PatientFormModal({ onClose, initial = {}, readOnly = fal
         readOnly
           ? <Button variant="ghost" onClick={onClose}>Fechar</Button>
           : <>
-              <Button variant="ghost" onClick={onClose}>Cancelar</Button>
-              <Button variant="primary" onClick={handleSave}>{isEdit ? 'Salvar Alterações' : 'Cadastrar Paciente'}</Button>
+              <Button variant="ghost" onClick={onClose} disabled={saving}>Cancelar</Button>
+              <Button variant="primary" onClick={handleSave} disabled={saving}>{saving ? 'Salvando...' : isEdit ? 'Salvar Alterações' : 'Cadastrar Paciente'}</Button>
             </>
       }
     >

@@ -310,7 +310,14 @@ export function DataProvider({ children }) {
       await syncInvolvedTherapists(id, data.involvedTherapistIds)
     }
 
-    setPatients(prev => prev.map(p => p.id === id ? { ...p, ...data, updatedAt: new Date().toISOString() } : p))
+    // Re-read from DB after all sync operations to guarantee state reflects DB truth.
+    // This prevents race conditions where a second save reads stale in-memory state.
+    const { data: fresh } = await supabase.from('patients').select(PATIENT_SELECT).eq('id', id).single()
+    if (fresh) {
+      setPatients(prev => prev.map(p => p.id === id ? mapPatient(fresh) : p))
+    } else {
+      setPatients(prev => prev.map(p => p.id === id ? { ...p, ...data, updatedAt: new Date().toISOString() } : p))
+    }
   }
 
   async function deletePatient(id) {
