@@ -291,6 +291,7 @@ export async function generateConsultasPacientePDF({
   patient, guardians, consultations, therapists,
   consultationStatuses, appointmentTypes, specialtiesData,
   filter, companySettings = null,
+  draftMode = false, nfNumber = null, nfDate = null,
 }) {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
   const pageW = doc.internal.pageSize.width
@@ -298,6 +299,22 @@ export async function generateConsultasPacientePDF({
   const period = formatPeriod(filter)
 
   let y = await buildReportHeader(doc, 'Demonstrativo de Pagamento', period, companySettings)
+
+  if (nfNumber || nfDate) {
+    const nfLine = [
+      nfNumber ? `NF nº ${nfNumber}` : '',
+      nfDate ? `Emitida em ${fmtDatePDF(nfDate)}` : '',
+    ].filter(Boolean).join('  —  ')
+    doc.setFillColor(240, 253, 244)
+    doc.setDrawColor(187, 247, 208)
+    doc.roundedRect(margin, y, pageW - margin * 2, 8, 1.5, 1.5, 'FD')
+    doc.setFontSize(8)
+    doc.setFont('helvetica', 'bold')
+    doc.setTextColor(22, 163, 74)
+    doc.text(nfLine, pageW / 2, y + 5.5, { align: 'center' })
+    doc.setTextColor(...PDF_DARK)
+    y += 12
+  }
 
   y = sectionBlock(doc, 'Dados do Paciente', y)
   const col1 = margin, col2 = pageW / 2 + 5
@@ -372,7 +389,23 @@ export async function generateConsultasPacientePDF({
   }
 
   addAllPageFooters(doc)
-  const fileName = `demonstrativo_${patient.fullName.replace(/\s+/g, '_').toLowerCase()}_${period.replace(/\//g, '-').replace(/\s/g, '_')}.pdf`
+
+  if (draftMode) {
+    const totalPages = doc.getNumberOfPages()
+    for (let i = 1; i <= totalPages; i++) {
+      doc.setPage(i)
+      doc.setGState(new doc.GState({ opacity: 0.07 }))
+      doc.setFontSize(80)
+      doc.setFont('helvetica', 'bold')
+      doc.setTextColor(80, 80, 80)
+      doc.text('RASCUNHO', pageW / 2, doc.internal.pageSize.height / 2, { angle: 45, align: 'center' })
+      doc.setGState(new doc.GState({ opacity: 1 }))
+      doc.setTextColor(...PDF_DARK)
+    }
+  }
+
+  const suffix = draftMode ? '_RASCUNHO' : ''
+  const fileName = `demonstrativo_${patient.fullName.replace(/\s+/g, '_').toLowerCase()}_${period.replace(/\//g, '-').replace(/\s/g, '_')}${suffix}.pdf`
   doc.save(fileName)
 }
 

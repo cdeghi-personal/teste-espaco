@@ -321,7 +321,8 @@ export function DataProvider({ children }) {
   }
 
   async function deletePatient(id) {
-    await supabase.from('patients').update({ deleted: true }).eq('id', id)
+    const { error } = await supabase.from('patients').update({ deleted: true }).eq('id', id)
+    if (error) { toast.show(error.message); return { error: error.message } }
     setPatients(prev => prev.filter(p => p.id !== id))
   }
 
@@ -1234,6 +1235,43 @@ export function DataProvider({ children }) {
     return {}
   }
 
+  // ─── Payment Demonstratives ──────────────────────────────────────────────────
+
+  // Atualiza status de consultas em lote SEM acionar handlePrepaidConsumption.
+  // Usado exclusivamente no fluxo de faturamento (Demonstrativo Definitivo).
+  async function batchFaturarConsultations(ids, statusId) {
+    if (!ids?.length) return
+    const { error } = await supabase
+      .from('consultations')
+      .update({ consultation_status_id: statusId })
+      .in('id', ids)
+    if (error) throw new Error(error.message)
+    setConsultations(prev => prev.map(c =>
+      ids.includes(c.id) ? { ...c, consultationStatusId: statusId } : c
+    ))
+  }
+
+  async function addPaymentDemonstrativo(data) {
+    const { data: { session } } = await supabase.auth.getSession()
+    const { data: inserted, error } = await supabase
+      .from('payment_demonstratives')
+      .insert({
+        patient_id:       data.patientId,
+        period_start:     data.periodStart,
+        period_end:       data.periodEnd,
+        mes_label:        data.mesLabel,
+        nf_number:        data.nfNumber || null,
+        nf_date:          data.nfDate || null,
+        consultation_ids: data.consultationIds || [],
+        form_data:        data.formData || null,
+        created_by:       session?.user?.id || null,
+      })
+      .select()
+      .single()
+    if (error) throw new Error(error.message)
+    return inserted
+  }
+
   // ─── Audit Log ───────────────────────────────────────────────────────────────
 
   async function logAudit(action, resourceType, resourceId, resourceName = '') {
@@ -1273,6 +1311,7 @@ export function DataProvider({ children }) {
     logAudit,
     companySettings, updateCompanySettings,
     addPrepaidPackage, getPrepaidData, addLedgerAdjustment,
+    batchFaturarConsultations, addPaymentDemonstrativo,
   }
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>

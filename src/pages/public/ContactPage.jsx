@@ -4,13 +4,22 @@ import { SPECIALTIES } from '../../constants/specialties'
 import { supabase } from '../../lib/supabase'
 
 export default function ContactPage() {
-  const [form, setForm] = useState({ name: '', phone: '', email: '', specialty: '', message: '', howFound: '' })
+  const [form, setForm] = useState({ name: '', phone: '', email: '', specialty: '', message: '', howFound: '', patientName: '', contactReason: '', referredBy: '' })
   const [sent, setSent] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
+  const showReferredBy = form.howFound === 'Indicação médica' || form.howFound === 'Indicação de amigos/família'
+
   function handleChange(e) {
-    setForm({ ...form, [e.target.name]: e.target.value })
+    const { name, value } = e.target
+    setForm(prev => {
+      const next = { ...prev, [name]: value }
+      if (name === 'howFound' && value !== 'Indicação médica' && value !== 'Indicação de amigos/família') {
+        next.referredBy = ''
+      }
+      return next
+    })
   }
 
   async function handleSubmit(e) {
@@ -18,12 +27,15 @@ export default function ContactPage() {
     setLoading(true)
     setError('')
     const { error: err } = await supabase.from('contact_leads').insert({
-      name:       form.name,
-      phone:      form.phone,
-      email:      form.email || null,
-      specialty:  form.specialty || null,
-      how_found:  form.howFound || null,
-      message:    form.message,
+      name:           form.name,
+      phone:          form.phone,
+      email:          form.email || null,
+      specialty:      form.specialty || null,
+      how_found:      form.howFound || null,
+      message:        form.message,
+      patient_name:   form.patientName || null,
+      contact_reason: form.contactReason || null,
+      referred_by:    (showReferredBy && form.referredBy) ? form.referredBy : null,
     })
     setLoading(false)
     if (err) {
@@ -58,7 +70,7 @@ export default function ContactPage() {
                   <h3 className="text-xl font-bold text-green-800 mb-2">Mensagem enviada!</h3>
                   <p className="text-green-600">Entraremos em contato em breve. Obrigado!</p>
                   <button
-                    onClick={() => { setSent(false); setForm({ name: '', phone: '', email: '', specialty: '', message: '', howFound: '' }) }}
+                    onClick={() => { setSent(false); setForm({ name: '', phone: '', email: '', specialty: '', message: '', howFound: '', patientName: '', contactReason: '', referredBy: '' }) }}
                     className="mt-4 text-sm text-green-700 underline"
                   >
                     Enviar outra mensagem
@@ -79,16 +91,27 @@ export default function ContactPage() {
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Telefone / WhatsApp *</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Nome do paciente</label>
                       <input
-                        name="phone"
-                        value={form.phone}
+                        name="patientName"
+                        value={form.patientName}
                         onChange={handleChange}
-                        required
                         className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none"
-                        placeholder="(11) 9 9999-9999"
+                        placeholder="Nome do filho/paciente (opcional)"
                       />
                     </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Telefone / WhatsApp *</label>
+                    <input
+                      name="phone"
+                      value={form.phone}
+                      onChange={handleChange}
+                      required
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none"
+                      placeholder="(11) 9 9999-9999"
+                    />
                   </div>
 
                   <div>
@@ -101,6 +124,24 @@ export default function ContactPage() {
                       className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none"
                       placeholder="seu@email.com"
                     />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Motivo do contato</label>
+                    <select
+                      name="contactReason"
+                      value={form.contactReason}
+                      onChange={handleChange}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none"
+                    >
+                      <option value="">Selecione (opcional)</option>
+                      <option>Agendamento de avaliação</option>
+                      <option>Informações sobre terapias</option>
+                      <option>Valores e formas de pagamento</option>
+                      <option>Convênios/reembolso</option>
+                      <option>Dúvidas gerais</option>
+                      <option>Outro</option>
+                    </select>
                   </div>
 
                   <div>
@@ -135,6 +176,19 @@ export default function ContactPage() {
                       <option>Outro</option>
                     </select>
                   </div>
+
+                  {showReferredBy && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Indicado por</label>
+                      <input
+                        name="referredBy"
+                        value={form.referredBy}
+                        onChange={handleChange}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none"
+                        placeholder="Nome de quem indicou (opcional)"
+                      />
+                    </div>
+                  )}
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Mensagem *</label>

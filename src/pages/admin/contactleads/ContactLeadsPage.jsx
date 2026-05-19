@@ -66,7 +66,8 @@ function LeadCard({ lead, onUpdate }) {
           <div className="flex items-center gap-3 mt-0.5 flex-wrap">
             <span className="text-xs text-gray-500">{format(parseISO(lead.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</span>
             {specialty && <span className="text-xs text-brand-blue font-medium">{specialty}</span>}
-            {lead.how_found && <span className="text-xs text-gray-400">{lead.how_found}</span>}
+            {lead.contact_reason && <span className="text-xs text-purple-600 font-medium">{lead.contact_reason}</span>}
+            {lead.how_found && <span className="text-xs text-gray-400">{lead.how_found}{lead.referred_by ? ` — ${lead.referred_by}` : ''}</span>}
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
@@ -93,6 +94,9 @@ function LeadCard({ lead, onUpdate }) {
           <div className="pt-3 grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
             <div><span className="text-gray-400 text-xs">Telefone</span><div className="font-medium text-gray-800">{lead.phone}</div></div>
             {lead.email && <div><span className="text-gray-400 text-xs">E-mail</span><div className="font-medium text-gray-800">{lead.email}</div></div>}
+            {lead.patient_name && <div><span className="text-gray-400 text-xs">Nome do paciente</span><div className="font-medium text-gray-800">{lead.patient_name}</div></div>}
+            {lead.contact_reason && <div><span className="text-gray-400 text-xs">Motivo</span><div className="font-medium text-gray-800">{lead.contact_reason}</div></div>}
+            {lead.referred_by && <div><span className="text-gray-400 text-xs">Indicado por</span><div className="font-medium text-gray-800">{lead.referred_by}</div></div>}
           </div>
 
           {/* Mensagem */}

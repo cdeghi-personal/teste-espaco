@@ -130,6 +130,19 @@ supabase/
   61_therapist_specialty_can_be_rt.sql # Adiciona can_be_rt boolean DEFAULT false em therapist_specialties
   62_patient_specialty_report_settings.sql # Nova tabela patient_specialty_report_settings (referral_challenges por paciente+especialidade) + RLS
   63_convenio_reports_rt_goals_cnes.sql # convenio_reports: responsible_therapist_id + intervention_goals; company_settings: cnes
+  64_patient_specialties_payment.sql   # payment_type em patient_specialties + tabela patient_specialty_payment_history
+  65_patient_specialty_payment_history.sql # Histórico de alterações financeiras por paciente+especialidade
+  66_company_settings_discount.sql     # therapist_discount_percent em company_settings
+  67_prepaid_packages.sql              # Tabela patient_prepaid_packages + patient_prepaid_ledger
+  68_consultation_status_consumes_prepaid.sql # Flag consumes_prepaid_session em consultation_statuses
+  69_prepaid_enrich.sql                # Backfill: marca prepaid_session_consumed em consultas já debitadas
+  70_prepaid_ledger_no_unique.sql      # Remove constraint unique(consultation_id) do ledger — append-only
+  71_consultation_status_requires_note.sql # Flag requires_objective_note em consultation_statuses
+  72_patient_needs_convenio_report.sql # needs_convenio_report boolean em patients
+  73_patient_specialties_pay_per_session.sql # Adiciona PAY_PER_SESSION ao CHECK constraint de patient_specialties
+  74_contact_leads_new_fields.sql      # Adiciona patient_name, contact_reason, referred_by em contact_leads
+  75_fix_patients_admin_rls.sql        # Corrige policy admin em patients: remove deleted=false do USING (bloqueava soft-delete), usa subquery inline em vez de is_admin()
+  76_payment_demonstratives.sql        # Tabela payment_demonstratives — histórico de demonstrativos definitivos (com NF); admin only
   functions/
     invite-therapist/index.ts    # Edge Function — envia convite por e-mail ao criar terapeuta
     suggest-convenio/index.ts    # Edge Function — gera sugestões de texto para relatório de convênio via OpenAI gpt-4o-mini
@@ -178,7 +191,8 @@ Encontrar em: Supabase Dashboard → Project Settings → API.
 | `patient_involved_therapists` | Terapeutas envolvidos no atendimento do paciente (N:N) — complementa o Gerente do Caso |
 | `audit_logs` | Log de auditoria — registra VIEW/INSERT/UPDATE/DELETE com user_id, user_email, user_name, action, resource_type, resource_id, resource_name; retém apenas 90 dias |
 | `audit_logs_history` | Arquivo do log de auditoria — mesmo schema + coluna archived_at; retém de 90 dias a 1 ano; manutenção via pg_cron (maintain_audit_logs) |
-| `contact_leads` | Contatos do site público — name, phone, email, specialty, how_found, message, status, internal_note, assigned_to, last_contact_at |
+| `contact_leads` | Contatos do site público — name, phone, email, specialty, how_found, message, status, internal_note, assigned_to, last_contact_at, patient_name, contact_reason, referred_by |
+| `payment_demonstratives` | Histórico de demonstrativos de pagamento definitivos — patient_id, period_start, period_end, mes_label, nf_number, nf_date, consultation_ids (UUID[]), form_data (JSONB), created_by; admin only |
 | `support_tickets` | Chamados de suporte — subject, type, author, description, solution, status, nova_resposta (BOOLEAN), created_by_id |
 | `support_ticket_history` | Histórico de status dos chamados — ticket_id, status, changed_at, changed_by, note (TEXT) |
 | `age_ranges` | Faixas etárias — name, min_age, max_age, color; critério: min_age ≤ idade < max_age |
@@ -414,11 +428,16 @@ Authentication → URL Configuration:
 ## Relatórios PDF (`/admin/relatorios`)
 
 - **Acesso:** todos os autenticados. Terapeutas veem apenas "Consultas por Terapeuta", com campo Terapeuta pré-preenchido (read-only) com seu próprio nome (`user.id`).
-- **Consultas por Paciente:** coluna Valor (R$) usa `patient.specialties.find(s => s.key === c.specialty)?.patientValue` — admin only
+- **Demonstrativo de Pagamento (admin only):** ao clicar "Gerar PDF", admin entra em modo preview com 3 botões:
+  - **Baixar e Gerar Demonstrativo:** abre modal de NF (número + data emissão, ambos opcionais) → salva em `payment_demonstratives` → atualiza status das consultas para "Faturado" via `batchFaturarConsultations` (sem tocar no ledger pré-pago) → gera PDF com banner verde de NF
+  - **Gerar DRAFT:** gera PDF com marca d'água "RASCUNHO" diagonal, sem salvar histórico nem alterar status
+  - **Fechar:** volta ao formulário sem ação
+- **Sequência de operações definitivas (quasi-transactional):** salva histórico PRIMEIRO; se falhar, nada mais é executado; se `batchFaturarConsultations` falhar após salvar, alerta que o status deve ser corrigido manualmente
+- **`batchFaturarConsultations(ids, statusId)`** no DataContext: update direto em `consultations.consultation_status_id` SEM chamar `handlePrepaidConsumption` — ledger pré-pago não é afetado
 - **Consultas por Terapeuta:** coluna Valor (R$) usa `patient.specialties.find(s => s.key === c.specialty)?.therapistValue`
 - Ambos exibem total de atendimentos + total do período no rodapé
 - Filtros: tipo de relatório, paciente/terapeuta (searchable), período (mês ou De/Até), status (múltipla seleção — inclui automáticos)
-- Funções: `generateConsultasPacientePDF()`, `generateConsultasTerapeutaPDF()` em `src/utils/generateReportPDF.js`
+- Funções: `generateConsultasPacientePDF({ ..., draftMode, nfNumber, nfDate })`, `generateConsultasTerapeutaPDF()` em `src/utils/generateReportPDF.js`
 - Card de acesso rápido ao "Relatório de Convênio" na parte superior da página
 
 ## Relatório de Convênio (`/admin/relatorios/convenio`)
@@ -647,6 +666,7 @@ Não é mais editável. Texto padrão fixo definido em `DESEMPENHO_FIXO` em `gen
 - Status: `novo` (vermelho), `em_contato` (amarelo), `agendado` (azul), `convertido` (verde), `sem_interesse` (cinza)
 - Dashboard: banner vermelho clicável quando há leads `novo`
 - Sidebar: badge vermelho com contagem de `novo`
+- **Campos adicionais do formulário público:** `patient_name` (nome do filho/paciente — opcional), `contact_reason` (motivo: Agendamento de avaliação / Informações sobre terapias / Valores e formas de pagamento / Convênios/reembolso / Dúvidas gerais / Outro), `referred_by` (quem indicou — só visível/gravado quando `how_found` = "Indicação médica" ou "Indicação de amigos/família")
 
 ## Auditoria de Acesso (`/admin/auditoria`)
 

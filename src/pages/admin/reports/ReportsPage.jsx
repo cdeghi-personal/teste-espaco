@@ -1,18 +1,21 @@
 import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { FiFileText, FiUser, FiUsers, FiCalendar, FiChevronDown, FiExternalLink } from 'react-icons/fi'
+import { FiFileText, FiUser, FiUsers, FiCalendar, FiChevronDown, FiExternalLink, FiX, FiDownload, FiArrowLeft } from 'react-icons/fi'
 import HelpButton from '../../../components/ui/HelpButton'
 import { useData } from '../../../context/DataContext'
 import { useAuth } from '../../../context/AuthContext'
+import { useToast } from '../../../components/ui/Toast'
 import { generateConsultasPacientePDF, generateConsultasTerapeutaPDF, findPatientSpecialtyConfig } from '../../../utils/generateReportPDF'
 import { SPECIALTIES } from '../../../constants/specialties'
 import { ROUTES } from '../../../constants/routes'
+import { formatMesLabel } from '../../../utils/pdfShared'
 
 const CURRENT_MONTH = new Date().toISOString().slice(0, 7) // YYYY-MM
 
 export default function ReportsPage() {
   const { user } = useAuth()
   const navigate = useNavigate()
+  const toast = useToast()
   const {
     patients,
     therapists,
@@ -22,6 +25,8 @@ export default function ReportsPage() {
     specialtiesData,
     getGuardiansForPatient,
     companySettings,
+    batchFaturarConsultations,
+    addPaymentDemonstrativo,
   } = useData()
 
   const isAdmin = user?.role === 'admin'
@@ -42,6 +47,13 @@ export default function ReportsPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [unconfiguredWarning, setUnconfiguredWarning] = useState(null)
+  // Preview mode — Demonstrativo de Pagamento (admin only)
+  const [previewMode, setPreviewMode] = useState(false)
+  const [pendingConsultations, setPendingConsultations] = useState([])
+  const [showNfModal, setShowNfModal] = useState(false)
+  const [nfNumber, setNfNumber] = useState('')
+  const [nfDate, setNfDate] = useState(new Date().toISOString().slice(0, 10))
+  const [faturandoLoading, setFaturandoLoading] = useState(false)
 
   const activePatients = useMemo(
     () => (patients || []).filter(p => !p.deleted).sort((a, b) => a.fullName.localeCompare(b.fullName)),
@@ -117,39 +129,34 @@ export default function ReportsPage() {
     return [...byPatient.entries()].map(([name, sps]) => ({ name, specialties: [...sps] }))
   }
 
-  async function generatePDF() {
+  async function generatePDF(consults, options = {}) {
     setLoading(true)
     try {
       const filter = buildFilter()
-      const allConsults = consultations || []
       const specialtiesArr = specialtiesData || Object.entries(SPECIALTIES).map(([key, v]) => ({ key, label: v.label }))
 
       if (reportType === 'patient') {
-        const patientConsultations = filterConsultations(
-          allConsults.filter(c => c.patientId === selectedPatientId)
-        ).sort((a, b) => (a.date > b.date ? 1 : -1))
-
+        const sorted = [...consults].sort((a, b) => (a.date > b.date ? 1 : -1))
         const guardians = await getGuardiansForPatient(selectedPatientId)
-
         await generateConsultasPacientePDF({
           patient: selectedPatient,
           guardians: guardians || [],
-          consultations: patientConsultations,
+          consultations: sorted,
           therapists: activeTherapists,
           consultationStatuses: consultationStatuses || [],
           appointmentTypes: appointmentTypes || [],
           specialtiesData: specialtiesArr,
           filter,
           companySettings,
+          draftMode: options.draftMode || false,
+          nfNumber: options.nfNumber || null,
+          nfDate: options.nfDate || null,
         })
       } else {
-        const therapistConsultations = filterConsultations(
-          allConsults.filter(c => c.therapistId === selectedTherapistId)
-        ).sort((a, b) => (a.date > b.date ? 1 : -1))
-
+        const sorted = [...consults].sort((a, b) => (a.date > b.date ? 1 : -1))
         await generateConsultasTerapeutaPDF({
           therapist: selectedTherapist,
-          consultations: therapistConsultations,
+          consultations: sorted,
           patients: activePatients,
           consultationStatuses: consultationStatuses || [],
           appointmentTypes: appointmentTypes || [],
@@ -166,6 +173,13 @@ export default function ReportsPage() {
     }
   }
 
+  function enterPreviewMode(consults) {
+    setPendingConsultations(consults)
+    setPreviewMode(true)
+    setNfNumber('')
+    setNfDate(new Date().toISOString().slice(0, 10))
+  }
+
   async function handleGenerate() {
     const validationError = validateForm()
     if (validationError) { setError(validationError); return }
@@ -179,14 +193,77 @@ export default function ReportsPage() {
     if (reportType === 'patient') {
       consults = filterConsultations(allConsults.filter(c => c.patientId === selectedPatientId))
       const items = buildUnconfiguredItems(consults, [selectedPatient], specialtiesArr)
-      if (items.length > 0) { setUnconfiguredWarning({ items }); return }
+      if (items.length > 0) { setUnconfiguredWarning({ items, pendingConsults: consults }); return }
+      // Admin: entra no modo preview com os 3 botões
+      if (isAdmin) { enterPreviewMode(consults); return }
     } else {
       consults = filterConsultations(allConsults.filter(c => c.therapistId === selectedTherapistId))
       const items = buildUnconfiguredItems(consults, activePatients, specialtiesArr)
-      if (items.length > 0) { setUnconfiguredWarning({ items }); return }
+      if (items.length > 0) { setUnconfiguredWarning({ items, pendingConsults: consults }); return }
     }
 
-    await generatePDF()
+    await generatePDF(consults)
+  }
+
+  // Calcula period_start / period_end e mes_label para o demonstrativo
+  function buildDemonstrativoPeriod() {
+    if (periodType === 'month') {
+      const [y, m] = periodMonth.split('-').map(Number)
+      const start = new Date(y, m - 1, 1)
+      const end = new Date(y, m, 0)
+      const toISO = d => d.toISOString().slice(0, 10)
+      return { periodStart: toISO(start), periodEnd: toISO(end), mesLabel: formatMesLabel(periodMonth) }
+    }
+    return {
+      periodStart: periodFrom,
+      periodEnd: periodTo,
+      mesLabel: `${periodFrom?.split('-').reverse().join('/')} – ${periodTo?.split('-').reverse().join('/')}`,
+    }
+  }
+
+  async function handleFaturar() {
+    const faturadoStatus = (consultationStatuses || []).find(s =>
+      s.name?.toLowerCase().includes('faturado')
+    )
+    if (!faturadoStatus) {
+      toast.show('Status "Faturado" não encontrado. Crie-o em Status Atendimento antes de faturar.', 'error')
+      return
+    }
+    setFaturandoLoading(true)
+    const ids = pendingConsultations.map(c => c.id)
+    try {
+      // 1. Salva histórico PRIMEIRO — se falhar, nada mais acontece
+      const { periodStart, periodEnd, mesLabel } = buildDemonstrativoPeriod()
+      await addPaymentDemonstrativo({
+        patientId: selectedPatientId,
+        periodStart, periodEnd, mesLabel,
+        nfNumber: nfNumber || null,
+        nfDate: nfDate || null,
+        consultationIds: ids,
+        formData: { patientName: selectedPatient?.fullName, periodType, periodMonth, periodFrom, periodTo },
+      })
+
+      // 2. Altera status das consultas — bypass do ledger pré-pago intencional
+      try {
+        await batchFaturarConsultations(ids, faturadoStatus.id)
+      } catch (statusErr) {
+        console.error('[handleFaturar] status update failed', statusErr)
+        toast.show(`Histórico salvo, mas erro ao atualizar status: ${statusErr?.message || ''}. Verifique as consultas manualmente.`, 'error')
+        setFaturandoLoading(false)
+        return
+      }
+
+      // 3. Gera e baixa o PDF
+      await generatePDF(pendingConsultations, { nfNumber: nfNumber || null, nfDate: nfDate || null })
+      toast.show('Demonstrativo gerado e consultas faturadas com sucesso.', 'success')
+      setShowNfModal(false)
+      setPreviewMode(false)
+    } catch (err) {
+      console.error('[handleFaturar]', err)
+      toast.show(`Erro ao salvar demonstrativo: ${err?.message || 'Tente novamente.'}`, 'error')
+    } finally {
+      setFaturandoLoading(false)
+    }
   }
 
   return (
@@ -232,7 +309,7 @@ export default function ReportsPage() {
             {isAdmin && (
               <button
                 type="button"
-                onClick={() => { setReportType('patient'); setSelectedPatientId(''); setPatientSearch('') }}
+                onClick={() => { setReportType('patient'); setSelectedPatientId(''); setPatientSearch(''); setPreviewMode(false); setPendingConsultations([]) }}
                 className={`flex items-center gap-3 px-4 py-3 rounded-xl border-2 text-sm font-medium transition-all ${
                   reportType === 'patient'
                     ? 'border-brand-blue bg-blue-50 text-brand-blue'
@@ -245,7 +322,7 @@ export default function ReportsPage() {
             )}
             <button
               type="button"
-              onClick={() => { setReportType('therapist'); setSelectedTherapistId(isAdmin ? '' : (user?.id || '')); setTherapistSearch('') }}
+              onClick={() => { setReportType('therapist'); setSelectedTherapistId(isAdmin ? '' : (user?.id || '')); setTherapistSearch(''); setPreviewMode(false); setPendingConsultations([]) }}
               className={`flex items-center gap-3 px-4 py-3 rounded-xl border-2 text-sm font-medium transition-all ${
                 reportType === 'therapist'
                   ? 'border-brand-blue bg-blue-50 text-brand-blue'
@@ -501,18 +578,26 @@ export default function ReportsPage() {
               </button>
               <button
                 type="button"
-                onClick={() => { setUnconfiguredWarning(null); generatePDF() }}
+                onClick={() => {
+                  const consults = unconfiguredWarning.pendingConsults
+                  setUnconfiguredWarning(null)
+                  if (reportType === 'patient' && isAdmin) {
+                    enterPreviewMode(consults)
+                  } else {
+                    generatePDF(consults)
+                  }
+                }}
                 disabled={loading}
                 className="flex-1 py-2 rounded-xl bg-amber-600 text-white font-semibold text-sm hover:bg-amber-700 transition-colors disabled:opacity-60"
               >
-                {loading ? 'Gerando...' : 'Gerar mesmo assim'}
+                {loading ? 'Gerando...' : 'Continuar mesmo assim'}
               </button>
             </div>
           </div>
         )}
 
-        {/* Botão gerar */}
-        {!unconfiguredWarning && (
+        {/* Botão gerar (oculto em modo preview ou quando aviso está visível) */}
+        {!unconfiguredWarning && !previewMode && (
           <button
             type="button"
             onClick={handleGenerate}
@@ -522,6 +607,102 @@ export default function ReportsPage() {
             <FiFileText size={18} />
             {loading ? 'Gerando PDF...' : 'Gerar PDF'}
           </button>
+        )}
+
+        {/* Preview mode — Demonstrativo de Pagamento */}
+        {previewMode && !showNfModal && (
+          <div className="border border-blue-200 bg-blue-50 rounded-2xl p-5 space-y-4">
+            <div className="flex items-center gap-2">
+              <FiFileText size={18} className="text-brand-blue shrink-0" />
+              <span className="font-semibold text-gray-900">Demonstrativo pronto para gerar</span>
+            </div>
+            <div className="text-sm text-gray-700 space-y-1">
+              <div><span className="text-gray-400">Paciente:</span> <span className="font-medium">{selectedPatient?.fullName}</span></div>
+              <div><span className="text-gray-400">Período:</span> <span className="font-medium">{buildDemonstrativoPeriod().mesLabel}</span></div>
+              <div><span className="text-gray-400">Atendimentos:</span> <span className="font-medium">{pendingConsultations.length}</span></div>
+            </div>
+            <div className="flex flex-col gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setShowNfModal(true)}
+                disabled={faturandoLoading || loading}
+                className="w-full flex items-center justify-center gap-2 bg-brand-blue text-white font-semibold py-3 rounded-xl hover:bg-brand-blue-dark transition-all disabled:opacity-60 text-sm"
+              >
+                <FiDownload size={16} />
+                Baixar e Gerar Demonstrativo
+              </button>
+              <button
+                type="button"
+                onClick={() => generatePDF(pendingConsultations, { draftMode: true })}
+                disabled={faturandoLoading || loading}
+                className="w-full flex items-center justify-center gap-2 border border-gray-300 text-gray-700 font-medium py-3 rounded-xl hover:bg-gray-50 transition-all disabled:opacity-60 text-sm bg-white"
+              >
+                <FiFileText size={16} />
+                {loading ? 'Gerando...' : 'Gerar DRAFT'}
+              </button>
+              <button
+                type="button"
+                onClick={() => { setPreviewMode(false); setPendingConsultations([]) }}
+                disabled={faturandoLoading || loading}
+                className="w-full flex items-center justify-center gap-2 text-gray-500 font-medium py-2 rounded-xl hover:bg-gray-100 transition-all text-sm"
+              >
+                <FiArrowLeft size={14} />
+                Fechar
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Modal inline — dados da NF */}
+        {previewMode && showNfModal && (
+          <div className="border border-green-200 bg-green-50 rounded-2xl p-5 space-y-4">
+            <div className="flex items-center justify-between">
+              <span className="font-semibold text-gray-900 text-sm">Informações da Nota Fiscal</span>
+              <button type="button" onClick={() => setShowNfModal(false)} className="text-gray-400 hover:text-gray-600">
+                <FiX size={16} />
+              </button>
+            </div>
+            <p className="text-xs text-gray-500">Preencha os dados da NF (opcional). Ao confirmar, as consultas serão marcadas como Faturado e o histórico será salvo.</p>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Número da NF</label>
+                <input
+                  type="text"
+                  value={nfNumber}
+                  onChange={e => setNfNumber(e.target.value)}
+                  placeholder="Ex: 001234 (opcional)"
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-brand-blue outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Data de emissão</label>
+                <input
+                  type="date"
+                  value={nfDate}
+                  onChange={e => setNfDate(e.target.value)}
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-brand-blue outline-none"
+                />
+              </div>
+            </div>
+            <div className="flex gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setShowNfModal(false)}
+                disabled={faturandoLoading}
+                className="flex-1 py-2.5 rounded-xl border border-gray-300 text-gray-700 font-medium text-sm hover:bg-gray-50 transition-colors disabled:opacity-60"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleFaturar}
+                disabled={faturandoLoading}
+                className="flex-1 py-2.5 rounded-xl bg-brand-blue text-white font-semibold text-sm hover:bg-brand-blue-dark transition-colors disabled:opacity-60"
+              >
+                {faturandoLoading ? 'Processando...' : 'Confirmar e Gerar'}
+              </button>
+            </div>
+          </div>
         )}
       </div>
     </div>
