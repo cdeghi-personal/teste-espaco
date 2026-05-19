@@ -694,6 +694,8 @@ export function DataProvider({ children }) {
     if (rest.nextObjectives !== undefined) update.next_objectives = rest.nextObjectives
     if (rest.guardianFeedback !== undefined) update.guardian_feedback = rest.guardianFeedback
     if (rest.sessionQuality !== undefined) update.session_quality = rest.sessionQuality
+    if (rest.nfNumber !== undefined) update.nf_number = rest.nfNumber || null
+    if (rest.nfIssueDate !== undefined) update.nf_issue_date = rest.nfIssueDate || null
 
     if (Object.keys(update).length) {
       await supabase.from('consultations').update(update).eq('id', id)

@@ -106,7 +106,8 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
   const activeSpecialties = specialtiesData.filter(s => s.active !== false)
   const activeStatuses = consultationStatuses.filter(s => s.active !== false && (user?.role === 'admin' || !s.automatic))
   const currentStatus = isEdit ? consultationStatuses.find(s => s.id === initial.consultationStatusId) : null
-  const isBlocked = isEdit && currentStatus?.automatic && user?.role !== 'admin'
+  const isAdmin  = user?.role === 'admin'
+  const isBlocked = isEdit && currentStatus?.automatic && !isAdmin
   const activeAppointmentTypes = appointmentTypes.filter(t => t.active !== false)
   const activeRooms = rooms.filter(r => r.active !== false)
   const patientAppointments = form.patientId
@@ -333,6 +334,37 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
             <Textarea label="Orientações Passadas ao Responsável" value={form.guardianFeedback} onChange={e => set('guardianFeedback', e.target.value)} placeholder="O que foi comunicado ao responsável ao final da sessão..." rows={2} disabled={readOnly} />
           </div>
         </section>
+
+        {/* Seção NF — admin sempre vê em edição; terapeuta vê apenas se já preenchido */}
+        {isEdit && (isAdmin || initial.nfNumber || initial.nfIssueDate) && (
+          <section className="space-y-3">
+            <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Nota Fiscal / Faturamento</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Input
+                label="Número da NF"
+                value={form.nfNumber || ''}
+                onChange={e => set('nfNumber', e.target.value)}
+                placeholder="Ex.: 000123"
+                disabled={!isAdmin}
+              />
+              <Input
+                label="Data de Emissão"
+                type="date"
+                value={form.nfIssueDate || ''}
+                onChange={e => set('nfIssueDate', e.target.value)}
+                disabled={!isAdmin}
+              />
+            </div>
+            {initial.previousStatusBeforeInvoice && (() => {
+              const prevStatus = consultationStatuses.find(s => s.id === initial.previousStatusBeforeInvoice)
+              return prevStatus ? (
+                <p className="text-xs text-gray-400">
+                  Status anterior ao faturamento: <span className="font-medium text-gray-600">{prevStatus.name}</span>
+                </p>
+              ) : null
+            })()}
+          </section>
+        )}
       </div>
     </Modal>
   )
