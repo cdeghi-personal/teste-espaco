@@ -540,8 +540,11 @@ export function DataProvider({ children }) {
     const patientSpec = (patient.specialties || []).find(s => s.key === newSpecialty)
     if (!patientSpec || patientSpec.paymentType !== 'PREPAID_PACKAGE') {
       if (patientChanged && oldConsumed) return // já estornou acima
-      await supabase.from('consultations').update({ prepaid_session_consumed: false }).eq('id', consultationId)
-      setConsultations(prev => prev.map(c => c.id === consultationId ? { ...c, prepaidSessionConsumed: false } : c))
+      const effectiveOld = patientChanged ? false : oldConsumed
+      if (effectiveOld) {
+        await supabase.from('consultations').update({ prepaid_session_consumed: false }).eq('id', consultationId)
+        setConsultations(prev => prev.map(c => c.id === consultationId ? { ...c, prepaidSessionConsumed: false } : c))
+      }
       return
     }
 
