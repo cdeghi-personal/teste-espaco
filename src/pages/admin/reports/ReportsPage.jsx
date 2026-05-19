@@ -4,7 +4,7 @@ import { FiFileText, FiUser, FiUsers, FiCalendar, FiChevronDown, FiExternalLink 
 import HelpButton from '../../../components/ui/HelpButton'
 import { useData } from '../../../context/DataContext'
 import { useAuth } from '../../../context/AuthContext'
-import { generateConsultasPacientePDF, generateConsultasTerapeutaPDF } from '../../../utils/generateReportPDF'
+import { generateConsultasPacientePDF, generateConsultasTerapeutaPDF, findPatientSpecialtyConfig } from '../../../utils/generateReportPDF'
 import { SPECIALTIES } from '../../../constants/specialties'
 import { ROUTES } from '../../../constants/routes'
 
@@ -41,6 +41,7 @@ export default function ReportsPage() {
   const [selectedStatusIds, setSelectedStatusIds] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [unconfiguredWarning, setUnconfiguredWarning] = useState(null)
 
   const activePatients = useMemo(
     () => (patients || []).filter(p => !p.deleted).sort((a, b) => a.fullName.localeCompare(b.fullName)),
@@ -101,12 +102,23 @@ export default function ReportsPage() {
     return ''
   }
 
-  async function handleGenerate() {
-    const validationError = validateForm()
-    if (validationError) { setError(validationError); return }
-    setError('')
-    setLoading(true)
+  function buildUnconfiguredItems(consults, patientsArr, specialtiesArr) {
+    const byPatient = new Map()
+    for (const c of consults) {
+      const patient = patientsArr.find(p => p.id === c.patientId)
+      if (!patient) continue
+      const spec = findPatientSpecialtyConfig(patient, c.specialty, specialtiesArr)
+      if (!spec) {
+        if (!byPatient.has(patient.fullName)) byPatient.set(patient.fullName, new Set())
+        const label = specialtiesArr.find(s => s.key === c.specialty)?.label || c.specialty
+        byPatient.get(patient.fullName).add(label)
+      }
+    }
+    return [...byPatient.entries()].map(([name, sps]) => ({ name, specialties: [...sps] }))
+  }
 
+  async function generatePDF() {
+    setLoading(true)
     try {
       const filter = buildFilter()
       const allConsults = consultations || []
@@ -152,6 +164,29 @@ export default function ReportsPage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  async function handleGenerate() {
+    const validationError = validateForm()
+    if (validationError) { setError(validationError); return }
+    setError('')
+    setUnconfiguredWarning(null)
+
+    const allConsults = consultations || []
+    const specialtiesArr = specialtiesData || Object.entries(SPECIALTIES).map(([key, v]) => ({ key, label: v.label }))
+
+    let consults
+    if (reportType === 'patient') {
+      consults = filterConsultations(allConsults.filter(c => c.patientId === selectedPatientId))
+      const items = buildUnconfiguredItems(consults, [selectedPatient], specialtiesArr)
+      if (items.length > 0) { setUnconfiguredWarning({ items }); return }
+    } else {
+      consults = filterConsultations(allConsults.filter(c => c.therapistId === selectedTherapistId))
+      const items = buildUnconfiguredItems(consults, activePatients, specialtiesArr)
+      if (items.length > 0) { setUnconfiguredWarning({ items }); return }
+    }
+
+    await generatePDF()
   }
 
   return (
@@ -439,16 +474,55 @@ export default function ReportsPage() {
           </div>
         )}
 
+        {/* Aviso de especialidades não configuradas */}
+        {unconfiguredWarning && (
+          <div className="bg-amber-50 border border-amber-300 rounded-xl px-4 py-4 text-sm text-amber-900">
+            <p className="font-semibold mb-2">Especialidades sem configuração financeira encontradas:</p>
+            {unconfiguredWarning.items.map(item => (
+              <div key={item.name} className="mb-1.5">
+                <span className="font-medium">{item.name}:</span>
+                <ul className="ml-3 mt-0.5 space-y-0.5">
+                  {item.specialties.map(s => (
+                    <li key={s} className="text-amber-800">• {s}</li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+            <p className="mt-2 text-amber-700 text-xs">
+              Sem essa configuração, os valores serão exibidos como "Não configurado" e não serão considerados no total.
+            </p>
+            <div className="flex gap-2 mt-3">
+              <button
+                type="button"
+                onClick={() => setUnconfiguredWarning(null)}
+                className="flex-1 py-2 rounded-xl border border-amber-400 text-amber-900 font-medium text-sm hover:bg-amber-100 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => { setUnconfiguredWarning(null); generatePDF() }}
+                disabled={loading}
+                className="flex-1 py-2 rounded-xl bg-amber-600 text-white font-semibold text-sm hover:bg-amber-700 transition-colors disabled:opacity-60"
+              >
+                {loading ? 'Gerando...' : 'Gerar mesmo assim'}
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Botão gerar */}
-        <button
-          type="button"
-          onClick={handleGenerate}
-          disabled={loading}
-          className="w-full flex items-center justify-center gap-2 bg-brand-blue text-white font-semibold py-3.5 rounded-xl hover:bg-brand-blue-dark transition-all disabled:opacity-60 text-sm"
-        >
-          <FiFileText size={18} />
-          {loading ? 'Gerando PDF...' : 'Gerar PDF'}
-        </button>
+        {!unconfiguredWarning && (
+          <button
+            type="button"
+            onClick={handleGenerate}
+            disabled={loading}
+            className="w-full flex items-center justify-center gap-2 bg-brand-blue text-white font-semibold py-3.5 rounded-xl hover:bg-brand-blue-dark transition-all disabled:opacity-60 text-sm"
+          >
+            <FiFileText size={18} />
+            {loading ? 'Gerando PDF...' : 'Gerar PDF'}
+          </button>
+        )}
       </div>
     </div>
   )

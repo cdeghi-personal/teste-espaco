@@ -7,6 +7,8 @@ import {
 } from './pdfShared'
 import { PAYMENT_TYPE_LABELS } from '../constants/paymentTypes'
 
+const PDF_RED = [220, 38, 38]
+
 function formatPeriod(filter) {
   if (filter.type === 'month') {
     const [y, m] = filter.month.split('-')
@@ -34,13 +36,28 @@ async function buildReportHeader(doc, subtitle, period, companySettings) {
   return 42
 }
 
+// Helper central para localizar configuração financeira de uma especialidade no paciente.
+// Tenta: 1) match direto por key; 2) match por label via specialtiesData.
+export function findPatientSpecialtyConfig(patient, consultationSpecialty, specialtiesData) {
+  if (!patient || !consultationSpecialty) return null
+  const byKey = patient.specialties?.find(s => s.key === consultationSpecialty)
+  if (byKey) return byKey
+  if (specialtiesData?.length) {
+    const sd = specialtiesData.find(s =>
+      s.label?.toLowerCase() === consultationSpecialty?.toLowerCase()
+    )
+    if (sd) return patient.specialties?.find(s => s.key === sd.key) || null
+  }
+  return null
+}
+
 // Resolve valor de paciente para uma consulta segundo a modalidade de pagamento.
-// Retorna { display: string, amount: number, paymentType: string }
-function resolvePatientValue(c, patient, monthlyTracked) {
-  const spec = patient.specialties?.find(s => s.key === c.specialty)
+// Retorna { display, amount, paymentType, isUnconfigured }
+function resolvePatientValue(c, patient, monthlyTracked, specialtiesData) {
+  const spec = findPatientSpecialtyConfig(patient, c.specialty, specialtiesData)
 
   if (!spec) {
-    return { display: 'Não configurado', amount: 0, paymentType: 'POST_PER_SESSION' }
+    return { display: 'Não configurado', amount: 0, paymentType: 'POST_PER_SESSION', isUnconfigured: true }
   }
 
   const paymentType = spec.paymentType || 'POST_PER_SESSION'
@@ -52,22 +69,28 @@ function resolvePatientValue(c, patient, monthlyTracked) {
       const mv = spec?.monthlyPatientValue
       monthlyTracked.set(key, mv != null && mv !== '' ? (parseFloat(mv) || 0) : 0)
     }
-    return { display: 'Mensal', amount: 0, paymentType }
+    return { display: 'Mensal', amount: 0, paymentType, isUnconfigured: false }
   }
 
   if (paymentType === 'PREPAID_PACKAGE') {
-    return { display: 'Pré-pago', amount: 0, paymentType }
+    return { display: 'Pré-pago', amount: 0, paymentType, isUnconfigured: false }
   }
 
-  // POST_PER_SESSION | PAY_PER_SESSION (default)
+  // POST_PER_SESSION | PAY_PER_SESSION
   const pv = spec?.patientValue
   const amount = pv != null && pv !== '' ? (parseFloat(pv) || 0) : 0
-  return { display: fmtCurrencyPDF(amount), amount, paymentType }
+  return { display: fmtCurrencyPDF(amount), amount, paymentType, isUnconfigured: false }
 }
 
 // Resolve valor de terapeuta para uma consulta segundo a modalidade de pagamento.
-function resolveTherapistValue(c, patient, monthlyTracked) {
-  const spec = patient?.specialties?.find(s => s.key === c.specialty)
+// Retorna { display, amount, paymentType, isUnconfigured }
+function resolveTherapistValue(c, patient, monthlyTracked, specialtiesData) {
+  const spec = findPatientSpecialtyConfig(patient, c.specialty, specialtiesData)
+
+  if (!spec) {
+    return { display: 'Não configurado', amount: 0, paymentType: 'POST_PER_SESSION', isUnconfigured: true }
+  }
+
   const paymentType = spec?.paymentType || 'POST_PER_SESSION'
 
   if (paymentType === 'POST_MONTHLY') {
@@ -77,23 +100,23 @@ function resolveTherapistValue(c, patient, monthlyTracked) {
       const mv = spec?.monthlyTherapistValue
       monthlyTracked.set(key, mv != null && mv !== '' ? (parseFloat(mv) || 0) : 0)
     }
-    return { display: 'Mensal', amount: 0, paymentType }
+    return { display: 'Mensal', amount: 0, paymentType, isUnconfigured: false }
   }
 
   if (paymentType === 'PREPAID_PACKAGE') {
     const tv = spec?.therapistValue
     const amount = tv != null && tv !== '' ? (parseFloat(tv) || 0) : 0
-    return { display: amount > 0 ? fmtCurrencyPDF(amount) : 'Pré-pago', amount, paymentType }
+    return { display: amount > 0 ? fmtCurrencyPDF(amount) : 'Pré-pago', amount, paymentType, isUnconfigured: false }
   }
 
   // POST_PER_SESSION | PAY_PER_SESSION
   const tv = spec?.therapistValue
   const amount = tv != null && tv !== '' ? (parseFloat(tv) || 0) : 0
-  return { display: fmtCurrencyPDF(amount), amount, paymentType }
+  return { display: fmtCurrencyPDF(amount), amount, paymentType, isUnconfigured: false }
 }
 
 // Renderiza o bloco de totais após a tabela de consultas
-function renderTotals(doc, y, pageW, margin, totalCount, totalPostSessao, monthlyTracked, totalPrepago) {
+function renderTotals(doc, y, pageW, margin, totalCount, totalPostSessao, monthlyTracked, totalPrepago, hasUnconfigured) {
   const totalMensal = [...monthlyTracked.values()].reduce((a, b) => a + b, 0)
   const grandTotal = totalPostSessao + totalMensal + totalPrepago
 
@@ -104,6 +127,8 @@ function renderTotals(doc, y, pageW, margin, totalCount, totalPostSessao, monthl
 
   const hasMixed = (totalPostSessao > 0 || totalMensal > 0 || totalPrepago > 0) &&
     [totalPostSessao > 0, totalMensal > 0, totalPrepago > 0].filter(Boolean).length > 1
+
+  let lastY = y + 4
 
   if (hasMixed) {
     let lineY = y + 4
@@ -123,19 +148,31 @@ function renderTotals(doc, y, pageW, margin, totalCount, totalPostSessao, monthl
     }
     doc.setFont('helvetica', 'bold')
     doc.text(`Total do período: ${fmtCurrencyPDF(grandTotal)}`, pageW - margin, lineY, { align: 'right' })
+    lastY = lineY
   } else {
     doc.text(`Total do período: ${fmtCurrencyPDF(grandTotal)}`, pageW - margin, y + 4, { align: 'right' })
+    lastY = y + 4
+  }
+
+  if (hasUnconfigured) {
+    doc.setFontSize(7)
+    doc.setFont('helvetica', 'italic')
+    doc.setTextColor(...PDF_RED)
+    doc.text(
+      '* Existem atendimentos com especialidade sem configuração financeira. Revise o cadastro do paciente.',
+      margin, lastY + 7
+    )
+    doc.setTextColor(...PDF_DARK)
   }
 }
 
 // ─── Card renderer: cada atendimento como bloco 2 colunas ─────
-// Coluna esquerda (55%): 3 linhas de campos dispostos horizontalmente.
-// Coluna direita (45%): área contínua com Objetivo da Sessão.
 function drawAttendanceCard(doc, data, y, pageH, margin, pageW) {
   const {
     date, time, statusName, typeName,
     therapistName, specLabel, credential,
     modalityLabel, valueDisplay, objective,
+    isValueUnconfigured,
   } = data
 
   const contentW = pageW - margin * 2
@@ -144,42 +181,36 @@ function drawAttendanceCard(doc, data, y, pageH, margin, pageW) {
   const divX = margin + leftW
 
   const CARD_PAD = 3.5
-  const FIELD_H = 9        // altura total de cada linha de campos
-  const F_LBL = 2.5        // offset da baseline do label a partir do topo da linha
-  const F_VAL = 7          // offset da baseline do valor
-  const ROW_SEP = 1        // separador horizontal entre linhas
-  const CARD_GAP = 3.5     // espaço entre cards
-  const RIGHT_LH = 4.3     // entrelinha do texto objetivo
+  const FIELD_H = 9
+  const F_LBL = 2.5
+  const F_VAL = 7
+  const ROW_SEP = 1
+  const CARD_GAP = 3.5
+  const RIGHT_LH = 4.3
 
-  // Altura coluna esquerda: padding + 3 linhas + 2 separadores + padding
   const leftH = CARD_PAD + 3 * FIELD_H + 2 * ROW_SEP + CARD_PAD
 
-  // Altura coluna direita: depende do texto do objetivo
   const rightTextW = rightW - CARD_PAD * 2
   const objLines = doc.splitTextToSize(objective || '—', rightTextW)
   const rightH = CARD_PAD + F_LBL + 2 + objLines.length * RIGHT_LH + CARD_PAD
 
   const cardH = Math.max(leftH, rightH)
 
-  // Quebra de página antes de começar, se necessário
   if (y + cardH > pageH - 18) {
     doc.addPage()
     y = 18
   }
 
-  // ── Backgrounds ──────────────────────────────────────────────
   doc.setFillColor(250, 251, 253)
   doc.roundedRect(margin, y, contentW, cardH, 1.5, 1.5, 'F')
   doc.setFillColor(244, 246, 253)
   doc.rect(divX + 0.3, y + 0.3, rightW - 0.3, cardH - 0.6, 'F')
 
-  // ── Borda e divisor vertical ─────────────────────────────────
   doc.setDrawColor(208, 213, 227)
   doc.setLineWidth(0.3)
   doc.roundedRect(margin, y, contentW, cardH, 1.5, 1.5, 'S')
   doc.line(divX, y, divX, y + cardH)
 
-  // ── Coluna esquerda: 3 linhas com campos horizontais ─────────
   const rows = [
     [
       { label: 'DATA', value: time ? `${date}  ${time}` : date },
@@ -192,14 +223,13 @@ function drawAttendanceCard(doc, data, y, pageH, margin, pageW) {
       { label: 'CONSELHO', value: credential },
     ],
     [
-      { label: 'MODALIDADE', value: modalityLabel },
-      { label: 'VALOR', value: valueDisplay },
+      { label: 'MODALIDADE', value: modalityLabel, isWarning: isValueUnconfigured },
+      { label: 'VALOR', value: valueDisplay, isWarning: isValueUnconfigured },
     ],
   ]
 
   let ly = y + CARD_PAD
   rows.forEach((row, ri) => {
-    // Separador horizontal entre linhas
     if (ri > 0) {
       doc.setDrawColor(213, 218, 230)
       doc.setLineWidth(0.15)
@@ -211,7 +241,6 @@ function drawAttendanceCard(doc, data, y, pageH, margin, pageW) {
     const fieldW = leftW / nFields
 
     row.forEach((field, fi) => {
-      // Separador vertical entre campos dentro da mesma linha
       if (fi > 0) {
         doc.setDrawColor(220, 224, 235)
         doc.setLineWidth(0.12)
@@ -221,23 +250,21 @@ function drawAttendanceCard(doc, data, y, pageH, margin, pageW) {
       const fx = margin + fi * fieldW + CARD_PAD
       const maxFW = fieldW - CARD_PAD * 1.8
 
-      // Label
       doc.setFontSize(5)
       doc.setFont('helvetica', 'normal')
       doc.setTextColor(148, 153, 170)
       doc.text(field.label, fx, ly + F_LBL)
 
-      // Valor
       doc.setFontSize(7)
       doc.setFont('helvetica', 'bold')
-      doc.setTextColor(20, 25, 42)
+      doc.setTextColor(...(field.isWarning ? PDF_RED : PDF_DARK))
       doc.text(doc.splitTextToSize(field.value, maxFW)[0] || field.value, fx, ly + F_VAL)
+      doc.setTextColor(...PDF_DARK)
     })
 
     ly += FIELD_H
   })
 
-  // ── Coluna direita: objetivo da sessão ───────────────────────
   const rtx = divX + CARD_PAD
   let ry = y + CARD_PAD
 
@@ -249,7 +276,7 @@ function drawAttendanceCard(doc, data, y, pageH, margin, pageW) {
 
   doc.setFontSize(7)
   doc.setFont('helvetica', 'normal')
-  doc.setTextColor(20, 25, 42)
+  doc.setTextColor(...PDF_DARK)
   objLines.forEach(line => {
     doc.text(line, rtx, ry + RIGHT_LH - 0.5)
     ry += RIGHT_LH
@@ -272,7 +299,6 @@ export async function generateConsultasPacientePDF({
 
   let y = await buildReportHeader(doc, 'Demonstrativo de Pagamento', period, companySettings)
 
-  // ── Dados do Paciente ──
   y = sectionBlock(doc, 'Dados do Paciente', y)
   const col1 = margin, col2 = pageW / 2 + 5
   let y1 = y, y2 = y
@@ -282,7 +308,6 @@ export async function generateConsultasPacientePDF({
   y2 = labelValue(doc, 'Diagnóstico Principal', patient.diagnosis, col2, y2, 80) + 2
   y = Math.max(y1, y2) + 6
 
-  // ── Responsáveis ──
   const paiMae = guardians.filter(g =>
     ['pai', 'mãe', 'mae', 'pai/mãe', 'mãe/pai'].some(rel =>
       (g.relationship || '').toLowerCase().includes(rel.replace(/ã/g, 'a'))
@@ -303,7 +328,6 @@ export async function generateConsultasPacientePDF({
     y = doc.lastAutoTable.finalY + 6
   }
 
-  // ── Atendimentos ──
   y = sectionBlock(doc, `Atendimentos Realizados no Período: ${period}`, y)
 
   if (consultations.length === 0) {
@@ -313,8 +337,8 @@ export async function generateConsultasPacientePDF({
   } else {
     let totalPostSessao = 0
     let totalPrepago = 0
+    let hasUnconfigured = false
     const monthlyTracked = new Map()
-
     const pageH = doc.internal.pageSize.height
 
     for (const c of consultations) {
@@ -324,7 +348,8 @@ export async function generateConsultasPacientePDF({
       const status = consultationStatuses.find(s => s.id === c.consultationStatusId)
       const type = appointmentTypes.find(t => t.id === c.appointmentTypeId)
 
-      const { display: valueDisplay, amount, paymentType } = resolvePatientValue(c, patient, monthlyTracked)
+      const { display: valueDisplay, amount, paymentType, isUnconfigured } = resolvePatientValue(c, patient, monthlyTracked, specialtiesData)
+      if (isUnconfigured) hasUnconfigured = true
       if (paymentType === 'POST_PER_SESSION' || paymentType === 'PAY_PER_SESSION') totalPostSessao += amount
       else if (paymentType === 'PREPAID_PACKAGE') totalPrepago += amount
 
@@ -336,13 +361,14 @@ export async function generateConsultasPacientePDF({
         therapistName: therapist?.name || '—',
         specLabel: spec?.label || c.specialty || '—',
         credential,
-        modalityLabel: PAYMENT_TYPE_LABELS[paymentType] || paymentType,
+        modalityLabel: isUnconfigured ? 'Não configurada' : (PAYMENT_TYPE_LABELS[paymentType] || paymentType),
         valueDisplay,
         objective: c.mainObjective || '—',
+        isValueUnconfigured: isUnconfigured,
       }, y, pageH, margin, pageW)
     }
 
-    renderTotals(doc, y, pageW, margin, consultations.length, totalPostSessao, monthlyTracked, totalPrepago)
+    renderTotals(doc, y, pageW, margin, consultations.length, totalPostSessao, monthlyTracked, totalPrepago, hasUnconfigured)
   }
 
   addAllPageFooters(doc)
@@ -364,7 +390,6 @@ export async function generateConsultasTerapeutaPDF({
 
   let y = await buildReportHeader(doc, 'Relatório de Consultas por Terapeuta', period, companySettings)
 
-  // ── Dados do Terapeuta ──
   y = sectionBlock(doc, 'Dados do Terapeuta', y)
   const specialtiesStr = (therapist.therapistSpecialties || [])
     .map(s => {
@@ -382,7 +407,6 @@ export async function generateConsultasTerapeutaPDF({
   y2 = labelValue(doc, 'Especialidades e Conselhos', specialtiesStr, col2, y2, 80) + 2
   y = Math.max(y1, y2) + 6
 
-  // ── Atendimentos ──
   y = sectionBlock(doc, `Atendimentos Realizados no Período: ${period}`, y)
 
   if (consultations.length === 0) {
@@ -392,28 +416,32 @@ export async function generateConsultasTerapeutaPDF({
   } else {
     let totalPostSessao = 0
     let totalPrepago = 0
+    let hasUnconfigured = false
     const monthlyTracked = new Map()
+
+    const body = consultations.map(c => {
+      const patient = patients.find(p => p.id === c.patientId)
+      const spec = specialtiesData.find(s => s.key === c.specialty)
+      const status = consultationStatuses.find(s => s.id === c.consultationStatusId)
+      const type = appointmentTypes.find(t => t.id === c.appointmentTypeId)
+
+      const { display, amount, paymentType, isUnconfigured } = resolveTherapistValue(c, patient, monthlyTracked, specialtiesData)
+      if (isUnconfigured) hasUnconfigured = true
+      if (paymentType === 'POST_PER_SESSION' || paymentType === 'PAY_PER_SESSION') totalPostSessao += amount
+      else if (paymentType === 'PREPAID_PACKAGE') totalPrepago += amount
+
+      return [
+        fmtDatePDF(c.date), c.time ? c.time.slice(0, 5) : '—',
+        patient?.fullName || '—', spec?.label || c.specialty || '—',
+        status?.name || '—', type?.name || '—',
+        display, c.mainObjective || '—',
+      ]
+    })
 
     autoTable(doc, {
       startY: y, margin: { left: margin, right: margin },
       head: [['Data', 'Hora', 'Paciente', 'Especialidade', 'Status', 'Tipo', 'Valor (R$)', 'Objetivo da Sessão']],
-      body: consultations.map(c => {
-        const patient = patients.find(p => p.id === c.patientId)
-        const spec = specialtiesData.find(s => s.key === c.specialty)
-        const status = consultationStatuses.find(s => s.id === c.consultationStatusId)
-        const type = appointmentTypes.find(t => t.id === c.appointmentTypeId)
-
-        const { display, amount, paymentType } = resolveTherapistValue(c, patient, monthlyTracked)
-        if (paymentType === 'POST_PER_SESSION' || paymentType === 'PAY_PER_SESSION') totalPostSessao += amount
-        else if (paymentType === 'PREPAID_PACKAGE') totalPrepago += amount
-
-        return [
-          fmtDatePDF(c.date), c.time ? c.time.slice(0, 5) : '—',
-          patient?.fullName || '—', spec?.label || c.specialty || '—',
-          status?.name || '—', type?.name || '—',
-          display, c.mainObjective || '—',
-        ]
-      }),
+      body,
       styles: { fontSize: 7, cellPadding: 2 },
       headStyles: { fillColor: PDF_BLUE, textColor: 255, fontStyle: 'bold', fontSize: 7.5 },
       alternateRowStyles: { fillColor: PDF_LIGHT },
@@ -422,9 +450,15 @@ export async function generateConsultasTerapeutaPDF({
         3: { cellWidth: 26 }, 4: { cellWidth: 22 }, 5: { cellWidth: 22 },
         6: { cellWidth: 20, halign: 'right' }, 7: { cellWidth: 'auto' },
       },
+      didParseCell: (data) => {
+        if (data.section === 'body' && data.column.index === 6 && data.cell.text[0] === 'Não configurado') {
+          data.cell.styles.textColor = PDF_RED
+          data.cell.styles.fontStyle = 'bold'
+        }
+      },
     })
     y = doc.lastAutoTable.finalY + 4
-    renderTotals(doc, y, pageW, margin, consultations.length, totalPostSessao, monthlyTracked, totalPrepago)
+    renderTotals(doc, y, pageW, margin, consultations.length, totalPostSessao, monthlyTracked, totalPrepago, hasUnconfigured)
   }
 
   addAllPageFooters(doc)

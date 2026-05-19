@@ -105,18 +105,19 @@ export default function PatientFormModal({ onClose, initial = {}, readOnly = fal
     setForm(f => ({ ...f, specialties: f.specialties.map(s => s.key === key ? { ...s, [field]: value } : s) }))
   }
   function handlePatientValueChange(key, value) {
+    setForm(f => ({ ...f, specialties: f.specialties.map(s => s.key === key ? { ...s, patientValue: value } : s) }))
+  }
+  function handlePatientValueBlur(key) {
     setForm(f => ({
       ...f,
       specialties: f.specialties.map(s => {
         if (s.key !== key) return s
-        const pv = parseFloat(value)
-        const therapistEmpty = s.therapistValue === '' || s.therapistValue == null || Number(s.therapistValue) === 0
-        const suggest = therapistEmpty && !isNaN(pv) && pv > 0 && discountPct >= 0
-        return {
-          ...s,
-          patientValue: value,
-          therapistValue: suggest ? String(+(pv * (1 - discountPct / 100)).toFixed(2)) : s.therapistValue,
-        }
+        if (s.paymentType === 'POST_MONTHLY') return s
+        const pv = parseFloat(s.patientValue)
+        if (isNaN(pv) || pv <= 0 || !(discountPct > 0)) return s
+        const therapistEmpty = s.therapistValue === '' || s.therapistValue == null
+        if (!therapistEmpty) return s
+        return { ...s, therapistValue: String(+(pv * (1 - discountPct / 100)).toFixed(2)) }
       }),
     }))
   }
@@ -334,7 +335,9 @@ export default function PatientFormModal({ onClose, initial = {}, readOnly = fal
                             <div>
                               <label className="block text-xs text-gray-500 mb-1">Valor Paciente / sessão</label>
                               <input type="number" min="0" step="0.01" value={s.patientValue ?? ''} placeholder="0,00"
-                                onChange={e => handlePatientValueChange(s.key, e.target.value)} className={inputCls} />
+                                onChange={e => handlePatientValueChange(s.key, e.target.value)}
+                                onBlur={() => handlePatientValueBlur(s.key)}
+                                className={inputCls} />
                             </div>
                             <div>
                               <div className="flex items-center justify-between mb-1">
