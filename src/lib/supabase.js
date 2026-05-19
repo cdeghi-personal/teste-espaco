@@ -242,6 +242,7 @@ export function mapRoom(row) {
 
 export async function syncPatientRelations(patientId, data) {
   const ops = []
+  const toNum = v => { const n = parseFloat(v); return (v === '' || v == null || isNaN(n)) ? null : n }
 
   if (data.specialties !== undefined) {
     ops.push(
@@ -253,11 +254,11 @@ export async function syncPatientRelations(patientId, data) {
           data.specialties.map(s => ({
             patient_id: patientId,
             specialty: s.key ?? s,
-            patient_value: s.patientValue ?? null,
-            therapist_value: s.therapistValue ?? null,
+            patient_value: toNum(s.patientValue),
+            therapist_value: toNum(s.therapistValue),
             payment_type: s.paymentType || 'POST_PER_SESSION',
-            monthly_patient_value: s.monthlyPatientValue ?? null,
-            monthly_therapist_value: s.monthlyTherapistValue ?? null,
+            monthly_patient_value: toNum(s.monthlyPatientValue),
+            monthly_therapist_value: toNum(s.monthlyTherapistValue),
             payment_notes: s.paymentNotes || null,
           }))
         )
