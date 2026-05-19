@@ -243,7 +243,7 @@ export function mapRoom(row) {
 export async function syncPatientRelations(patientId, data) {
   const ops = []
   const toNum = v => { const n = parseFloat(v); return (v === '' || v == null || isNaN(n)) ? null : n }
-  const VALID_PT = ['POST_PER_SESSION', 'POST_MONTHLY', 'PREPAID_PACKAGE']
+  const VALID_PT = ['POST_PER_SESSION', 'POST_MONTHLY', 'PREPAID_PACKAGE', 'PAY_PER_SESSION']
 
   if (data.specialties !== undefined) {
     ops.push(
