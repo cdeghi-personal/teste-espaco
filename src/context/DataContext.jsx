@@ -291,7 +291,8 @@ export function DataProvider({ children }) {
 
     if (Object.keys(update).length) {
       update.updated_at = new Date().toISOString()
-      await supabase.from('patients').update(update).eq('id', id)
+      const { error: updateError } = await supabase.from('patients').update(update).eq('id', id)
+      if (updateError) throw new Error(updateError.message)
     }
 
     if (data.specialties !== undefined) {
@@ -311,9 +312,8 @@ export function DataProvider({ children }) {
     }
 
     // Re-read from DB after all sync operations to guarantee state reflects DB truth.
-    // This prevents race conditions where a second save reads stale in-memory state.
-    const { data: fresh } = await supabase.from('patients').select(PATIENT_SELECT).eq('id', id).single()
-    if (fresh) {
+    const { data: fresh, error: freshError } = await supabase.from('patients').select(PATIENT_SELECT).eq('id', id).single()
+    if (fresh && !freshError) {
       setPatients(prev => prev.map(p => p.id === id ? mapPatient(fresh) : p))
     } else {
       setPatients(prev => prev.map(p => p.id === id ? { ...p, ...data, updatedAt: new Date().toISOString() } : p))

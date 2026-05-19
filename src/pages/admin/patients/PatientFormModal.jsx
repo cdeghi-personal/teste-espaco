@@ -8,6 +8,7 @@ import Select from '../../../components/ui/Select'
 import Textarea from '../../../components/ui/Textarea'
 import { useData } from '../../../context/DataContext'
 import { useAuth } from '../../../context/AuthContext'
+import { useToast } from '../../../components/ui/Toast'
 import { PAYMENT_TYPE_OPTIONS } from '../../../constants/paymentTypes'
 
 const EMPTY_EXT = { name: '', specialty: '', phone: '' }
@@ -38,6 +39,7 @@ function textColorForBg(hex) {
 export default function PatientFormModal({ onClose, initial = {}, readOnly = false }) {
   const { paymentMethods, therapists, diagnoses, patientStatuses, specialtiesData, addPatient, updatePatient, companySettings } = useData()
   const { user } = useAuth()
+  const toast = useToast()
   const isAdmin = user?.role === 'admin'
   const isEdit = !!initial.id
 
@@ -153,10 +155,13 @@ export default function PatientFormModal({ onClose, initial = {}, readOnly = fal
       } else {
         await addPatient(form)
       }
+      onClose()
+    } catch (err) {
+      console.error('[PatientFormModal] save error:', err)
+      toast.show(err?.message || 'Erro ao salvar paciente', 'error')
     } finally {
       setSaving(false)
     }
-    onClose()
   }
 
   const activeTherapists = therapists.filter(t => t.active !== false)
