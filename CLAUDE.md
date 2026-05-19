@@ -78,6 +78,7 @@ src/
       reports/          ReportsPage, ConvenioReportPage
       support/          SupportPage, SupportFormModal
       company/          CompanySettingsPage
+      payments/         PaymentsPage
 supabase/
   01_schema.sql                  # Tabelas, enums, índices, trigger de criação de profile
   02_rls.sql                     # Row Level Security — admin vê tudo, terapeuta vê só os seus
@@ -143,6 +144,9 @@ supabase/
   74_contact_leads_new_fields.sql      # Adiciona patient_name, contact_reason, referred_by em contact_leads
   75_fix_patients_admin_rls.sql        # Corrige policy admin em patients: remove deleted=false do USING (bloqueava soft-delete), usa subquery inline em vez de is_admin()
   76_payment_demonstratives.sql        # Tabela payment_demonstratives — histórico de demonstrativos definitivos (com NF); admin only
+  77_audit_consultation_rich_name.sql  # fn_audit_log: consultations → "Paciente: X | Data/Hora: DD/MM/YYYY HH:MM | Especialidade: Y | Terapeuta: Z | Tipo: W | Sala: K | Status: S" — recria apenas fn_audit_log, NÃO toca log_view_audit
+  78_consultations_nf_fields.sql       # Adiciona nf_number, nf_issue_date, previous_status_before_invoice em consultations; índice parcial em nf_number
+  79_payment_invoices.sql              # Tabela payment_invoices (ISSUED/PAID/CANCELLED) — NF global única via índice parcial; RLS admin only
   functions/
     invite-therapist/index.ts    # Edge Function — envia convite por e-mail ao criar terapeuta
     suggest-convenio/index.ts    # Edge Function — gera sugestões de texto para relatório de convênio via OpenAI gpt-4o-mini
@@ -173,7 +177,7 @@ Encontrar em: Supabase Dashboard → Project Settings → API.
 | `guardians` | Responsáveis — soft delete com `active = false`; tem campo `neighborhood` |
 | `patient_guardians` | Relação N:N paciente ↔ responsável |
 | `appointments` | Agendamentos — hard delete; campos `time` (HH:MM), `room_id` |
-| `consultations` | Consultas/evolução — hard delete; tem `appointment_type_id`, `time` (HH:MM), `room_id` |
+| `consultations` | Consultas/evolução — hard delete; tem `appointment_type_id`, `time` (HH:MM), `room_id`, `nf_number`, `nf_issue_date`, `previous_status_before_invoice` |
 | `consultation_activities` | Atividades dentro de uma consulta |
 | `specialties` | Tabela de config — toggle `active` |
 | `payment_methods` | Tabela de config — toggle `active` |
@@ -199,6 +203,7 @@ Encontrar em: Supabase Dashboard → Project Settings → API.
 | `convenio_reports` | Histórico de relatórios ao convênio — patient_id, therapist_id, responsible_therapist_id (RT), specialty, mes_label, version_label, intervention_goals, created_by |
 | `patient_specialty_report_settings` | Desafios relacionados do Encaminhamento por paciente + especialidade — unique(patient_id, specialty), referral_challenges |
 | `company_settings` | Configurações da empresa — linha única (id=1, CHECK constraint); razao_social, cnpj, cnes, ai_system_prompt, updated_at |
+| `payment_invoices` | Notas fiscais / faturas — nf_number (globalmente único via índice parcial), patient_id, nf_issue_date, status (ISSUED/PAID/CANCELLED), total_amount, payment_demonstrative_id, consultation_ids (UUID[]), snapshot (JSONB), created_by, cancelled_at, cancelled_by, paid_at, paid_by; admin only |
 
 ### Mappers (DB → App)
 
@@ -207,6 +212,7 @@ Todos em `src/lib/supabase.js`. Convertem snake_case do banco para camelCase do 
 - `mapTherapist` — `therapistSpecialties` agora é `[{ specialty, credential, canBeRt }]`
 - `mapGuardian` (inclui `neighborhood`), `mapTherapist`, `mapAppointment` (inclui `startTime`, `endTime` calculado via duration), `mapConsultation` (inclui `time`, `roomId`)
 - `mapSpecialty`, `mapPaymentMethod`, `mapDiagnosis`, `mapPatientStatus`, `mapRoom`
+- `mapConsultation` também inclui `nfNumber`, `nfIssueDate`, `previousStatusBeforeInvoice`
 - `mapConsultationStatus` (inclui `automatic`), `mapAppointmentType`, `mapExam`, `mapMedication`, `mapConduct`
 - `age_ranges` mapeado inline no DataContext: `{ id, name, minAge, maxAge, color }`
 - `company_settings` exposto como `companySettings` (`{ razaoSocial, cnpj, aiSystemPrompt }`) via `useData()`; função `updateCompanySettings({ razaoSocial, cnpj, aiSystemPrompt })` faz `.update().eq('id', 1)`
@@ -216,6 +222,10 @@ Todos em `src/lib/supabase.js`. Convertem snake_case do banco para camelCase do 
 - `syncExternalTherapists(patientId, [{ name, specialty, phone }])`
 - `fetchInactivePatients()` — busca pacientes com `deleted=true` sob demanda (não carregado no estado global); usado pela `PatientsPage` ao ativar o toggle "Ver Inativos"
 - `getPaymentDemonstrativos(patientId)` — busca registros de `payment_demonstratives` por paciente, `ORDER BY created_at DESC`; usado pelo `HistoricoSection` em `ReportsPage`
+- `createPaymentInvoice({ nfNumber, patientId, nfDate, totalAmount, demonstrativoId, consultationIds, snapshot })` — INSERT em `payment_invoices`; retorna o registro inserido
+- `getPaymentInvoices({ patientId, status, nfNumber, dateFrom, dateTo, search })` — SELECT com JOIN `patients(full_name)`; filtros opcionais; busca texto client-side
+- `cancelPaymentInvoice(invoiceId, consultationIds)` — lê `previous_status_before_invoice` de cada consulta, restaura status, limpa `nf_number`/`nf_issue_date`, atualiza invoice para CANCELLED
+- `markInvoicePaid(invoiceId, consultationIds, paidStatusId)` — atualiza consultas para status pago, atualiza invoice para PAID
 
 ### RLS — padrão para verificação de admin
 
@@ -339,6 +349,7 @@ Authentication → URL Configuration:
 '/admin/pacientes/avancado'     // busca avançada de pacientes — todos autenticados; filtros multi-select (terapeuta, gerente de caso, especialidade, forma de pagamento, diagnóstico, status, faixa etária); exporta CSV
 '/admin/relatorios/convenio'    // relatório de convênio — todos autenticados; gera Relatório ao Convênio + Lista de Presença em PDF
 '/admin/empresa'                // dados da empresa (Razão Social + CNPJ) — admin only
+'/admin/pagamentos'             // gestão de notas fiscais / faturas (PaymentsPage) — admin only
 '/admin/guia'                   // Guia do Sistema (GuidePageV2) — admin only; abas 'Para Terapeutas' e 'Para Administradores' visiveis so para admin
 ```
 
@@ -371,6 +382,7 @@ Authentication → URL Configuration:
 
 - Item "Contatos" — visível apenas para admin, com badge vermelho mostrando contagem de `novo`
 - Item "Relatórios" — visível para **todos** os autenticados (terapeuta vê apenas próprios dados na página)
+- Item "Pagamentos" — visível apenas para admin (ícone `FiDollarSign`); rota `/admin/pagamentos`; posicionado após "Relatórios"
 - Item "Suporte" — visível para **todos** os usuários autenticados; badge laranja para admin puro mostrando contagem de tickets com status `novo` ou `reprovado_usuario`
 - Seção "Administração" — colapsável, visível a **todos** os autenticados; contém: Terapeutas, Especialidades, Formas de Pagamento, Diagnósticos, Status do Paciente, Status Atendimento, Tipos de Atendimento, Salas, Faixas Etárias (read-only para terapeutas) + Log de Auditoria (admin only) + **Dados da Empresa** (admin only, ícone `FiBriefcase`)
 - "Sair" sempre visível no rodapé — redireciona para `/login` (não para a home pública)
@@ -436,7 +448,8 @@ Authentication → URL Configuration:
   - **Faturar:** fecha o modal e exibe o formulário inline de NF (número + data emissão, ambos opcionais) → ao confirmar: salva em `payment_demonstratives` (com `totalAmount` em `form_data`) → atualiza status para "Faturado" via `batchFaturarConsultations` → gera e baixa PDF definitivo com banner verde de NF
 - **Sequência de operações definitivas (quasi-transactional):** salva histórico PRIMEIRO; se falhar, nada mais é executado; se `batchFaturarConsultations` falhar após salvar, alerta que o status deve ser corrigido manualmente
 - **Histórico de Demonstrativos Faturados:** seção abaixo do formulário (admin, quando paciente selecionado) mostra registros de `payment_demonstratives` ordenados por data; clicar no `>` abre modal de detalhes com período, NF, total e data de geração. Atualizado automaticamente após cada faturamento via `historyRefreshKey`.
-- **`batchFaturarConsultations(ids, statusId)`** no DataContext: update direto em `consultations.consultation_status_id` SEM chamar `handlePrepaidConsumption` — ledger pré-pago não é afetado
+- **`batchFaturarConsultations(ids, statusId, { nfNumber, nfDate } = {})`** no DataContext: lê `previous_status_before_invoice` existente de cada consulta (Promise.all), salva onde ainda null, depois atualiza `consultation_status_id` + `nf_number` + `nf_issue_date`; SEM chamar `handlePrepaidConsumption` — ledger pré-pago não é afetado
+- Após faturar, `handleFaturar` em `ReportsPage` chama `createPaymentInvoice` (try/catch silencioso) para registrar em `payment_invoices` com snapshot completo das consultas
 - **`getPaymentDemonstrativos(patientId)`** no DataContext: busca registros de `payment_demonstratives` por paciente, ordenados por `created_at DESC`
 - **Consultas por Terapeuta:** coluna Valor (R$) usa `patient.specialties.find(s => s.key === c.specialty)?.therapistValue`
 - Ambos exibem total de atendimentos + total do período no rodapé
@@ -641,6 +654,7 @@ Não é mais editável. Texto padrão fixo definido em `DESEMPENHO_FIXO` em `gen
 - **`addConsultation`**: passa `oldConsumed: false` (nova consulta nunca consumiu); `await`s a chamada
 - **`updateConsultation`**: lê `prepaid_session_consumed` do banco ANTES de aplicar o UPDATE principal → passa como `oldConsumed`; `await`s a chamada. Isso evita race condition onde a leitura dentro da função veria o valor desatualizado
 - `handlePrepaidConsumption` **não lê** `prepaid_session_consumed` do banco internamente — usa apenas o `oldConsumed` recebido como parâmetro
+- **Fix de audit duplicado:** `handlePrepaidConsumption` só executa o segundo UPDATE (`prepaid_session_consumed = false`) quando `effectiveOld = true` — evita UPDATE desnecessário (e log duplicado) quando o valor já é false. `effectiveOld = patientChanged ? false : oldConsumed`.
 
 ### Relatórios PDF com tipos de pagamento (`generateReportPDF.js`)
 
@@ -656,6 +670,18 @@ Não é mais editável. Texto padrão fixo definido em `DESEMPENHO_FIXO` em `gen
 - Card na listagem: Paciente, Especialidade, Status, Tipo / Data + Hora, Terapeuta, Sala
 - Editar/excluir: visível apenas para o terapeuta responsável ou admin
 - **Campos obrigatórios quando status = "Realizada":** Objetivo da Sessão, Relato da Sessão / Evolução, Objetivo da Próxima Sessão
+- **Seção Nota Fiscal / Faturamento (ConsultationFormModal):** visível apenas em edição quando admin ou quando a consulta já tem NF. Admin pode editar Número da NF e Data de Emissão; terapeuta vê read-only. Exibe status anterior (antes do faturamento) quando `previous_status_before_invoice` está preenchido.
+
+## Pagamentos / Notas Fiscais (`/admin/pagamentos`)
+
+- **Acesso:** admin only (`PaymentsPage.jsx`).
+- **Filtros:** busca livre (NF ou nome do paciente), status (ISSUED/PAID/CANCELLED/Todos), período (dateFrom/dateTo).
+- **StatusBadge:** ISSUED=azul, PAID=verde, CANCELLED=cinza.
+- **InvoiceCard:** paciente, período/mês, total, status, número/data da NF; botões Ver detalhes / Marcar como Pago / Cancelar NF (Marcar Pago e Cancelar só para ISSUED).
+- **InvoiceDetailModal:** snapshot completo — paciente, período, NF, total, lista de consultas (data/hora/especialidade/terapeuta/status/valor), data de geração.
+- **Cancelar NF (`cancelPaymentInvoice`):** restaura `previous_status_before_invoice` em cada consulta, limpa `nf_number`/`nf_issue_date`, muda invoice para CANCELLED. Confirmação modal antes.
+- **Marcar como Pago (`markInvoicePaid`):** busca status cujo nome contenha "pago" (case-insensitive), atualiza consultas e invoice para PAID. Confirmação modal antes.
+- Estado local atualizado otimisticamente após ações de cancelar/pagar.
 
 ## Agenda (`/admin/agenda`)
 
@@ -677,7 +703,7 @@ Não é mais editável. Texto padrão fixo definido em `DESEMPENHO_FIXO` em `gen
 - Triggers AFTER em todas as tabelas principais + tabelas de configuração → `fn_audit_log` SECURITY DEFINER
 - **resource_name por tabela:**
   - `patients`, `guardians`, `therapists` → `full_name`
-  - `consultations` → `"Paciente | DD/MM/YYYY HH:MM | Especialidade | Terapeuta"` (JOIN em patients + therapists)
+  - `consultations` → `"Paciente: X | Data/Hora: DD/MM/YYYY HH:MM | Especialidade: Y | Terapeuta: Z | Tipo: W | Sala: K | Status: S"` (migration 77; JOIN em patients, therapists, specialties, appointment_types, rooms, consultation_statuses; cada JOIN em bloco EXCEPTION individual; campos ausentes exibidos como `—`)
   - `medical_record_exams` → `"Paciente | Exames"`
   - `medical_record_medications` → `"Paciente | Medicamentos"`
   - `medical_record_conducts` → `"Paciente | Conduta"`
