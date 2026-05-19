@@ -38,18 +38,12 @@ async function buildReportHeader(doc, subtitle, period, companySettings) {
 // Retorna { display: string, amount: number, paymentType: string }
 function resolvePatientValue(c, patient, monthlyTracked) {
   const spec = patient.specialties?.find(s => s.key === c.specialty)
-  const paymentType = spec?.paymentType || 'POST_PER_SESSION'
-  // DEBUG — remover após confirmar diagnóstico
-  console.log('[DEMO_VALOR]', {
-    consultationId: c.id,
-    consultationDate: c.date,
-    consultationSpecialty: c.specialty,
-    patientSpecialties: patient.specialties,
-    specEncontrado: spec,
-    paymentType,
-    patientValue: spec?.patientValue,
-    monthlyPatientValue: spec?.monthlyPatientValue,
-  })
+
+  if (!spec) {
+    return { display: 'Não configurado', amount: 0, paymentType: 'POST_PER_SESSION' }
+  }
+
+  const paymentType = spec.paymentType || 'POST_PER_SESSION'
 
   if (paymentType === 'POST_MONTHLY') {
     const month = c.date?.slice(0, 7)
