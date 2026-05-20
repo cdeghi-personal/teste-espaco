@@ -22,9 +22,11 @@ export default function ConsultationsPage() {
   const [expanded, setExpanded] = useState(null)
   const [seriesDeleteConfirm, setSeriesDeleteConfirm] = useState(null) // { id, seriesId, date }
   const [showSeriesModal, setShowSeriesModal] = useState(false)
+  const [myConsultations, setMyConsultations] = useState(false)
 
   const isAdmin = user?.role === 'admin'
   const isAdminOrTeam = isAdmin || user?.belongsToTeam
+  const canFilterMine = isAdmin && !!user?.id
 
   function getPatient(id) { return patients.find(p => p.id === id) }
   function getTherapist(id) { return therapists.find(t => t.id === id) }
@@ -32,12 +34,21 @@ export default function ConsultationsPage() {
 
   const activeSpecialties = specialtiesData.filter(s => s.active !== false)
 
-  const visibleConsultations = isAdmin
-    ? consultations
-    : consultations.filter(c =>
+  const visibleConsultations = (() => {
+    if (!isAdmin) {
+      return consultations.filter(c =>
         c.therapistId === user?.id ||
         (c.consultationTherapists || []).some(t => t.therapistId === user?.id)
       )
+    }
+    if (myConsultations && user?.id) {
+      return consultations.filter(c =>
+        c.therapistId === user.id ||
+        (c.consultationTherapists || []).some(t => t.therapistId === user.id)
+      )
+    }
+    return consultations
+  })()
 
   const filtered = visibleConsultations
     .filter(c => {
@@ -111,6 +122,21 @@ export default function ConsultationsPage() {
           <option value="">Especialidade</option>
           {activeSpecialties.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
         </select>
+        {canFilterMine && (
+          <button
+            type="button"
+            onClick={() => setMyConsultations(v => !v)}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-sm font-medium transition-all shrink-0 ${
+              myConsultations
+                ? 'border-brand-blue bg-brand-blue text-white'
+                : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+            }`}
+          >
+            <FiRepeat size={13} />
+            <span className="hidden sm:inline">Meus Atendimentos</span>
+            <span className="sm:hidden">Meus</span>
+          </button>
+        )}
       </div>
 
       <div className="space-y-3">
@@ -142,6 +168,24 @@ export default function ConsultationsPage() {
                     )}
                     {apptType && (
                       <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">{apptType.name}</span>
+                    )}
+                    {c.seriesId && !c.isSeriesException && (
+                      <span title="Recorrente" className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs font-medium bg-indigo-50 text-indigo-500">
+                        <FiRepeat size={10} />
+                      </span>
+                    )}
+                    {c.seriesId && c.isSeriesException && (
+                      <span title="Ocorrência alterada individualmente" className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-600">
+                        <FiRepeat size={10} /><span>!</span>
+                      </span>
+                    )}
+                    {(c.consultationTherapists || []).length > 1 && (
+                      <span
+                        title={(c.consultationTherapists || []).map(ct => therapists.find(t => t.id === ct.therapistId)?.name || '?').join(', ')}
+                        className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-500"
+                      >
+                        👥 {(c.consultationTherapists || []).length}
+                      </span>
                     )}
                   </div>
                   <div className="flex items-center gap-3 text-xs text-gray-500 flex-wrap">

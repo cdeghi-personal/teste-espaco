@@ -50,6 +50,8 @@ export default function AgendaPage() {
     // 0=Dom→5(FDS), 1=Seg→0, ..., 5=Sex→4, 6=Sáb→5(FDS)
     return (d === 0 || d === 6) ? 5 : d - 1
   })
+  const [myAgenda, setMyAgenda] = useState(user?.role !== 'admin')
+  const canFilterMine = !!user?.id
 
   const today = format(new Date(), 'yyyy-MM-dd')
 
@@ -78,6 +80,9 @@ export default function AgendaPage() {
   function filterConsultation(c, iso) {
     if (c.date !== iso) return false
     if (!user) return false
+    if (myAgenda && user?.id) {
+      if (c.therapistId !== user.id && !(c.consultationTherapists || []).some(t => t.therapistId === user.id)) return false
+    }
     if (isTeamTherapist(c.therapistId)) {
       // Consultas da equipe: restritas a admin, membros da equipe ou próprio terapeuta
       if (user.role !== 'admin' && !user.belongsToTeam && c.therapistId !== user.id) return false
@@ -198,6 +203,21 @@ export default function AgendaPage() {
             </select>
           </>
         )}
+        {canFilterMine && (
+          <button
+            type="button"
+            onClick={() => setMyAgenda(v => !v)}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-sm font-medium transition-all shrink-0 ${
+              myAgenda
+                ? 'border-brand-blue bg-brand-blue text-white'
+                : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+            }`}
+          >
+            <FiRepeat size={13} />
+            <span className="hidden sm:inline">Minha Agenda</span>
+            <span className="sm:hidden">Minha</span>
+          </button>
+        )}
       </div>
 
       {/* ── Weekly grid — desktop ── */}
@@ -254,6 +274,29 @@ export default function AgendaPage() {
                         </span>
                       </div>
                       {room && <div className="truncate opacity-75 mt-0.5" style={{ fontSize: '10px' }}>{room.name}</div>}
+                      {!isPrivate && (item.seriesId || (item.consultationTherapists || []).length > 1) && (
+                        <div className="flex items-center gap-0.5 mt-0.5 flex-wrap">
+                          {item.seriesId && !item.isSeriesException && (
+                            <span title="Recorrente" className="inline-flex items-center px-1 py-0.5 rounded bg-white/25" style={{ fontSize: '9px' }}>
+                              <FiRepeat size={7} />
+                            </span>
+                          )}
+                          {item.seriesId && item.isSeriesException && (
+                            <span title="Ocorrência alterada" className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded bg-white/25" style={{ fontSize: '9px' }}>
+                              <FiRepeat size={7} /><span>!</span>
+                            </span>
+                          )}
+                          {(item.consultationTherapists || []).length > 1 && (
+                            <span
+                              title={(item.consultationTherapists || []).map(ct => therapists.find(t => t.id === ct.therapistId)?.name || '?').join(', ')}
+                              className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded bg-white/25"
+                              style={{ fontSize: '9px' }}
+                            >
+                              👥 {(item.consultationTherapists || []).length}
+                            </span>
+                          )}
+                        </div>
+                      )}
                       {!isPrivate && (user?.role === 'admin' || user?.id === item.therapistId) && (
                         <div className="absolute top-1 right-1 hidden group-hover:flex gap-0.5">
                           <button
@@ -309,6 +352,29 @@ export default function AgendaPage() {
                       </div>
                       {room && <div className="truncate opacity-75 mt-0.5" style={{ fontSize: '10px' }}>{room.name}</div>}
                       <div className="opacity-60 mt-0.5" style={{ fontSize: '10px' }}>{isSun ? 'Dom' : 'Sáb'}</div>
+                      {!isPrivate && (item.seriesId || (item.consultationTherapists || []).length > 1) && (
+                        <div className="flex items-center gap-0.5 mt-0.5 flex-wrap">
+                          {item.seriesId && !item.isSeriesException && (
+                            <span title="Recorrente" className="inline-flex items-center px-1 py-0.5 rounded bg-white/25" style={{ fontSize: '9px' }}>
+                              <FiRepeat size={7} />
+                            </span>
+                          )}
+                          {item.seriesId && item.isSeriesException && (
+                            <span title="Ocorrência alterada" className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded bg-white/25" style={{ fontSize: '9px' }}>
+                              <FiRepeat size={7} /><span>!</span>
+                            </span>
+                          )}
+                          {(item.consultationTherapists || []).length > 1 && (
+                            <span
+                              title={(item.consultationTherapists || []).map(ct => therapists.find(t => t.id === ct.therapistId)?.name || '?').join(', ')}
+                              className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded bg-white/25"
+                              style={{ fontSize: '9px' }}
+                            >
+                              👥 {(item.consultationTherapists || []).length}
+                            </span>
+                          )}
+                        </div>
+                      )}
                       {!isPrivate && (user?.role === 'admin' || user?.id === item.therapistId) && (
                         <div className="absolute top-1 right-1 hidden group-hover:flex gap-0.5">
                           <button
@@ -418,6 +484,28 @@ export default function AgendaPage() {
                         <div className="text-xs text-gray-500 truncate">
                           {isPrivate ? (room?.name || '') : `${therapist?.name}${room ? ` • ${room.name}` : ''}`}
                         </div>
+                        {!isPrivate && (item.seriesId || (item.consultationTherapists || []).length > 1) && (
+                          <div className="flex items-center gap-1 mt-1 flex-wrap">
+                            {item.seriesId && !item.isSeriesException && (
+                              <span title="Recorrente" className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs bg-indigo-50 text-indigo-500">
+                                <FiRepeat size={9} />
+                              </span>
+                            )}
+                            {item.seriesId && item.isSeriesException && (
+                              <span title="Ocorrência alterada" className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs bg-amber-50 text-amber-600">
+                                <FiRepeat size={9} /><span>!</span>
+                              </span>
+                            )}
+                            {(item.consultationTherapists || []).length > 1 && (
+                              <span
+                                title={(item.consultationTherapists || []).map(ct => therapists.find(t => t.id === ct.therapistId)?.name || '?').join(', ')}
+                                className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs bg-blue-50 text-blue-500"
+                              >
+                                👥 {(item.consultationTherapists || []).length}
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </div>
                       {!isPrivate && (user?.role === 'admin' || user?.id === item.therapistId) && (
                         <div className="flex gap-1 shrink-0">
