@@ -51,7 +51,7 @@ export default function AgendaPage() {
     return (d === 0 || d === 6) ? 5 : d - 1
   })
   const [myAgenda, setMyAgenda] = useState(user?.role !== 'admin')
-  const canFilterMine = !!user?.id
+  const canFilterMine = user?.role === 'admin' && !!user?.id
 
   const today = format(new Date(), 'yyyy-MM-dd')
 
@@ -273,27 +273,31 @@ export default function AgendaPage() {
                           {isPrivate ? 'Consulta Particular' : shortName(patient?.fullName)}
                         </span>
                       </div>
-                      {room && <div className="truncate opacity-75 mt-0.5" style={{ fontSize: '10px' }}>{room.name}</div>}
-                      {!isPrivate && (item.seriesId || (item.consultationTherapists || []).length > 1) && (
-                        <div className="flex items-center gap-0.5 mt-0.5 flex-wrap">
-                          {item.seriesId && !item.isSeriesException && (
-                            <span title="Recorrente" className="inline-flex items-center px-1 py-0.5 rounded bg-white/25" style={{ fontSize: '9px' }}>
-                              <FiRepeat size={7} />
-                            </span>
-                          )}
-                          {item.seriesId && item.isSeriesException && (
-                            <span title="Ocorrência alterada" className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded bg-white/25" style={{ fontSize: '9px' }}>
-                              <FiRepeat size={7} /><span>!</span>
-                            </span>
-                          )}
-                          {(item.consultationTherapists || []).length > 1 && (
-                            <span
-                              title={(item.consultationTherapists || []).map(ct => therapists.find(t => t.id === ct.therapistId)?.name || '?').join(', ')}
-                              className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded bg-white/25"
-                              style={{ fontSize: '9px' }}
-                            >
-                              👥 {(item.consultationTherapists || []).length}
-                            </span>
+                      {(room || item.seriesId || (item.consultationTherapists || []).length > 1) && (
+                        <div className="flex items-center justify-between gap-1 mt-0.5">
+                          <span className="truncate opacity-75 flex-1" style={{ fontSize: '10px' }}>{room?.name || ''}</span>
+                          {(item.seriesId || (item.consultationTherapists || []).length > 1) && (
+                            <div className="flex items-center gap-0.5 shrink-0">
+                              {item.seriesId && !item.isSeriesException && (
+                                <span title="Recorrente" className="inline-flex items-center px-1 py-0.5 rounded bg-white/25" style={{ fontSize: '9px' }}>
+                                  <FiRepeat size={7} />
+                                </span>
+                              )}
+                              {item.seriesId && item.isSeriesException && (
+                                <span title="Ocorrência alterada" className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded bg-white/25" style={{ fontSize: '9px' }}>
+                                  <FiRepeat size={7} /><span>!</span>
+                                </span>
+                              )}
+                              {(item.consultationTherapists || []).length > 1 && (
+                                <span
+                                  title={(item.consultationTherapists || []).map(ct => therapists.find(t => t.id === ct.therapistId)?.name || '?').join(', ')}
+                                  className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded bg-white/25"
+                                  style={{ fontSize: '9px' }}
+                                >
+                                  👥 {(item.consultationTherapists || []).length}
+                                </span>
+                              )}
+                            </div>
                           )}
                         </div>
                       )}
@@ -350,31 +354,35 @@ export default function AgendaPage() {
                           {isPrivate ? 'Consulta Particular' : shortName(patient?.fullName)}
                         </span>
                       </div>
-                      {room && <div className="truncate opacity-75 mt-0.5" style={{ fontSize: '10px' }}>{room.name}</div>}
-                      <div className="opacity-60 mt-0.5" style={{ fontSize: '10px' }}>{isSun ? 'Dom' : 'Sáb'}</div>
-                      {!isPrivate && (item.seriesId || (item.consultationTherapists || []).length > 1) && (
-                        <div className="flex items-center gap-0.5 mt-0.5 flex-wrap">
-                          {item.seriesId && !item.isSeriesException && (
-                            <span title="Recorrente" className="inline-flex items-center px-1 py-0.5 rounded bg-white/25" style={{ fontSize: '9px' }}>
-                              <FiRepeat size={7} />
-                            </span>
-                          )}
-                          {item.seriesId && item.isSeriesException && (
-                            <span title="Ocorrência alterada" className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded bg-white/25" style={{ fontSize: '9px' }}>
-                              <FiRepeat size={7} /><span>!</span>
-                            </span>
-                          )}
-                          {(item.consultationTherapists || []).length > 1 && (
-                            <span
-                              title={(item.consultationTherapists || []).map(ct => therapists.find(t => t.id === ct.therapistId)?.name || '?').join(', ')}
-                              className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded bg-white/25"
-                              style={{ fontSize: '9px' }}
-                            >
-                              👥 {(item.consultationTherapists || []).length}
-                            </span>
+                      {(room || item.seriesId || (item.consultationTherapists || []).length > 1) && (
+                        <div className="flex items-center justify-between gap-1 mt-0.5">
+                          <span className="truncate opacity-75 flex-1" style={{ fontSize: '10px' }}>{room?.name || ''}</span>
+                          {(item.seriesId || (item.consultationTherapists || []).length > 1) && (
+                            <div className="flex items-center gap-0.5 shrink-0">
+                              {item.seriesId && !item.isSeriesException && (
+                                <span title="Recorrente" className="inline-flex items-center px-1 py-0.5 rounded bg-white/25" style={{ fontSize: '9px' }}>
+                                  <FiRepeat size={7} />
+                                </span>
+                              )}
+                              {item.seriesId && item.isSeriesException && (
+                                <span title="Ocorrência alterada" className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded bg-white/25" style={{ fontSize: '9px' }}>
+                                  <FiRepeat size={7} /><span>!</span>
+                                </span>
+                              )}
+                              {(item.consultationTherapists || []).length > 1 && (
+                                <span
+                                  title={(item.consultationTherapists || []).map(ct => therapists.find(t => t.id === ct.therapistId)?.name || '?').join(', ')}
+                                  className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded bg-white/25"
+                                  style={{ fontSize: '9px' }}
+                                >
+                                  👥 {(item.consultationTherapists || []).length}
+                                </span>
+                              )}
+                            </div>
                           )}
                         </div>
                       )}
+                      <div className="opacity-60 mt-0.5" style={{ fontSize: '10px' }}>{isSun ? 'Dom' : 'Sáb'}</div>
                       {!isPrivate && (user?.role === 'admin' || user?.id === item.therapistId) && (
                         <div className="absolute top-1 right-1 hidden group-hover:flex gap-0.5">
                           <button
@@ -484,7 +492,7 @@ export default function AgendaPage() {
                         <div className="text-xs text-gray-500 truncate">
                           {isPrivate ? (room?.name || '') : `${therapist?.name}${room ? ` • ${room.name}` : ''}`}
                         </div>
-                        {!isPrivate && (item.seriesId || (item.consultationTherapists || []).length > 1) && (
+                        {(item.seriesId || (item.consultationTherapists || []).length > 1) && (
                           <div className="flex items-center gap-1 mt-1 flex-wrap">
                             {item.seriesId && !item.isSeriesException && (
                               <span title="Recorrente" className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs bg-indigo-50 text-indigo-500">
