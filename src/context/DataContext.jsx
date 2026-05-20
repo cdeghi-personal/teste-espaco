@@ -602,7 +602,7 @@ export function DataProvider({ children }) {
   }
 
   async function addConsultation(data) {
-    const { activities, appointmentId, ...rest } = data
+    const { activities, appointmentId, secondaryTherapists, ...rest } = data
 
     const { data: inserted, error } = await supabase
       .from('consultations')
@@ -650,7 +650,20 @@ export function DataProvider({ children }) {
       await updateAppointment(appointmentId, { consultationId: inserted.id, status: 'completed' })
     }
 
-    const newConsultation = { ...mapConsultation(inserted), activities: mappedActivities }
+    // Insere participation: terapeuta principal + secundários
+    const ctRows = [
+      { consultation_id: inserted.id, therapist_id: rest.therapistId, specialty: rest.specialty, is_primary: true },
+      ...(secondaryTherapists || []).filter(t => t.therapistId && t.specialty).map(t => ({
+        consultation_id: inserted.id, therapist_id: t.therapistId, specialty: t.specialty, is_primary: false,
+      })),
+    ]
+    const { error: ctErr } = await supabase.from('consultation_therapists').insert(ctRows)
+    if (ctErr) console.error('[addConsultation] consultation_therapists error:', ctErr)
+
+    const localCTs = ctRows.map((ct, i) => ({
+      id: `local-${i}`, therapistId: ct.therapist_id, specialty: ct.specialty, isPrimary: ct.is_primary,
+    }))
+    const newConsultation = { ...mapConsultation(inserted), activities: mappedActivities, consultationTherapists: localCTs }
     setConsultations(prev => [newConsultation, ...prev])
     if (rest.consultationStatusId) {
       const status = consultationStatuses.find(s => s.id === rest.consultationStatusId)
@@ -668,7 +681,7 @@ export function DataProvider({ children }) {
   }
 
   async function updateConsultation(id, data) {
-    const { activities, ...rest } = data
+    const { activities, secondaryTherapists, ...rest } = data
 
     // Captura estado existente e oldConsumed ANTES do update para garantir leitura consistente
     const existing = consultations.find(c => c.id === id)
@@ -720,7 +733,33 @@ export function DataProvider({ children }) {
       }
     }
 
-    setConsultations(prev => prev.map(c => c.id === id ? { ...c, ...data } : c))
+    // Sincroniza consultation_therapists quando terapeuta/especialidade/secundários mudam
+    let newConsultationTherapists
+    const shouldSyncCT = secondaryTherapists !== undefined || rest.therapistId !== undefined || rest.specialty !== undefined
+    if (shouldSyncCT && existing) {
+      const newPrimaryId = rest.therapistId || existing.therapistId
+      const newSpecialty = rest.specialty || existing.specialty
+      const secondaries = secondaryTherapists !== undefined
+        ? secondaryTherapists.filter(t => t.therapistId && t.specialty)
+        : (existing.consultationTherapists || []).filter(t => !t.isPrimary)
+      const ctRows = [
+        { consultation_id: id, therapist_id: newPrimaryId, specialty: newSpecialty, is_primary: true },
+        ...secondaries.map(t => ({ consultation_id: id, therapist_id: t.therapistId, specialty: t.specialty, is_primary: false })),
+      ]
+      await supabase.from('consultation_therapists').delete().eq('consultation_id', id)
+      if (ctRows.length) await supabase.from('consultation_therapists').insert(ctRows)
+      newConsultationTherapists = ctRows.map((ct, i) => ({
+        id: `local-ct-${i}`, therapistId: ct.therapist_id, specialty: ct.specialty, isPrimary: ct.is_primary,
+      }))
+    }
+
+    setConsultations(prev => prev.map(c => {
+      if (c.id !== id) return c
+      const updated = { ...c, ...rest }
+      if (activities !== undefined) updated.activities = activities
+      if (newConsultationTherapists !== undefined) updated.consultationTherapists = newConsultationTherapists
+      return updated
+    }))
     if (rest.consultationStatusId !== undefined && existing) {
       const newPatientId = rest.patientId || existing.patientId
       const newSpecialty = rest.specialty || existing.specialty

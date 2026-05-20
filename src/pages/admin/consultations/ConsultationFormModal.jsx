@@ -18,6 +18,7 @@ const EMPTY = {
   mainObjective: '', activities: [],
   evolutionNotes: '', nextObjectives: '',
   sessionQuality: 'good', guardianFeedback: '', appointmentId: '',
+  secondaryTherapists: [],
 }
 
 export default function ConsultationFormModal({ onClose, initial = {}, readOnly = false }) {
@@ -36,6 +37,9 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
     ...initial,
     consultationStatusId: initial.consultationStatusId || defaultStatusId,
     activities: initial.activities ? [...initial.activities.map(a => ({ ...a }))] : [],
+    secondaryTherapists: (initial.consultationTherapists || [])
+      .filter(t => !t.isPrimary)
+      .map(t => ({ tempId: generateId(), therapistId: t.therapistId, specialty: t.specialty })),
   })
   const [errors, setErrors] = useState({})
   const [prepaidBalance, setPrepaidBalance] = useState(null)
@@ -76,6 +80,18 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
     set('activities', form.activities.filter((_, i) => i !== idx))
   }
 
+  function addSecondaryTherapist() {
+    set('secondaryTherapists', [...form.secondaryTherapists, { tempId: generateId(), therapistId: '', specialty: '' }])
+  }
+
+  function updateSecondaryTherapist(tempId, field, value) {
+    set('secondaryTherapists', form.secondaryTherapists.map(t => t.tempId === tempId ? { ...t, [field]: value } : t))
+  }
+
+  function removeSecondaryTherapist(tempId) {
+    set('secondaryTherapists', form.secondaryTherapists.filter(t => t.tempId !== tempId))
+  }
+
   function validate() {
     const e = {}
     if (!form.patientId) e.patientId = 'Selecione o paciente'
@@ -93,6 +109,23 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
     }
     if (selectedStatus?.requiresObjectiveNote && !form.mainObjective.trim()) {
       e.mainObjective = 'Este status exige uma observação no Objetivo da Sessão'
+    }
+    // Validações de terapeutas secundários
+    const secIds = form.secondaryTherapists.map(t => t.therapistId).filter(Boolean)
+    if (secIds.includes(form.therapistId)) {
+      e.secondaryTherapists = 'O terapeuta principal não pode ser adicionado como participante'
+    } else if (new Set(secIds).size !== secIds.length) {
+      e.secondaryTherapists = 'Há terapeutas duplicados na lista de participantes'
+    } else {
+      const patient = patients.find(p => p.id === form.patientId)
+      const allSpecialties = [form.specialty, ...form.secondaryTherapists.map(t => t.specialty)].filter(Boolean)
+      const prepaidCount = allSpecialties.filter(sp => {
+        const spec = (patient?.specialties || []).find(s => s.key === sp)
+        return spec?.paymentType === 'PREPAID_PACKAGE'
+      }).length
+      if (prepaidCount > 1) {
+        e.secondaryTherapists = 'Apenas uma especialidade pré-paga por atendimento é permitida'
+      }
     }
     return e
   }
@@ -280,6 +313,69 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
             )}
           </div>
         </section>
+
+        {/* Terapeutas Adicionais */}
+        {(isAdmin || user?.id === form.therapistId || form.secondaryTherapists.length > 0) && (
+          <section>
+            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3 pb-2 border-b border-gray-100">
+              Terapeutas Adicionais
+            </h3>
+            <div className="space-y-2">
+              {form.secondaryTherapists.map(sec => {
+                const usedTherapistIds = [form.therapistId, ...form.secondaryTherapists.filter(t => t.tempId !== sec.tempId).map(t => t.therapistId)]
+                return (
+                  <div key={sec.tempId} className="flex items-end gap-2">
+                    <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <Select
+                        label="Terapeuta"
+                        value={sec.therapistId}
+                        onChange={e => updateSecondaryTherapist(sec.tempId, 'therapistId', e.target.value)}
+                        disabled={readOnly}
+                      >
+                        <option value="">Selecione</option>
+                        {activeTherapists.filter(t => !usedTherapistIds.includes(t.id)).map(t => (
+                          <option key={t.id} value={t.id}>{t.name}</option>
+                        ))}
+                      </Select>
+                      <Select
+                        label="Especialidade"
+                        value={sec.specialty}
+                        onChange={e => updateSecondaryTherapist(sec.tempId, 'specialty', e.target.value)}
+                        disabled={readOnly}
+                      >
+                        <option value="">Selecione</option>
+                        {activeSpecialties.map(s => (
+                          <option key={s.key} value={s.key}>{s.label}</option>
+                        ))}
+                      </Select>
+                    </div>
+                    {!readOnly && (
+                      <button
+                        type="button"
+                        onClick={() => removeSecondaryTherapist(sec.tempId)}
+                        className="mb-1 p-1.5 text-gray-400 hover:text-red-500 transition-colors shrink-0"
+                      >
+                        <FiTrash2 size={14} />
+                      </button>
+                    )}
+                  </div>
+                )
+              })}
+              {errors.secondaryTherapists && (
+                <p className="text-xs text-red-500">{errors.secondaryTherapists}</p>
+              )}
+              {!readOnly && (isAdmin || user?.id === form.therapistId) && (
+                <button
+                  type="button"
+                  onClick={addSecondaryTherapist}
+                  className="flex items-center gap-1.5 text-sm text-brand-blue hover:underline mt-1"
+                >
+                  <FiPlus size={14} /> Adicionar terapeuta
+                </button>
+              )}
+            </div>
+          </section>
+        )}
 
         {/* Objetivo principal */}
         <section>

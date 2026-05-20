@@ -88,7 +88,7 @@ export default function AgendaPage() {
     }
     // Consultas de não-equipe: visíveis para todos (anônimas), ignoram filtro de busca
     if (filterRoom && c.roomId !== filterRoom) return false
-    if (filterTherapist && c.therapistId !== filterTherapist) return false
+    if (filterTherapist && c.therapistId !== filterTherapist && !(c.consultationTherapists || []).some(t => t.therapistId === filterTherapist)) return false
     return true
   }
 

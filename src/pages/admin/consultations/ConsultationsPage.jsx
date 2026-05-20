@@ -32,9 +32,12 @@ export default function ConsultationsPage() {
 
   const activeSpecialties = specialtiesData.filter(s => s.active !== false)
 
-  const visibleConsultations = user?.role === 'admin'
+  const visibleConsultations = isAdmin
     ? consultations
-    : consultations.filter(c => c.therapistId === user?.id)
+    : consultations.filter(c =>
+        c.therapistId === user?.id ||
+        (c.consultationTherapists || []).some(t => t.therapistId === user?.id)
+      )
 
   const filtered = visibleConsultations
     .filter(c => {
