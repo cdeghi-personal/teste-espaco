@@ -677,6 +677,8 @@ Não é mais editável. Texto padrão fixo definido em `DESEMPENHO_FIXO` em `gen
 - Card na listagem: Paciente, Especialidade, Status, Tipo / Data + Hora, Terapeuta, Sala
 - Editar/excluir: visível apenas para o terapeuta responsável ou admin
 - **Visibilidade para terapeutas:** lista inclui consultas onde o terapeuta é primário **ou** participante secundário em `consultation_therapists`
+- **Toggle "Meus Atendimentos":** visível apenas para admin que também é terapeuta (`canFilterMine = isAdmin && !!user?.id`); padrão `false`; filtra consultas onde o admin é primário ou secundário. Terapeutas já têm filtro implícito — toggle não é exibido para eles.
+- **Chips visuais no card:** chip indigo FiRepeat para série regular (`seriesId && !isSeriesException`); chip amber FiRepeat+`!` para ocorrência alterada individualmente (`seriesId && isSeriesException`); chip 👥 N (azul) com tooltip dos nomes para múltiplos terapeutas (`consultationTherapists.length > 1`).
 - **Campos obrigatórios quando status = "Realizada":** Objetivo da Sessão, Relato da Sessão / Evolução, Objetivo da Próxima Sessão
 - **Seção Terapeutas Adicionais (ConsultationFormModal):** lista de terapeutas secundários com select de terapeuta + especialidade; visível para admin e terapeuta principal; read-only em modo visualização. Validações: sem duplicatas, sem mesmo que primário, sem múltiplos PREPAID_PACKAGE.
 - **Seção Nota Fiscal / Faturamento (ConsultationFormModal):** visível apenas em edição quando admin ou quando a consulta já tem NF. Admin pode editar Número da NF e Data de Emissão; terapeuta vê read-only. Exibe status anterior (antes do faturamento) quando `previous_status_before_invoice` está preenchido.
@@ -698,6 +700,8 @@ Não é mais editável. Texto padrão fixo definido em `DESEMPENHO_FIXO` em `gen
 - 6 colunas: Seg/Ter/Qua/Qui/Sex + Sáb-Dom; mobile: abas
 - Card: `HH:MM - PrimeiroNome Ultimo` + sala em 10px
 - Legenda inferior exibe nome completo do terapeuta
+- **Toggle "Minha Agenda":** visível para qualquer usuário com `user.id` preenchido (`canFilterMine = !!user?.id`); padrão `true` para não-admin (terapeutas veem só os seus por padrão), `false` para admin. Ao ativar, `filterConsultation` exige que o usuário seja primário ou participante secundário (`consultationTherapists`).
+- **Chips visuais nos cards:** desktop — `bg-white/25` (funciona em qualquer cor de fundo do terapeuta); mobile — `bg-indigo-50`/`bg-amber-50`/`bg-blue-50`. Mesma semântica dos chips de ConsultationsPage: indigo = série, amber+`!` = ocorrência alterada, 👥 N = múltiplos terapeutas. Exibidos apenas em consultas não-privadas (`!isPrivate`).
 
 ## CRM de Contatos (`/admin/contatos`)
 
@@ -772,6 +776,7 @@ Não é mais editável. Texto padrão fixo definido em `DESEMPENHO_FIXO` em `gen
 - Ao editar atendimento de série: admin vê banner de confirmação com "Apenas esta" / "Esta e as próximas"; terapeutas auto-marcam `is_series_exception = true` sem diálogo.
 - Chip roxo "Consulta recorrente" exibido no `ConsultationFormModal` quando `initial.seriesId` presente.
 - Exclusão da lista: se `seriesId` presente → modal com opções "Apenas este" / "Este e os próximos" (`seriesDeleteConfirm`).
+- **Chips de recorrência nos cards (Agenda e ConsultationsPage):** indigo FiRepeat = série regular; amber FiRepeat+`!` = ocorrência alterada individualmente; 👥 N = múltiplos terapeutas com tooltip de nomes.
 
 ### `addConsultationSeries` (DataContext)
 
