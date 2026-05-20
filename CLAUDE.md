@@ -148,6 +148,7 @@ supabase/
   78_consultations_nf_fields.sql       # Adiciona nf_number, nf_issue_date, previous_status_before_invoice em consultations; índice parcial em nf_number
   79_payment_invoices.sql              # Tabela payment_invoices (ISSUED/PAID/CANCELLED) — NF global única via índice parcial; RLS admin only
   80_series_and_multi_therapist.sql    # Tabelas consultation_series + consultation_therapists; ADD series_id/series_original_date/is_series_exception em consultations; RLS e GRANTs
+  81_audit_series.sql                  # fn_audit_log: consultation_series → "Paciente | Especialidade | Início: DD/MM/YYYY"; consultation_therapists → "Paciente | DD/MM/YYYY | Terapeuta"; triggers nas duas tabelas
   functions/
     invite-therapist/index.ts    # Edge Function — envia convite por e-mail ao criar terapeuta
     suggest-convenio/index.ts    # Edge Function — gera sugestões de texto para relatório de convênio via OpenAI gpt-4o-mini
@@ -455,7 +456,9 @@ Authentication → URL Configuration:
 - **`batchFaturarConsultations(ids, statusId, { nfNumber, nfDate } = {})`** no DataContext: lê `previous_status_before_invoice` existente de cada consulta (Promise.all), salva onde ainda null, depois atualiza `consultation_status_id` + `nf_number` + `nf_issue_date`; SEM chamar `handlePrepaidConsumption` — ledger pré-pago não é afetado
 - Após faturar, `handleFaturar` em `ReportsPage` chama `createPaymentInvoice` (try/catch silencioso) para registrar em `payment_invoices` com snapshot completo das consultas
 - **`getPaymentDemonstrativos(patientId)`** no DataContext: busca registros de `payment_demonstratives` por paciente, ordenados por `created_at DESC`
-- **Consultas por Terapeuta:** coluna Valor (R$) usa `patient.specialties.find(s => s.key === c.specialty)?.therapistValue`
+- **Consultas por Terapeuta:** inclui consultas onde o terapeuta é participante secundário (`consultation_therapists`). Cada consulta recebe `effectiveSpecialty` = especialidade do terapeuta selecionado naquele atendimento. Coluna Valor usa `effectiveSpecialty` para buscar o valor de repasse correto em `patient.specialties`.
+- **Demonstrativo de Pagamento:** expande terapeutas secundários como entradas de cobrança separadas — para cada consulta com participantes secundários, gera cards adicionais com o terapeuta secundário e sua especialidade, usando `effectiveSpecialty` para calcular o valor do paciente.
+- **`effectiveSpecialty`:** campo virtual adicionado em `ReportsPage` antes de gerar o PDF — `c.effectiveSpecialty = participation?.specialty || c.specialty`. Usado por `resolvePatientValue`, `resolveTherapistValue` e `findPatientSpecialtyConfig` em `generateReportPDF.js`.
 - Ambos exibem total de atendimentos + total do período no rodapé
 - Filtros: tipo de relatório, paciente/terapeuta (searchable), período (mês ou De/Até), status (múltipla seleção — inclui automáticos)
 - Funções: `generateConsultasPacientePDF({ ..., draftMode, nfNumber, nfDate, returnBlob })` — quando `returnBlob=true` retorna `{ blob, filename, totalAmount }` em vez de fazer `doc.save()`; `generateConsultasTerapeutaPDF()` em `src/utils/generateReportPDF.js`
@@ -673,7 +676,9 @@ Não é mais editável. Texto padrão fixo definido em `DESEMPENHO_FIXO` em `gen
 - Campos Horário (time) e Sala no formulário
 - Card na listagem: Paciente, Especialidade, Status, Tipo / Data + Hora, Terapeuta, Sala
 - Editar/excluir: visível apenas para o terapeuta responsável ou admin
+- **Visibilidade para terapeutas:** lista inclui consultas onde o terapeuta é primário **ou** participante secundário em `consultation_therapists`
 - **Campos obrigatórios quando status = "Realizada":** Objetivo da Sessão, Relato da Sessão / Evolução, Objetivo da Próxima Sessão
+- **Seção Terapeutas Adicionais (ConsultationFormModal):** lista de terapeutas secundários com select de terapeuta + especialidade; visível para admin e terapeuta principal; read-only em modo visualização. Validações: sem duplicatas, sem mesmo que primário, sem múltiplos PREPAID_PACKAGE.
 - **Seção Nota Fiscal / Faturamento (ConsultationFormModal):** visível apenas em edição quando admin ou quando a consulta já tem NF. Admin pode editar Número da NF e Data de Emissão; terapeuta vê read-only. Exibe status anterior (antes do faturamento) quando `previous_status_before_invoice` está preenchido.
 
 ## Pagamentos / Notas Fiscais (`/admin/pagamentos`)
@@ -708,6 +713,8 @@ Não é mais editável. Texto padrão fixo definido em `DESEMPENHO_FIXO` em `gen
 - **resource_name por tabela:**
   - `patients`, `guardians`, `therapists` → `full_name`
   - `consultations` → `"Paciente: X | Data/Hora: DD/MM/YYYY HH:MM | Especialidade: Y | Terapeuta: Z | Tipo: W | Sala: K | Status: S"` (migration 77; JOIN em patients, therapists, specialties, appointment_types, rooms, consultation_statuses; cada JOIN em bloco EXCEPTION individual; campos ausentes exibidos como `—`)
+  - `consultation_series` → `"Paciente | Especialidade | Início: DD/MM/YYYY"` (migration 81)
+  - `consultation_therapists` → `"Paciente | DD/MM/YYYY | Terapeuta"` (migration 81)
   - `medical_record_exams` → `"Paciente | Exames"`
   - `medical_record_medications` → `"Paciente | Medicamentos"`
   - `medical_record_conducts` → `"Paciente | Conduta"`
@@ -761,8 +768,10 @@ Não é mais editável. Texto padrão fixo definido em `DESEMPENHO_FIXO` em `gen
 ### UX
 
 - Criar série: modal separado `SeriesFormModal` (não embutido no `ConsultationFormModal`).
-- Botão "Série" na Agenda (`FiRepeat`) — visível para admin e membros da equipe (`isAdminOrTeam`).
-- Ao editar atendimento de série: pergunta "Apenas este" vs "Este e os próximos" antes de abrir o form (Fase 3).
+- Botão "Série" (`FiRepeat`) — visível para admin e membros da equipe (`isAdminOrTeam`) em **Agenda** e em **Atendimentos** (`ConsultationsPage`).
+- Ao editar atendimento de série: admin vê banner de confirmação com "Apenas esta" / "Esta e as próximas"; terapeutas auto-marcam `is_series_exception = true` sem diálogo.
+- Chip roxo "Consulta recorrente" exibido no `ConsultationFormModal` quando `initial.seriesId` presente.
+- Exclusão da lista: se `seriesId` presente → modal com opções "Apenas este" / "Este e os próximos" (`seriesDeleteConfirm`).
 
 ### `addConsultationSeries` (DataContext)
 
@@ -793,12 +802,12 @@ Não é mais editável. Texto padrão fixo definido em `DESEMPENHO_FIXO` em `gen
 - Múltiplas especialidades `PREPAID_PACKAGE` no mesmo atendimento são bloqueadas na Fase 1 (UI impede).
 - `handlePrepaidConsumption` opera apenas sobre `consultations.specialty` (especialidade principal) por enquanto.
 
-### Impactos futuros (implementar nas Fases 4–6)
+### Status de implementação
 
-- **Agenda:** filtro por terapeuta deve incluir participações em `consultation_therapists`, não só `therapist_id`.
-- **Relatório por terapeuta:** busca deve incluir consultas onde o terapeuta é participante secundário; valor usa a especialidade desse terapeuta no atendimento.
-- **Demonstrativo:** atendimento com múltiplas especialidades gera sublinhas por especialidade/valor no PDF.
-- **Pré-pago com múltiplas especialidades:** debitar 1 sessão por especialidade PREPAID participante (Fase 6).
+- **Agenda:** ✅ filtro por terapeuta inclui participações em `consultation_therapists` (`AgendaPage.filterConsultation`).
+- **Relatório por terapeuta:** ✅ busca inclui consultas onde o terapeuta é participante secundário; `effectiveSpecialty` resolve a especialidade correta para valor e label.
+- **Demonstrativo:** ✅ terapeutas secundários expandidos como entradas adicionais de cobrança no PDF.
+- **Pré-pago com múltiplas especialidades:** ⏳ pendente (Fase 6 — não implementada). UI ainda bloqueia múltiplos PREPAID_PACKAGE no mesmo atendimento.
 
 ## Atenção — SELECTs explícitos no DataContext
 
