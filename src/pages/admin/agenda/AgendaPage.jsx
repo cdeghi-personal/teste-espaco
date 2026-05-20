@@ -51,7 +51,9 @@ export default function AgendaPage() {
     return (d === 0 || d === 6) ? 5 : d - 1
   })
   const [myAgenda, setMyAgenda] = useState(user?.role !== 'admin')
-  const canFilterMine = user?.role === 'admin' && !!user?.id
+  // Toggle visível para: admin+terapeuta OU terapeuta da equipe (que pode ver agenda dos colegas)
+  // Não-equipe não tem o que filtrar — só vê a própria agenda
+  const canFilterMine = !!user?.id && (user?.role === 'admin' || user?.belongsToTeam)
 
   const today = format(new Date(), 'yyyy-MM-dd')
 
@@ -260,6 +262,16 @@ export default function AgendaPage() {
                   const patient = isPrivate ? null : getPatient(item.patientId)
                   const room = getRoom(item.roomId)
                   const style = cardStyle(item)
+                  // DEBUG — remover após confirmar chips
+                  if (user?.role !== 'admin') {
+                    console.log('[AGENDA_CARD_DEBUG]', {
+                      userRole: user?.role, userBelongsToTeam: user?.belongsToTeam,
+                      userTherapistId: user?.id, consultationId: item.id,
+                      seriesId: item.seriesId, isSeriesException: item.isSeriesException,
+                      consultationTherapists: item.consultationTherapists,
+                      therapistsCount: item.consultationTherapists?.length, isPrivate,
+                    })
+                  }
                   return (
                     <div
                       key={item.id}
