@@ -277,10 +277,11 @@ export default function ReportsPage() {
     for (const c of consults) {
       const patient = patientsArr.find(p => p.id === c.patientId)
       if (!patient) continue
-      const spec = findPatientSpecialtyConfig(patient, c.specialty, specialtiesArr)
+      const effSpec = c.effectiveSpecialty || c.specialty
+      const spec = findPatientSpecialtyConfig(patient, effSpec, specialtiesArr)
       if (!spec) {
         if (!byPatient.has(patient.fullName)) byPatient.set(patient.fullName, new Set())
-        const label = specialtiesArr.find(s => s.key === c.specialty)?.label || c.specialty
+        const label = specialtiesArr.find(s => s.key === effSpec)?.label || effSpec
         byPatient.get(patient.fullName).add(label)
       }
     }
@@ -376,10 +377,18 @@ export default function ReportsPage() {
       if (items.length > 0) { setUnconfiguredWarning({ items, pendingConsults: consults }); return }
       await openPreview(consults)
     } else {
-      consults = filterConsultations(allConsults.filter(c => c.therapistId === selectedTherapistId))
-      const items = buildUnconfiguredItems(consults, activePatients, specialtiesArr)
-      if (items.length > 0) { setUnconfiguredWarning({ items, pendingConsults: consults }); return }
-      await generateTherapistPDF(consults)
+      consults = filterConsultations(allConsults.filter(c =>
+        c.therapistId === selectedTherapistId ||
+        (c.consultationTherapists || []).some(t => t.therapistId === selectedTherapistId)
+      ))
+      // Augment each consultation with effectiveSpecialty for the selected therapist
+      const augmented = consults.map(c => {
+        const participation = (c.consultationTherapists || []).find(t => t.therapistId === selectedTherapistId)
+        return { ...c, effectiveSpecialty: participation?.specialty || c.specialty }
+      })
+      const items = buildUnconfiguredItems(augmented, activePatients, specialtiesArr)
+      if (items.length > 0) { setUnconfiguredWarning({ items, pendingConsults: augmented }); return }
+      await generateTherapistPDF(augmented)
     }
   }
 

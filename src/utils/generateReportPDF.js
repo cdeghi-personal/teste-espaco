@@ -54,7 +54,7 @@ export function findPatientSpecialtyConfig(patient, consultationSpecialty, speci
 // Resolve valor de paciente para uma consulta segundo a modalidade de pagamento.
 // Retorna { display, amount, paymentType, isUnconfigured }
 function resolvePatientValue(c, patient, monthlyTracked, specialtiesData) {
-  const spec = findPatientSpecialtyConfig(patient, c.specialty, specialtiesData)
+  const spec = findPatientSpecialtyConfig(patient, c.effectiveSpecialty || c.specialty, specialtiesData)
 
   if (!spec) {
     return { display: 'Não configurado', amount: 0, paymentType: 'POST_PER_SESSION', isUnconfigured: true }
@@ -85,7 +85,7 @@ function resolvePatientValue(c, patient, monthlyTracked, specialtiesData) {
 // Resolve valor de terapeuta para uma consulta segundo a modalidade de pagamento.
 // Retorna { display, amount, paymentType, isUnconfigured }
 function resolveTherapistValue(c, patient, monthlyTracked, specialtiesData) {
-  const spec = findPatientSpecialtyConfig(patient, c.specialty, specialtiesData)
+  const spec = findPatientSpecialtyConfig(patient, c.effectiveSpecialty || c.specialty, specialtiesData)
 
   if (!spec) {
     return { display: 'Não configurado', amount: 0, paymentType: 'POST_PER_SESSION', isUnconfigured: true }
@@ -95,7 +95,7 @@ function resolveTherapistValue(c, patient, monthlyTracked, specialtiesData) {
 
   if (paymentType === 'POST_MONTHLY') {
     const month = c.date?.slice(0, 7)
-    const key = `${c.specialty}__${month}`
+    const key = `${c.effectiveSpecialty || c.specialty}__${month}`
     if (month && !monthlyTracked.has(key)) {
       const mv = spec?.monthlyTherapistValue
       monthlyTracked.set(key, mv != null && mv !== '' ? (parseFloat(mv) || 0) : 0)
@@ -360,10 +360,22 @@ export async function generateConsultasPacientePDF({
   } else {
     const pageH = doc.internal.pageSize.height
 
+    // Expand secondary therapist participants as separate billing entries
+    const expandedConsultations = []
     for (const c of consultations) {
+      expandedConsultations.push(c)
+      for (const ct of (c.consultationTherapists || []).filter(t => !t.isPrimary)) {
+        if (therapists.find(t => t.id === ct.therapistId)) {
+          expandedConsultations.push({ ...c, therapistId: ct.therapistId, effectiveSpecialty: ct.specialty })
+        }
+      }
+    }
+
+    for (const c of expandedConsultations) {
       const therapist = therapists.find(t => t.id === c.therapistId)
-      const spec = specialtiesData.find(s => s.key === c.specialty)
-      const credential = therapist?.therapistSpecialties?.find(s => s.specialty === c.specialty)?.credential || '—'
+      const effSpec = c.effectiveSpecialty || c.specialty
+      const spec = specialtiesData.find(s => s.key === effSpec)
+      const credential = therapist?.therapistSpecialties?.find(s => s.specialty === effSpec)?.credential || '—'
       const status = consultationStatuses.find(s => s.id === c.consultationStatusId)
       const type = appointmentTypes.find(t => t.id === c.appointmentTypeId)
 
@@ -378,7 +390,7 @@ export async function generateConsultasPacientePDF({
         statusName: status?.name || '—',
         typeName: type?.name || '—',
         therapistName: therapist?.name || '—',
-        specLabel: spec?.label || c.specialty || '—',
+        specLabel: spec?.label || effSpec || '—',
         credential,
         modalityLabel: isUnconfigured ? 'Não configurada' : (PAYMENT_TYPE_LABELS[paymentType] || paymentType),
         valueDisplay,
@@ -387,7 +399,7 @@ export async function generateConsultasPacientePDF({
       }, y, pageH, margin, pageW)
     }
 
-    renderTotals(doc, y, pageW, margin, consultations.length, totalPostSessao, monthlyTracked, totalPrepago, hasUnconfigured)
+    renderTotals(doc, y, pageW, margin, expandedConsultations.length, totalPostSessao, monthlyTracked, totalPrepago, hasUnconfigured)
   }
 
   addAllPageFooters(doc)
@@ -465,7 +477,8 @@ export async function generateConsultasTerapeutaPDF({
 
     const body = consultations.map(c => {
       const patient = patients.find(p => p.id === c.patientId)
-      const spec = specialtiesData.find(s => s.key === c.specialty)
+      const effSpec = c.effectiveSpecialty || c.specialty
+      const spec = specialtiesData.find(s => s.key === effSpec)
       const status = consultationStatuses.find(s => s.id === c.consultationStatusId)
       const type = appointmentTypes.find(t => t.id === c.appointmentTypeId)
 
@@ -476,7 +489,7 @@ export async function generateConsultasTerapeutaPDF({
 
       return [
         fmtDatePDF(c.date), c.time ? c.time.slice(0, 5) : '—',
-        patient?.fullName || '—', spec?.label || c.specialty || '—',
+        patient?.fullName || '—', spec?.label || effSpec || '—',
         status?.name || '—', type?.name || '—',
         display, c.mainObjective || '—',
       ]
