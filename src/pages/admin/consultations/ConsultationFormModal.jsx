@@ -127,6 +127,13 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
         e.secondaryTherapists = 'Apenas uma especialidade pré-paga por atendimento é permitida'
       }
     }
+    // Em atendimentos com múltiplos terapeutas, o principal deve ser da equipe
+    if (!e.therapistId && secIds.length > 0) {
+      const primaryTherapist = therapists.find(t => t.id === form.therapistId)
+      if (primaryTherapist && !primaryTherapist.belongsToTeam) {
+        e.therapistId = 'Em atendimentos com múltiplos terapeutas, o terapeuta principal deve ser um profissional da equipe. Terapeutas externos podem ser incluídos apenas como participantes adicionais.'
+      }
+    }
     return e
   }
 
@@ -168,6 +175,8 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
   const activeStatuses = consultationStatuses.filter(s => s.active !== false && (user?.role === 'admin' || !s.automatic))
   const currentStatus = isEdit ? consultationStatuses.find(s => s.id === initial.consultationStatusId) : null
   const isAdmin  = user?.role === 'admin'
+  const isAdminOrTeam = isAdmin || user?.belongsToTeam
+  const canManageSecondary = isAdmin || (user?.belongsToTeam && user?.id === form.therapistId)
   const isBlocked = isEdit && currentStatus?.automatic && !isAdmin
   const activeAppointmentTypes = appointmentTypes.filter(t => t.active !== false)
   const activeRooms = rooms.filter(r => r.active !== false)
@@ -264,7 +273,7 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
             </Select>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <Select label="Terapeuta *" value={form.therapistId} onChange={e => set('therapistId', e.target.value)} error={errors.therapistId} disabled={readOnly}>
+              <Select label="Terapeuta *" value={form.therapistId} onChange={e => set('therapistId', e.target.value)} error={errors.therapistId} disabled={readOnly || !isAdminOrTeam}>
                 <option value="">Selecione</option>
                 {activeTherapists.map(t => (
                   <option key={t.id} value={t.id}>{t.name}</option>
@@ -314,8 +323,8 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
           </div>
         </section>
 
-        {/* Terapeutas Adicionais */}
-        {(isAdmin || user?.id === form.therapistId || form.secondaryTherapists.length > 0) && (
+        {/* Terapeutas Adicionais — visível para quem pode gerenciar ou quando já há participantes */}
+        {(canManageSecondary || form.secondaryTherapists.length > 0) && (
           <section>
             <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3 pb-2 border-b border-gray-100">
               Terapeutas Adicionais
@@ -330,7 +339,7 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
                         label="Terapeuta"
                         value={sec.therapistId}
                         onChange={e => updateSecondaryTherapist(sec.tempId, 'therapistId', e.target.value)}
-                        disabled={readOnly}
+                        disabled={readOnly || !canManageSecondary}
                       >
                         <option value="">Selecione</option>
                         {activeTherapists.filter(t => !usedTherapistIds.includes(t.id)).map(t => (
@@ -341,7 +350,7 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
                         label="Especialidade"
                         value={sec.specialty}
                         onChange={e => updateSecondaryTherapist(sec.tempId, 'specialty', e.target.value)}
-                        disabled={readOnly}
+                        disabled={readOnly || !canManageSecondary}
                       >
                         <option value="">Selecione</option>
                         {activeSpecialties.map(s => (
@@ -349,7 +358,7 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
                         ))}
                       </Select>
                     </div>
-                    {!readOnly && (
+                    {!readOnly && canManageSecondary && (
                       <button
                         type="button"
                         onClick={() => removeSecondaryTherapist(sec.tempId)}
@@ -364,7 +373,7 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
               {errors.secondaryTherapists && (
                 <p className="text-xs text-red-500">{errors.secondaryTherapists}</p>
               )}
-              {!readOnly && (isAdmin || user?.id === form.therapistId) && (
+              {!readOnly && canManageSecondary && (
                 <button
                   type="button"
                   onClick={addSecondaryTherapist}

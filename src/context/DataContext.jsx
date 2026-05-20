@@ -604,6 +604,18 @@ export function DataProvider({ children }) {
   async function addConsultation(data) {
     const { activities, appointmentId, secondaryTherapists, ...rest } = data
 
+    // Validação de segurança: terapeuta fora da equipe não pode registrar para outro terapeuta
+    const { data: { session: _sess } } = await supabase.auth.getSession()
+    const callerTherapist = therapists.find(t => t.userId === _sess?.user?.id)
+    if (callerTherapist && !callerTherapist.belongsToTeam) {
+      if (rest.therapistId && rest.therapistId !== callerTherapist.id) {
+        return { error: 'Você não tem permissão para registrar atendimentos em nome de outro terapeuta.' }
+      }
+      if (secondaryTherapists?.length > 0) {
+        return { error: 'Terapeutas fora da equipe não podem adicionar participantes adicionais ao atendimento.' }
+      }
+    }
+
     const { data: inserted, error } = await supabase
       .from('consultations')
       .insert({
@@ -682,6 +694,18 @@ export function DataProvider({ children }) {
 
   async function updateConsultation(id, data) {
     const { activities, secondaryTherapists, ...rest } = data
+
+    // Validação de segurança: terapeuta fora da equipe não pode alterar para outro terapeuta
+    const { data: { session: _sessUpd } } = await supabase.auth.getSession()
+    const callerTherapistUpd = therapists.find(t => t.userId === _sessUpd?.user?.id)
+    if (callerTherapistUpd && !callerTherapistUpd.belongsToTeam) {
+      if (rest.therapistId && rest.therapistId !== callerTherapistUpd.id) {
+        return { error: 'Você não tem permissão para alterar o terapeuta principal para outro profissional.' }
+      }
+      if (secondaryTherapists?.length > 0) {
+        return { error: 'Terapeutas fora da equipe não podem adicionar participantes adicionais ao atendimento.' }
+      }
+    }
 
     // Captura estado existente e oldConsumed ANTES do update para garantir leitura consistente
     const existing = consultations.find(c => c.id === id)
@@ -1499,6 +1523,14 @@ export function DataProvider({ children }) {
 
     const { data: { session } } = await supabase.auth.getSession()
     const createdBy = session?.user?.id || null
+
+    // Validação de segurança: terapeuta fora da equipe só pode criar série para si mesmo
+    const callerTherapistSeries = therapists.find(t => t.userId === createdBy)
+    if (callerTherapistSeries && !callerTherapistSeries.belongsToTeam) {
+      if (primaryTherapistId && primaryTherapistId !== callerTherapistSeries.id) {
+        return { error: 'Você não tem permissão para criar séries em nome de outro terapeuta.' }
+      }
+    }
 
     // 1. Gera datas das ocorrências
     const dates = generateSeriesDates({ recurrenceType, recurrenceDays, startDate, endDate, sessionCount })

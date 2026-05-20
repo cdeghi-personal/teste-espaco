@@ -144,7 +144,7 @@ export default function AgendaPage() {
             <p><strong>Filtro "Minha Agenda":</strong> terapeutas veem apenas seus próprios atendimentos. Admins veem todos.</p>
             <p><strong>Legenda:</strong> as cores na legenda inferior identificam cada terapeuta.</p>
           </HelpButton>
-          {isAdminOrTeam && (
+          {!!user?.id && (
             <Button variant="ghost" onClick={() => setShowSeriesModal(true)}>
               <FiRepeat size={15} />
               <span className="hidden sm:inline">Série</span>
@@ -262,16 +262,6 @@ export default function AgendaPage() {
                   const patient = isPrivate ? null : getPatient(item.patientId)
                   const room = getRoom(item.roomId)
                   const style = cardStyle(item)
-                  // DEBUG — remover após confirmar chips
-                  if (user?.role !== 'admin') {
-                    console.log('[AGENDA_CARD_DEBUG]', {
-                      userRole: user?.role, userBelongsToTeam: user?.belongsToTeam,
-                      userTherapistId: user?.id, consultationId: item.id,
-                      seriesId: item.seriesId, isSeriesException: item.isSeriesException,
-                      consultationTherapists: item.consultationTherapists,
-                      therapistsCount: item.consultationTherapists?.length, isPrivate,
-                    })
-                  }
                   return (
                     <div
                       key={item.id}

@@ -61,6 +61,9 @@ export default function SeriesFormModal({ onClose }) {
     () => (patients || []).filter(p => !p.deleted).sort((a, b) => a.fullName.localeCompare(b.fullName)),
     [patients]
   )
+  const isAdmin = user?.role === 'admin'
+  const isAdminOrTeam = isAdmin || user?.belongsToTeam
+
   const activeTherapists = useMemo(
     () => (therapists || []).filter(t => t.active !== false).sort((a, b) => a.name.localeCompare(b.name)),
     [therapists]
@@ -194,6 +197,7 @@ export default function SeriesFormModal({ onClose }) {
                 value={form.primaryTherapistId}
                 onChange={e => { set('primaryTherapistId', e.target.value); set('specialty', '') }}
                 error={errors.primaryTherapistId}
+                disabled={!isAdminOrTeam}
               >
                 <option value="">Selecione</option>
                 {activeTherapists.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
