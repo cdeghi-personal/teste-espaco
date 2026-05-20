@@ -42,6 +42,7 @@ src/
     pdfShared.js                 # Utilitários compartilhados por todos os PDFs (addPageHeader, addPageFooter, addAllPageFooters, sectionBlock, labelValue, loadLogo, fmtDatePDF, fmtCurrencyPDF + constantes)
     generateProntuarioPDF.js     # Gera PDF completo do prontuário (admin only)
     generateReportPDF.js         # Gera relatórios PDF: consultas por paciente ou terapeuta
+    conflictUtils.js             # Detecção de conflitos de agenda: detectConflicts, detectSeriesConflicts, CONFLICT_DURATION (50min), CONFLICT_LABELS
   components/
     layout/
       PublicLayout.jsx, PublicHeader.jsx, PublicFooter.jsx
@@ -149,6 +150,10 @@ supabase/
   79_payment_invoices.sql              # Tabela payment_invoices (ISSUED/PAID/CANCELLED) — NF global única via índice parcial; RLS admin only
   80_series_and_multi_therapist.sql    # Tabelas consultation_series + consultation_therapists; ADD series_id/series_original_date/is_series_exception em consultations; RLS e GRANTs
   81_audit_series.sql                  # fn_audit_log: consultation_series → "Paciente | Especialidade | Início: DD/MM/YYYY"; consultation_therapists → "Paciente | DD/MM/YYYY | Terapeuta"; triggers nas duas tabelas
+  82_fix_ct_team_select.sql            # Fix RLS: expande ct_therapist_select para incluir consultas de colegas da equipe (teamMember vê consultationTherapists[] preenchido)
+  83_fix_series_therapist_write.sql    # Fix RLS: adiciona INSERT/UPDATE em consultation_series para terapeuta (faltava no 80)
+  84_therapist_unavailabilities.sql    # Tabela therapist_unavailabilities + RLS (admin tudo; próprio terapeuta SELECT; membro da equipe SELECT)
+  85_consultation_conflicts.sql        # Tabela consultation_conflicts + RLS + RPC persist_consultation_conflicts (SECURITY DEFINER)
   functions/
     invite-therapist/index.ts    # Edge Function — envia convite por e-mail ao criar terapeuta
     suggest-convenio/index.ts    # Edge Function — gera sugestões de texto para relatório de convênio via OpenAI gpt-4o-mini
@@ -208,6 +213,8 @@ Encontrar em: Supabase Dashboard → Project Settings → API.
 | `payment_invoices` | Notas fiscais / faturas — nf_number (globalmente único via índice parcial), patient_id, nf_issue_date, status (ISSUED/PAID/CANCELLED), total_amount, payment_demonstrative_id, consultation_ids (UUID[]), snapshot (JSONB), created_by, cancelled_at, cancelled_by, paid_at, paid_by; admin only |
 | `consultation_series` | Séries recorrentes — patient_id, primary_therapist_id, specialty, appointment_type_id, consultation_status_id, room_id, time, duration, recurrence_type ('by_count'/'by_date'), recurrence_days (integer[] ISO 1=Seg…7=Dom), start_date, end_date, session_count, active, notes, created_by; RLS: admin tudo; terapeuta SELECT das próprias séries |
 | `consultation_therapists` | Participantes por consulta — consultation_id, therapist_id, specialty, is_primary; UNIQUE (consultation_id, therapist_id); sempre deve existir exatamente 1 is_primary=true; ON DELETE CASCADE de consultations |
+| `therapist_unavailabilities` | Indisponibilidades de terapeutas — therapist_id, unavailable_type ('TOTAL'/'PARTIAL'), reason, start_date, end_date (nullable), start_time, end_time, weekdays (integer[] ISO 1=Seg…7=Dom), active; RLS: admin tudo; próprio terapeuta SELECT; membro da equipe SELECT |
+| `consultation_conflicts` | Conflitos de agenda detectados — consultation_id (CASCADE), conflict_type ('THERAPIST_OVERLAP'/'ROOM_OVERLAP'/'THERAPIST_UNAVAILABLE_TOTAL'/'THERAPIST_UNAVAILABLE_PARTIAL'), related_consultation_id (SET NULL), therapist_id, room_id, unavailability_id, conflict_date, start_time, end_time, description, resolved; RLS: admin tudo; terapeuta SELECT para próprias/equipe |
 
 ### Mappers (DB → App)
 
@@ -219,6 +226,8 @@ Todos em `src/lib/supabase.js`. Convertem snake_case do banco para camelCase do 
 - `mapConsultation` também inclui `nfNumber`, `nfIssueDate`, `previousStatusBeforeInvoice`, `seriesId`, `seriesOriginalDate`, `isSeriesException`, `consultationTherapists[{id, therapistId, specialty, isPrimary}]`
 - `mapConsultationSeries` — novo mapper para `consultation_series`
 - `mapConsultationStatus` (inclui `automatic`), `mapAppointmentType`, `mapExam`, `mapMedication`, `mapConduct`
+- `mapUnavailability` — mapper para `therapist_unavailabilities` (camelCase; `weekdays[]`)
+- `mapConsultation` inclui também `conflicts[{id, conflictType, relatedConsultationId, therapistId, roomId, unavailabilityId, conflictDate, startTime, endTime, description, resolved}]` — filtrados por `!resolved` no mapper
 - `age_ranges` mapeado inline no DataContext: `{ id, name, minAge, maxAge, color }`
 - `company_settings` exposto como `companySettings` (`{ razaoSocial, cnpj, aiSystemPrompt }`) via `useData()`; função `updateCompanySettings({ razaoSocial, cnpj, aiSystemPrompt })` faz `.update().eq('id', 1)`
 - `syncPatientRelations(patientId, { specialties, conditionIds })` — specialties agora `[{ key, patientValue, therapistValue }]`
@@ -678,9 +687,16 @@ Não é mais editável. Texto padrão fixo definido em `DESEMPENHO_FIXO` em `gen
 - Editar/excluir: visível apenas para o terapeuta responsável ou admin
 - **Visibilidade para terapeutas:** lista inclui consultas onde o terapeuta é primário **ou** participante secundário em `consultation_therapists`
 - **Toggle "Meus Atendimentos":** visível apenas para admin que também é terapeuta (`canFilterMine = isAdmin && !!user?.id`); padrão `false`; filtra consultas onde o admin é primário ou secundário. Terapeutas já têm filtro implícito — toggle não é exibido para eles.
-- **Chips visuais no card:** chip indigo FiRepeat para série regular (`seriesId && !isSeriesException`); chip amber FiRepeat+`!` para ocorrência alterada individualmente (`seriesId && isSeriesException`); chip 👥 N (azul) com tooltip dos nomes para múltiplos terapeutas (`consultationTherapists.length > 1`).
+- **Chips visuais no card:** chip indigo FiRepeat para série regular (`seriesId && !isSeriesException`); chip amber FiRepeat+`!` para ocorrência alterada individualmente (`seriesId && isSeriesException`); chip 👥 N (azul) com tooltip dos nomes para múltiplos terapeutas (`consultationTherapists.length > 1`); chip vermelho `⚠ Conflito` quando `(c.conflicts || []).length > 0`.
 - **Campos obrigatórios quando status = "Realizada":** Objetivo da Sessão, Relato da Sessão / Evolução, Objetivo da Próxima Sessão
 - **Seção Terapeutas Adicionais (ConsultationFormModal):** lista de terapeutas secundários com select de terapeuta + especialidade; visível para admin e terapeuta principal; read-only em modo visualização. Validações: sem duplicatas, sem mesmo que primário, sem múltiplos PREPAID_PACKAGE.
+- **Permissões por perfil de terapeuta:**
+  - `isAdminOrTeam = isAdmin || user?.belongsToTeam` — campo `belongs_to_team` no `therapists`
+  - Campo Terapeuta (primário): editável apenas por `isAdminOrTeam`; terapeuta fora da equipe vê read-only (só pode salvar para si mesmo)
+  - Terapeutas Adicionais: `canManageSecondary = isAdmin || (user?.belongsToTeam && user?.id === form.therapistId)`
+  - Botão "Série": visível para qualquer usuário com `user?.id` (todos os terapeutas)
+  - Validação: se há secundários, o primário deve ser da equipe (`belongsToTeam`)
+  - Diálogo de escopo na edição de série: exibido para admin **ou** para o próprio terapeuta primário (`user?.id === initial.therapistId`)
 - **Seção Nota Fiscal / Faturamento (ConsultationFormModal):** visível apenas em edição quando admin ou quando a consulta já tem NF. Admin pode editar Número da NF e Data de Emissão; terapeuta vê read-only. Exibe status anterior (antes do faturamento) quando `previous_status_before_invoice` está preenchido.
 
 ## Pagamentos / Notas Fiscais (`/admin/pagamentos`)
@@ -701,7 +717,7 @@ Não é mais editável. Texto padrão fixo definido em `DESEMPENHO_FIXO` em `gen
 - Card: `HH:MM - PrimeiroNome Ultimo` + sala em 10px
 - Legenda inferior exibe nome completo do terapeuta
 - **Toggle "Minha Agenda":** visível para qualquer usuário com `user.id` preenchido (`canFilterMine = !!user?.id`); padrão `true` para não-admin (terapeutas veem só os seus por padrão), `false` para admin. Ao ativar, `filterConsultation` exige que o usuário seja primário ou participante secundário (`consultationTherapists`).
-- **Chips visuais nos cards:** desktop — `bg-white/25` (funciona em qualquer cor de fundo do terapeuta); mobile — `bg-indigo-50`/`bg-amber-50`/`bg-blue-50`. Mesma semântica dos chips de ConsultationsPage: indigo = série, amber+`!` = ocorrência alterada, 👥 N = múltiplos terapeutas. Exibidos apenas em consultas não-privadas (`!isPrivate`).
+- **Chips visuais nos cards:** desktop — `bg-white/25` (funciona em qualquer cor de fundo do terapeuta); mobile — `bg-indigo-50`/`bg-amber-50`/`bg-blue-50`. Mesma semântica dos chips de ConsultationsPage: indigo = série, amber+`!` = ocorrência alterada, 👥 N = múltiplos terapeutas, vermelho `⚠` = conflito. Chips de série/múltiplos terapeutas exibidos apenas quando `!isPrivate`; chip de conflito sempre visível.
 
 ## CRM de Contatos (`/admin/contatos`)
 
@@ -791,6 +807,66 @@ Não é mais editável. Texto padrão fixo definido em `DESEMPENHO_FIXO` em `gen
 - Cap de 500 datas e 5 anos à frente de `startDate`
 - Dias passados são incluídos (UI avisa mas não bloqueia)
 
+## Detecção e Sinalização de Conflitos de Agenda
+
+### Princípios
+
+- **Conflitos são alertas, não bloqueios.** O usuário pode salvar mesmo com conflitos detectados (confirmação prévia).
+- Duração fixa de `CONFLICT_DURATION = 50` minutos por atendimento para cálculo de sobreposição.
+- Algoritmo de sobreposição: `startA < endB && endA > startB` (em minutos desde meia-noite).
+
+### Tipos de conflito (`conflict_type`)
+
+| Tipo | Descrição |
+|---|---|
+| `THERAPIST_OVERLAP` | Terapeuta já tem outro atendimento no mesmo horário |
+| `ROOM_OVERLAP` | Sala já está ocupada no mesmo horário |
+| `THERAPIST_UNAVAILABLE_TOTAL` | Terapeuta tem indisponibilidade total que cobre o horário |
+| `THERAPIST_UNAVAILABLE_PARTIAL` | Terapeuta tem indisponibilidade parcial que se sobrepõe |
+
+- Conflitos cobrem o terapeuta primário **e** todos os secundários (`consultationTherapists`).
+- Conflito de sala apenas quando a sala está definida em ambos os atendimentos.
+
+### `conflictUtils.js` (`src/utils/conflictUtils.js`)
+
+- `CONFLICT_DURATION` — constante 50 (minutos)
+- `CONFLICT_LABELS` — mapa tipo → label legível em PT-BR
+- `detectConflicts(input, allConsultations, unavailabilities)` — retorna array de conflitos para um único atendimento
+- `detectSeriesConflicts(seriesInput, dates, allConsultations, unavailabilities)` — retorna `[{ date, conflicts[] }]` filtrado para datas com conflito
+
+### DataContext — novos valores e funções
+
+- `unavailabilities` — array carregado no `fetchAll` (active=true apenas); disponível via `useData()`
+- `persistConflicts(consultationId, conflicts[])` — chama RPC `persist_consultation_conflicts` (SECURITY DEFINER); substitui conflitos do atendimento atomicamente
+- `rebuildRelatedConflicts(relatedIds, updatedConsultations)` — reprocessa conflitos de atendimentos afetados por uma mudança (ex: após excluir um atendimento que era o `related_consultation_id` de outros)
+- `addUnavailability(data)`, `updateUnavailability(id, data)`, `deleteUnavailability(id)` — CRUD admin-only
+- `getUnavailabilitiesForTherapist(therapistId)` — busca TODAS as indisponibilidades do terapeuta (incluindo inativas); usado na tela de edição do terapeuta
+
+### Fluxo de salvamento com conflitos
+
+**Atendimento avulso (`ConsultationFormModal`):**
+1. `handleSave` valida o formulário.
+2. Detecta conflitos via `detectConflicts`.
+3. Se conflitos → exibe bloco âmbar inline com lista + botões "Cancelar" / "Salvar mesmo assim".
+4. Usuário confirma → `proceedSave(conflicts)` → segue para diálogo de série (se aplicável) → salva.
+
+**Série (`SeriesFormModal`):**
+1. `handleSave` detecta via `detectSeriesConflicts` por data.
+2. Se conflitos → exibe bloco scrollável com conflitos por data + botões "Cancelar" / "Criar mesmo assim".
+3. Usuário confirma → chama `addConsultationSeries` com `conflictsPerDate`.
+
+### Chips visuais
+
+- **`⚠ Conflito`** — chip vermelho nos cards de `ConsultationsPage` e `AgendaPage` quando `(c.conflicts || []).length > 0`.
+- Chips de série/múltiplos terapeutas e de conflito coexistem na mesma linha de badges.
+
+### Indisponibilidades (`TherapistFormModal`)
+
+- Seção colapsável "Indisponibilidades" visível apenas em modo edição (`isEdit`).
+- Admin: CRUD completo (adicionar, editar, excluir, ativar/desativar).
+- Terapeuta: somente leitura.
+- Campos: Tipo (Total/Parcial), Motivo, Data início, Data fim (opcional), Horário início/fim (apenas Parcial), Dias da semana (checkboxes ISO 1=Seg…7=Dom).
+
 ## Múltiplos Terapeutas por Atendimento
 
 ### Modelo de dados
@@ -817,7 +893,7 @@ Não é mais editável. Texto padrão fixo definido em `DESEMPENHO_FIXO` em `gen
 ## Atenção — SELECTs explícitos no DataContext
 
 `CONSULTATION_SELECT` lista colunas explicitamente. Ao adicionar novas colunas ao banco, **sempre incluir no SELECT** correspondente.
-Constantes: `PATIENT_SELECT` (inclui `patient_specialties(specialty, patient_value, therapist_value)`), `GUARDIAN_SELECT`, `CONSULTATION_SELECT` (inclui `consultation_activities(...)` e `consultation_therapists(id, therapist_id, specialty, is_primary)`).
+Constantes: `PATIENT_SELECT` (inclui `patient_specialties(specialty, patient_value, therapist_value)`), `GUARDIAN_SELECT`, `CONSULTATION_SELECT` (inclui `consultation_activities(...)`, `consultation_therapists(id, therapist_id, specialty, is_primary)` e `consultation_conflicts(id, conflict_type, related_consultation_id, therapist_id, room_id, unavailability_id, conflict_date, start_time, end_time, description, resolved)`).
 
 ## Especialidades (tabela `specialties` no banco)
 
