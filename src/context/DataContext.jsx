@@ -4,11 +4,13 @@ import {
   mapPatient, mapGuardian, mapTherapist, mapAppointment, mapConsultation, mapConsultationSeries,
   mapSpecialty, mapPaymentMethod, mapDiagnosis, mapPatientStatus, mapRoom,
   mapConsultationStatus, mapAppointmentType, mapExam, mapMedication, mapConduct,
+  mapUnavailability,
   syncPatientRelations, syncGuardianPatients,
   syncTherapistSpecialties, syncExternalTherapists, syncInvolvedTherapists,
 } from '../lib/supabase'
 import { useToast } from '../components/ui/Toast'
 import { generateSeriesDates } from '../utils/dateUtils'
+import { detectConflicts } from '../utils/conflictUtils'
 
 function dbError(error, toast) {
   const msg = error?.message || 'Erro ao salvar. Tente novamente.'
@@ -63,7 +65,8 @@ const CONSULTATION_SELECT = `
   main_objective, evolution_notes, next_objectives, guardian_feedback,
   session_quality, created_at,
   consultation_activities(id, name, description, outcome, sort_order),
-  consultation_therapists(id, therapist_id, specialty, is_primary)
+  consultation_therapists(id, therapist_id, specialty, is_primary),
+  consultation_conflicts(id, conflict_type, related_consultation_id, therapist_id, room_id, unavailability_id, conflict_date, start_time, end_time, description, resolved)
 `
 
 // ─── Provider ─────────────────────────────────────────────────────────────────
@@ -84,13 +87,14 @@ export function DataProvider({ children }) {
   const [appointmentTypes, setAppointmentTypes] = useState([])
   const [ageRanges, setAgeRanges] = useState([])
   const [companySettings, setCompanySettings] = useState({ razaoSocial: '', cnpj: '', aiSystemPrompt: '', cnes: '', therapistDiscountPercent: 0 })
+  const [unavailabilities, setUnavailabilities] = useState([])
   const [isLoading, setIsLoading] = useState(true)
 
   const fetchAll = useCallback(async () => {
     setIsLoading(true)
     const [
       patientsRes, guardiansRes, appointmentsRes, consultationsRes,
-      therapistsRes, specialtiesRes, paymentRes, diagnosesRes, statusesRes, roomsRes, consultStatusRes, apptTypesRes, ageRangesRes, companyRes,
+      therapistsRes, specialtiesRes, paymentRes, diagnosesRes, statusesRes, roomsRes, consultStatusRes, apptTypesRes, ageRangesRes, companyRes, unavailRes,
     ] = await Promise.all([
       supabase.from('patients').select(PATIENT_SELECT).eq('deleted', false).then(res => {
         // Se a query falhar (ex: tabela patient_involved_therapists ainda não existe),
@@ -113,6 +117,7 @@ export function DataProvider({ children }) {
       supabase.from('appointment_types').select('*').order('name'),
       supabase.from('age_ranges').select('*').order('min_age'),
       supabase.from('company_settings').select('razao_social, cnpj, ai_system_prompt, cnes, therapist_discount_percent').eq('id', 1).maybeSingle(),
+      supabase.from('therapist_unavailabilities').select('*').order('start_date'),
     ])
 
     setPatients((patientsRes.data || []).map(mapPatient))
@@ -139,6 +144,7 @@ export function DataProvider({ children }) {
         therapistDiscountPercent: companyRes.data.therapist_discount_percent ?? 0,
       })
     }
+    setUnavailabilities((unavailRes.data || []).map(mapUnavailability))
     setIsLoading(false)
   }, [])
 
@@ -153,6 +159,44 @@ export function DataProvider({ children }) {
     })
     return () => subscription.unsubscribe()
   }, [fetchAll])
+
+  // ─── Conflict helpers ────────────────────────────────────────────────────────
+
+  async function persistConflicts(consultationId, conflicts) {
+    if (!consultationId || !conflicts) return
+    try {
+      await supabase.rpc('persist_consultation_conflicts', {
+        p_consultation_id: consultationId,
+        p_conflicts: JSON.stringify(conflicts.map(c => ({
+          conflict_type: c.conflictType,
+          related_consultation_id: c.relatedConsultationId || null,
+          therapist_id: c.therapistId || null,
+          room_id: c.roomId || null,
+          unavailability_id: c.unavailabilityId || null,
+          conflict_date: c.conflictDate,
+          start_time: c.startTime,
+          end_time: c.endTime,
+          description: c.description || null,
+        }))),
+      })
+    } catch (err) {
+      console.warn('[persistConflicts]', err)
+    }
+  }
+
+  async function rebuildRelatedConflicts(relatedIds, updatedConsultations) {
+    for (const relatedId of relatedIds) {
+      const relatedC = updatedConsultations.find(c => c.id === relatedId)
+      if (!relatedC) continue
+      const relatedConflicts = detectConflicts(
+        { id: relatedC.id, date: relatedC.date, time: relatedC.time, therapistId: relatedC.therapistId, roomId: relatedC.roomId, consultationTherapists: relatedC.consultationTherapists || [] },
+        updatedConsultations,
+        unavailabilities
+      )
+      await persistConflicts(relatedId, relatedConflicts)
+      setConsultations(prev => prev.map(c => c.id === relatedId ? { ...c, conflicts: relatedConflicts } : c))
+    }
+  }
 
   // ─── Patients ───────────────────────────────────────────────────────────────
 
@@ -602,7 +646,7 @@ export function DataProvider({ children }) {
   }
 
   async function addConsultation(data) {
-    const { activities, appointmentId, secondaryTherapists, ...rest } = data
+    const { activities, appointmentId, secondaryTherapists, conflicts = [], ...rest } = data
 
     // Validação de segurança: terapeuta fora da equipe não pode registrar para outro terapeuta
     const { data: { session: _sess } } = await supabase.auth.getSession()
@@ -675,8 +719,17 @@ export function DataProvider({ children }) {
     const localCTs = ctRows.map((ct, i) => ({
       id: `local-${i}`, therapistId: ct.therapist_id, specialty: ct.specialty, isPrimary: ct.is_primary,
     }))
-    const newConsultation = { ...mapConsultation(inserted), activities: mappedActivities, consultationTherapists: localCTs }
+    const newConsultation = { ...mapConsultation(inserted), activities: mappedActivities, consultationTherapists: localCTs, conflicts }
     setConsultations(prev => [newConsultation, ...prev])
+
+    // Persiste conflitos e recalcula os relacionados
+    await persistConflicts(inserted.id, conflicts)
+    const relatedIds = [...new Set(conflicts.filter(c => c.relatedConsultationId).map(c => c.relatedConsultationId))]
+    if (relatedIds.length > 0) {
+      const updatedAll = [newConsultation, ...consultations]
+      await rebuildRelatedConflicts(relatedIds, updatedAll)
+    }
+
     if (rest.consultationStatusId) {
       const status = consultationStatuses.find(s => s.id === rest.consultationStatusId)
       const therapist = therapists.find(t => t.id === rest.therapistId)
@@ -693,7 +746,7 @@ export function DataProvider({ children }) {
   }
 
   async function updateConsultation(id, data) {
-    const { activities, secondaryTherapists, ...rest } = data
+    const { activities, secondaryTherapists, conflicts, ...rest } = data
 
     // Validação de segurança: terapeuta fora da equipe não pode alterar para outro terapeuta
     const { data: { session: _sessUpd } } = await supabase.auth.getSession()
@@ -782,8 +835,23 @@ export function DataProvider({ children }) {
       const updated = { ...c, ...rest }
       if (activities !== undefined) updated.activities = activities
       if (newConsultationTherapists !== undefined) updated.consultationTherapists = newConsultationTherapists
+      if (conflicts !== undefined) updated.conflicts = conflicts
       return updated
     }))
+
+    // Persiste conflitos recalculados
+    if (conflicts !== undefined) {
+      await persistConflicts(id, conflicts)
+      // Recalcula relacionados (antigos + novos)
+      const oldRelated = (existing?.conflicts || []).filter(c => c.relatedConsultationId).map(c => c.relatedConsultationId)
+      const newRelated = (conflicts || []).filter(c => c.relatedConsultationId).map(c => c.relatedConsultationId)
+      const allRelated = [...new Set([...oldRelated, ...newRelated])]
+      if (allRelated.length > 0) {
+        const updatedAll = consultations.map(c => c.id === id ? { ...c, ...rest, conflicts } : c)
+        await rebuildRelatedConflicts(allRelated, updatedAll)
+      }
+    }
+
     if (rest.consultationStatusId !== undefined && existing) {
       const newPatientId = rest.patientId || existing.patientId
       const newSpecialty = rest.specialty || existing.specialty
@@ -816,7 +884,14 @@ export function DataProvider({ children }) {
       })
     }
     await supabase.from('consultations').delete().eq('id', id)
+    const reverseRelated = consultations
+      .filter(c => c.id !== id && (c.conflicts || []).some(cf => cf.relatedConsultationId === id))
+      .map(c => c.id)
     setConsultations(prev => prev.filter(c => c.id !== id))
+    if (reverseRelated.length > 0) {
+      const updatedAll = consultations.filter(c => c.id !== id)
+      await rebuildRelatedConflicts(reverseRelated, updatedAll)
+    }
   }
 
   // ─── Therapists ─────────────────────────────────────────────────────────────
@@ -1519,6 +1594,7 @@ export function DataProvider({ children }) {
       patientId, primaryTherapistId, specialty,
       consultationStatusId, appointmentTypeId, roomId,
       time, recurrenceType, recurrenceDays, startDate, endDate, sessionCount, notes,
+      conflictsPerDate = [],
     } = data
 
     const { data: { session } } = await supabase.auth.getSession()
@@ -1603,6 +1679,15 @@ export function DataProvider({ children }) {
 
     const mapped = (full || []).map(mapConsultation)
     setConsultations(prev => [...mapped, ...prev])
+
+    // Persiste conflitos por data se fornecidos
+    if (conflictsPerDate.length > 0) {
+      await Promise.all(insertedIds.map((row, i) => {
+        const date = dates[i]
+        const entry = conflictsPerDate.find(e => e.date === date)
+        return entry?.conflicts?.length > 0 ? persistConflicts(row.id, entry.conflicts) : Promise.resolve()
+      }))
+    }
 
     return { series: mapConsultationSeries(series), consultations: mapped, count: mapped.length }
   }
@@ -1694,6 +1779,63 @@ export function DataProvider({ children }) {
     setConsultations(prev => prev.filter(c => !ids.includes(c.id)))
   }
 
+  // ─── Unavailabilities ────────────────────────────────────────────────────────
+
+  async function addUnavailability(data) {
+    const { data: { session } } = await supabase.auth.getSession()
+    const { data: inserted, error } = await supabase
+      .from('therapist_unavailabilities')
+      .insert({
+        therapist_id:     data.therapistId,
+        unavailable_type: data.unavailableType,
+        reason:           data.reason || null,
+        start_date:       data.startDate,
+        end_date:         data.endDate || null,
+        start_time:       data.startTime || null,
+        end_time:         data.endTime || null,
+        weekdays:         data.weekdays?.length ? data.weekdays : null,
+        active:           data.active !== false,
+        created_by:       session?.user?.id || null,
+      })
+      .select()
+      .single()
+    if (error) return dbError(error, toast)
+    const mapped = mapUnavailability(inserted)
+    setUnavailabilities(prev => [...prev, mapped])
+    return mapped
+  }
+
+  async function updateUnavailability(id, data) {
+    const update = {}
+    if (data.unavailableType !== undefined) update.unavailable_type = data.unavailableType
+    if (data.reason !== undefined)          update.reason = data.reason || null
+    if (data.startDate !== undefined)       update.start_date = data.startDate
+    if (data.endDate !== undefined)         update.end_date = data.endDate || null
+    if (data.startTime !== undefined)       update.start_time = data.startTime || null
+    if (data.endTime !== undefined)         update.end_time = data.endTime || null
+    if (data.weekdays !== undefined)        update.weekdays = data.weekdays?.length ? data.weekdays : null
+    if (data.active !== undefined)          update.active = data.active
+    update.updated_at = new Date().toISOString()
+    const { error } = await supabase.from('therapist_unavailabilities').update(update).eq('id', id)
+    if (error) return dbError(error, toast)
+    setUnavailabilities(prev => prev.map(u => u.id === id ? { ...u, ...data } : u))
+  }
+
+  async function deleteUnavailability(id) {
+    await supabase.from('therapist_unavailabilities').delete().eq('id', id)
+    setUnavailabilities(prev => prev.filter(u => u.id !== id))
+  }
+
+  async function getUnavailabilitiesForTherapist(therapistId) {
+    const { data, error } = await supabase
+      .from('therapist_unavailabilities')
+      .select('*')
+      .eq('therapist_id', therapistId)
+      .order('start_date')
+    if (error) { console.error(error); return [] }
+    return (data || []).map(mapUnavailability)
+  }
+
   // ─── Audit Log ───────────────────────────────────────────────────────────────
 
   async function logAudit(action, resourceType, resourceId, resourceName = '') {
@@ -1735,6 +1877,7 @@ export function DataProvider({ children }) {
     addPrepaidPackage, getPrepaidData, addLedgerAdjustment,
     batchFaturarConsultations, addPaymentDemonstrativo, getPaymentDemonstrativos,
     createPaymentInvoice, getPaymentInvoices, cancelPaymentInvoice, markInvoicePaid,
+    unavailabilities, addUnavailability, updateUnavailability, deleteUnavailability, getUnavailabilitiesForTherapist,
   }
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>

@@ -179,6 +179,36 @@ export function mapConsultation(row) {
       specialty: t.specialty,
       isPrimary: t.is_primary || false,
     })),
+    conflicts: (row.consultation_conflicts || [])
+      .filter(c => !c.resolved)
+      .map(c => ({
+        id: c.id,
+        conflictType: c.conflict_type,
+        relatedConsultationId: c.related_consultation_id || null,
+        therapistId: c.therapist_id || null,
+        roomId: c.room_id || null,
+        unavailabilityId: c.unavailability_id || null,
+        conflictDate: c.conflict_date,
+        startTime: c.start_time,
+        endTime: c.end_time,
+        description: c.description || '',
+      })),
+    createdAt: row.created_at,
+  }
+}
+
+export function mapUnavailability(row) {
+  return {
+    id: row.id,
+    therapistId: row.therapist_id,
+    unavailableType: row.unavailable_type,
+    reason: row.reason || '',
+    startDate: row.start_date,
+    endDate: row.end_date || null,
+    startTime: row.start_time || null,
+    endTime: row.end_time || null,
+    weekdays: row.weekdays || null,
+    active: row.active !== false,
     createdAt: row.created_at,
   }
 }

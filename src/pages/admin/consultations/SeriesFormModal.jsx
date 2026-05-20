@@ -8,6 +8,7 @@ import { useData } from '../../../context/DataContext'
 import { useAuth } from '../../../context/AuthContext'
 import { useToast } from '../../../components/ui/Toast'
 import { isoToday, generateSeriesDates } from '../../../utils/dateUtils'
+import { detectSeriesConflicts, CONFLICT_LABELS } from '../../../utils/conflictUtils'
 
 const WEEKDAYS = [
   { value: 1, label: 'Seg' },
@@ -20,7 +21,7 @@ const WEEKDAYS = [
 ]
 
 export default function SeriesFormModal({ onClose }) {
-  const { patients, therapists, specialtiesData, rooms, consultationStatuses, appointmentTypes, addConsultationSeries } = useData()
+  const { patients, therapists, specialtiesData, rooms, consultationStatuses, appointmentTypes, addConsultationSeries, consultations, unavailabilities } = useData()
   const { user } = useAuth()
   const toast = useToast()
 
@@ -41,6 +42,8 @@ export default function SeriesFormModal({ onClose }) {
   })
   const [errors, setErrors] = useState({})
   const [saving, setSaving] = useState(false)
+  const [seriesConflicts, setSeriesConflicts] = useState([]) // [{date, conflicts[]}]
+  const [showConflictWarning, setShowConflictWarning] = useState(false)
 
   function set(field, value) {
     setForm(f => ({ ...f, [field]: value }))
@@ -129,6 +132,17 @@ export default function SeriesFormModal({ onClose }) {
   async function handleSave() {
     const e = validate()
     if (Object.keys(e).length) { setErrors(e); return }
+
+    // Detecta conflitos em todas as datas da série
+    if (!showConflictWarning) {
+      const detected = detectSeriesConflicts(form, previewDates, consultations, unavailabilities)
+      if (detected.length > 0) {
+        setSeriesConflicts(detected)
+        setShowConflictWarning(true)
+        return
+      }
+    }
+
     setSaving(true)
     try {
       const result = await addConsultationSeries({
@@ -145,6 +159,7 @@ export default function SeriesFormModal({ onClose }) {
         endDate:               form.endDate || null,
         sessionCount:          Number(form.sessionCount) || null,
         notes:                 form.notes || null,
+        conflictsPerDate:      seriesConflicts,
       })
       if (result?.error) {
         toast.show(result.error, 'error')
@@ -163,15 +178,45 @@ export default function SeriesFormModal({ onClose }) {
       onClose={onClose}
       size="xl"
       footer={
-        <>
-          <Button variant="ghost" onClick={onClose}>Cancelar</Button>
-          <Button variant="primary" onClick={handleSave} disabled={saving}>
-            {saving ? 'Criando...' : `Criar Série${previewDates.length > 0 ? ` (${previewDates.length} atend.)` : ''}`}
-          </Button>
-        </>
+        showConflictWarning
+          ? <>
+              <Button variant="ghost" onClick={() => { setShowConflictWarning(false); setSeriesConflicts([]) }}>Cancelar</Button>
+              <Button variant="danger" onClick={handleSave} disabled={saving}>
+                {saving ? 'Criando...' : 'Criar mesmo assim'}
+              </Button>
+            </>
+          : <>
+              <Button variant="ghost" onClick={onClose}>Cancelar</Button>
+              <Button variant="primary" onClick={handleSave} disabled={saving}>
+                {saving ? 'Criando...' : `Criar Série${previewDates.length > 0 ? ` (${previewDates.length} atend.)` : ''}`}
+              </Button>
+            </>
       }
     >
       <div className="space-y-6">
+
+        {/* Aviso de conflitos */}
+        {showConflictWarning && seriesConflicts.length > 0 && (
+          <div className="flex flex-col gap-2 p-3 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-900">
+            <div className="flex items-center gap-2 font-semibold">
+              <span>⚠️</span>
+              <span>Conflitos encontrados em {seriesConflicts.length} data{seriesConflicts.length !== 1 ? 's' : ''} da série:</span>
+            </div>
+            <div className="space-y-2 max-h-48 overflow-y-auto text-xs text-amber-800">
+              {seriesConflicts.map(({ date, conflicts }) => (
+                <div key={date}>
+                  <div className="font-medium">{date.split('-').reverse().join('/')}</div>
+                  <ul className="pl-3 space-y-0.5">
+                    {conflicts.map((c, i) => (
+                      <li key={i}>• {CONFLICT_LABELS[c.conflictType] || c.conflictType}{c.description ? ` — ${c.description}` : ''}</li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+            <p className="text-xs text-amber-700">Deseja criar a série mesmo assim?</p>
+          </div>
+        )}
 
         {/* Aviso de datas passadas */}
         {hasPastDates && (

@@ -187,6 +187,14 @@ export default function ConsultationsPage() {
                         👥 {(c.consultationTherapists || []).length}
                       </span>
                     )}
+                    {(c.conflicts || []).length > 0 && (
+                      <span
+                        title={(c.conflicts || []).map(cf => cf.description || cf.conflictType).join('\n')}
+                        className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs font-medium bg-red-50 text-red-600"
+                      >
+                        ⚠ Conflito
+                      </span>
+                    )}
                   </div>
                   <div className="flex items-center gap-3 text-xs text-gray-500 flex-wrap">
                     <span>{formatDateShort(c.date)}{c.time && <span className="text-gray-400"> {c.time}</span>}</span>

@@ -9,6 +9,7 @@ import { useData } from '../../../context/DataContext'
 import { useAuth } from '../../../context/AuthContext'
 import { generateId } from '../../../utils/storageUtils'
 import { isoToday } from '../../../utils/dateUtils'
+import { detectConflicts, CONFLICT_LABELS } from '../../../utils/conflictUtils'
 
 const EMPTY_ACTIVITY = { id: '', name: '', description: '', outcome: 'achieved' }
 
@@ -22,7 +23,7 @@ const EMPTY = {
 }
 
 export default function ConsultationFormModal({ onClose, initial = {}, readOnly = false }) {
-  const { patients, therapists, specialtiesData, rooms, consultationStatuses, appointmentTypes, appointments, addConsultation, updateConsultation, updateConsultationSeries, getPrepaidData } = useData()
+  const { patients, therapists, specialtiesData, rooms, consultationStatuses, appointmentTypes, appointments, addConsultation, updateConsultation, updateConsultationSeries, getPrepaidData, consultations, unavailabilities } = useData()
   const { user } = useAuth()
   const isEdit = !!initial.id
 
@@ -44,6 +45,8 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
   const [errors, setErrors] = useState({})
   const [prepaidBalance, setPrepaidBalance] = useState(null)
   const [confirmSeriesEdit, setConfirmSeriesEdit] = useState(false)
+  const [conflictsToConfirm, setConflictsToConfirm] = useState(null) // null | conflicts[]
+  const [pendingConflicts, setPendingConflicts] = useState([])
 
   const hasSeries = isEdit && !!initial.seriesId
 
@@ -137,26 +140,55 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
     return e
   }
 
+  function buildConflictInput() {
+    return {
+      id: initial.id || null,
+      date: form.date,
+      time: form.time,
+      therapistId: form.therapistId,
+      roomId: form.roomId,
+      consultationTherapists: [
+        { therapistId: form.therapistId, isPrimary: true },
+        ...(form.secondaryTherapists || []).filter(t => t.therapistId).map(t => ({ therapistId: t.therapistId, isPrimary: false })),
+      ],
+    }
+  }
+
   function handleSave() {
     const e = validate()
     if (Object.keys(e).length) { setErrors(e); return }
-    // Terapeuta principal (admin ou não) escolhe escopo ao editar série
+    const conflicts = detectConflicts(buildConflictInput(), consultations, unavailabilities)
+    if (conflicts.length > 0) {
+      setConflictsToConfirm(conflicts)
+      return
+    }
+    proceedSave([])
+  }
+
+  function proceedSave(conflicts) {
     if (hasSeries && (isAdmin || user?.id === initial.therapistId)) {
+      setPendingConflicts(conflicts)
       setConfirmSeriesEdit(true)
       return
     }
-    // Caso restante: terapeuta adicional ou sem série — salva como ocorrência individual
     const saveData = hasSeries ? { ...form, isSeriesException: true } : form
-    if (isEdit) updateConsultation(initial.id, saveData)
-    else addConsultation(saveData)
+    if (isEdit) updateConsultation(initial.id, { ...saveData, conflicts })
+    else addConsultation({ ...saveData, conflicts })
     onClose()
+  }
+
+  function handleSaveAnyway() {
+    const conflicts = conflictsToConfirm || []
+    setConflictsToConfirm(null)
+    proceedSave(conflicts)
   }
 
   function doSave(scope) {
     const saveData = { ...form }
     if (scope === 'single') saveData.isSeriesException = true
+    const conflicts = pendingConflicts
     if (isEdit) {
-      updateConsultation(initial.id, saveData)
+      updateConsultation(initial.id, { ...saveData, conflicts })
       if (scope === 'forward') {
         updateConsultationSeries(initial.seriesId, initial.date, {
           time: form.time,
@@ -167,7 +199,7 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
         })
       }
     } else {
-      addConsultation(saveData)
+      addConsultation({ ...saveData, conflicts })
     }
     onClose()
   }
@@ -207,6 +239,11 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
       footer={
         readOnly
           ? <Button variant="ghost" onClick={onClose}>Fechar</Button>
+          : conflictsToConfirm !== null
+          ? <>
+              <Button variant="ghost" onClick={() => setConflictsToConfirm(null)}>Cancelar</Button>
+              <Button variant="danger" onClick={handleSaveAnyway}>Salvar mesmo assim</Button>
+            </>
           : confirmSeriesEdit
           ? <>
               <Button variant="ghost" onClick={() => setConfirmSeriesEdit(false)}>Voltar</Button>
@@ -230,6 +267,23 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
           <div className="flex items-start gap-2 p-3 bg-blue-50 border border-blue-100 rounded-xl text-sm text-blue-700">
             <FiRepeat size={15} className="shrink-0 mt-0.5" />
             <span>Esta consulta faz parte de uma série. <strong>Apenas esta</strong> salva só este registro (marca como exceção). <strong>Esta e as próximas</strong> aplica horário, sala, terapeuta, especialidade e tipo de atendimento aos atendimentos futuros não faturados da série.</span>
+          </div>
+        )}
+        {conflictsToConfirm !== null && conflictsToConfirm.length > 0 && (
+          <div className="flex flex-col gap-2 p-3 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-900">
+            <div className="flex items-center gap-2 font-semibold">
+              <span>⚠️</span>
+              <span>Conflitos encontrados para este atendimento:</span>
+            </div>
+            <ul className="space-y-1 pl-2 text-xs text-amber-800">
+              {conflictsToConfirm.map((c, i) => (
+                <li key={i} className="flex items-start gap-1.5">
+                  <span className="shrink-0">•</span>
+                  <span>{CONFLICT_LABELS[c.conflictType] || c.conflictType}{c.description ? ` — ${c.description}` : ''}</span>
+                </li>
+              ))}
+            </ul>
+            <p className="text-xs text-amber-700 mt-1">Deseja salvar mesmo assim?</p>
           </div>
         )}
         {isBlocked && (

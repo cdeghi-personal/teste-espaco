@@ -275,10 +275,10 @@ export default function AgendaPage() {
                           {isPrivate ? 'Consulta Particular' : shortName(patient?.fullName)}
                         </span>
                       </div>
-                      {(room || item.seriesId || (item.consultationTherapists || []).length > 1) && (
+                      {(room || item.seriesId || (item.consultationTherapists || []).length > 1 || (item.conflicts || []).length > 0) && (
                         <div className="flex items-center justify-between gap-1 mt-0.5">
                           <span className="truncate opacity-75 flex-1" style={{ fontSize: '10px' }}>{room?.name || ''}</span>
-                          {(item.seriesId || (item.consultationTherapists || []).length > 1) && (
+                          {(item.seriesId || (item.consultationTherapists || []).length > 1 || (item.conflicts || []).length > 0) && (
                             <div className="flex items-center gap-0.5 shrink-0">
                               {item.seriesId && !item.isSeriesException && (
                                 <span title="Recorrente" className="inline-flex items-center px-1 py-0.5 rounded bg-white/25" style={{ fontSize: '9px' }}>
@@ -297,6 +297,15 @@ export default function AgendaPage() {
                                   style={{ fontSize: '9px' }}
                                 >
                                   👥 {(item.consultationTherapists || []).length}
+                                </span>
+                              )}
+                              {(item.conflicts || []).length > 0 && (
+                                <span
+                                  title={(item.conflicts || []).map(c => c.description || c.conflictType).join('\n')}
+                                  className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded text-red-700 bg-red-100"
+                                  style={{ fontSize: '9px' }}
+                                >
+                                  ⚠
                                 </span>
                               )}
                             </div>
@@ -356,10 +365,10 @@ export default function AgendaPage() {
                           {isPrivate ? 'Consulta Particular' : shortName(patient?.fullName)}
                         </span>
                       </div>
-                      {(room || item.seriesId || (item.consultationTherapists || []).length > 1) && (
+                      {(room || item.seriesId || (item.consultationTherapists || []).length > 1 || (item.conflicts || []).length > 0) && (
                         <div className="flex items-center justify-between gap-1 mt-0.5">
                           <span className="truncate opacity-75 flex-1" style={{ fontSize: '10px' }}>{room?.name || ''}</span>
-                          {(item.seriesId || (item.consultationTherapists || []).length > 1) && (
+                          {(item.seriesId || (item.consultationTherapists || []).length > 1 || (item.conflicts || []).length > 0) && (
                             <div className="flex items-center gap-0.5 shrink-0">
                               {item.seriesId && !item.isSeriesException && (
                                 <span title="Recorrente" className="inline-flex items-center px-1 py-0.5 rounded bg-white/25" style={{ fontSize: '9px' }}>
@@ -378,6 +387,15 @@ export default function AgendaPage() {
                                   style={{ fontSize: '9px' }}
                                 >
                                   👥 {(item.consultationTherapists || []).length}
+                                </span>
+                              )}
+                              {(item.conflicts || []).length > 0 && (
+                                <span
+                                  title={(item.conflicts || []).map(c => c.description || c.conflictType).join('\n')}
+                                  className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded text-red-700 bg-red-100"
+                                  style={{ fontSize: '9px' }}
+                                >
+                                  ⚠
                                 </span>
                               )}
                             </div>
@@ -494,7 +512,7 @@ export default function AgendaPage() {
                         <div className="text-xs text-gray-500 truncate">
                           {isPrivate ? (room?.name || '') : `${therapist?.name}${room ? ` • ${room.name}` : ''}`}
                         </div>
-                        {(item.seriesId || (item.consultationTherapists || []).length > 1) && (
+                        {(item.seriesId || (item.consultationTherapists || []).length > 1 || (item.conflicts || []).length > 0) && (
                           <div className="flex items-center gap-1 mt-1 flex-wrap">
                             {item.seriesId && !item.isSeriesException && (
                               <span title="Recorrente" className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs bg-indigo-50 text-indigo-500">
@@ -512,6 +530,14 @@ export default function AgendaPage() {
                                 className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs bg-blue-50 text-blue-500"
                               >
                                 👥 {(item.consultationTherapists || []).length}
+                              </span>
+                            )}
+                            {(item.conflicts || []).length > 0 && (
+                              <span
+                                title={(item.conflicts || []).map(c => c.description || c.conflictType).join('\n')}
+                                className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs bg-red-50 text-red-600"
+                              >
+                                ⚠ {(item.conflicts || []).length}
                               </span>
                             )}
                           </div>
