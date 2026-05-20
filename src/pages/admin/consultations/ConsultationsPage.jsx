@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { FiPlus, FiSearch, FiClipboard, FiChevronDown, FiChevronUp, FiEdit2, FiTrash2, FiEye } from 'react-icons/fi'
+import { FiPlus, FiSearch, FiClipboard, FiChevronDown, FiChevronUp, FiEdit2, FiTrash2, FiEye, FiRepeat } from 'react-icons/fi'
 import HelpButton from '../../../components/ui/HelpButton'
 import { useData } from '../../../context/DataContext'
 import { useAuth } from '../../../context/AuthContext'
@@ -8,6 +8,7 @@ import Button from '../../../components/ui/Button'
 import Modal from '../../../components/ui/Modal'
 import EmptyState from '../../../components/ui/EmptyState'
 import ConsultationFormModal from './ConsultationFormModal'
+import SeriesFormModal from './SeriesFormModal'
 import { formatDateShort } from '../../../utils/dateUtils'
 
 export default function ConsultationsPage() {
@@ -20,8 +21,10 @@ export default function ConsultationsPage() {
   const [viewConsultation, setViewConsultation] = useState(null)
   const [expanded, setExpanded] = useState(null)
   const [seriesDeleteConfirm, setSeriesDeleteConfirm] = useState(null) // { id, seriesId, date }
+  const [showSeriesModal, setShowSeriesModal] = useState(false)
 
   const isAdmin = user?.role === 'admin'
+  const isAdminOrTeam = isAdmin || user?.belongsToTeam
 
   function getPatient(id) { return patients.find(p => p.id === id) }
   function getTherapist(id) { return therapists.find(t => t.id === id) }
@@ -67,11 +70,18 @@ export default function ConsultationsPage() {
         <div className="flex items-center gap-2 shrink-0">
           <HelpButton title="Como usar Atendimentos">
             <p><strong>Registrar atendimento:</strong> clique em <em>Novo Registro</em> e preencha paciente, terapeuta, especialidade, data, horário, status e tipo.</p>
+            <p><strong>Criar série:</strong> clique em <em>Série</em> para criar atendimentos recorrentes (ex.: toda segunda por 10 semanas).</p>
             <p><strong>Filtros:</strong> use os filtros de especialidade, status, tipo e terapeuta para localizar atendimentos específicos.</p>
             <p><strong>Editar:</strong> clique no lápis (✏) ou olhinho (👁) na linha para editar ou visualizar o atendimento. Terapeutas só podem editar ou excluir seus próprios atendimentos.</p>
             <p><strong>Status "Realizada":</strong> ao selecionar esse status, os campos Objetivo da Sessão, Relato de Evolução e Objetivo da Próxima Sessão tornam-se obrigatórios.</p>
             <p><strong>Status automáticos:</strong> configurados em Administração → Status Atendimento; aparecem nos filtros e no prontuário, mas não no formulário de registro.</p>
           </HelpButton>
+          {isAdminOrTeam && (
+            <Button variant="ghost" onClick={() => setShowSeriesModal(true)}>
+              <FiRepeat size={15} />
+              <span className="hidden sm:inline">Série</span>
+            </Button>
+          )}
           <Button variant="primary" onClick={() => { setEditConsultation(null); setShowModal(true) }}>
             <FiPlus size={16} />
             <span className="hidden sm:inline">Novo Registro</span>
@@ -239,6 +249,9 @@ export default function ConsultationsPage() {
           initial={viewConsultation}
           readOnly
         />
+      )}
+      {showSeriesModal && (
+        <SeriesFormModal onClose={() => setShowSeriesModal(false)} />
       )}
       {seriesDeleteConfirm && (
         <Modal
