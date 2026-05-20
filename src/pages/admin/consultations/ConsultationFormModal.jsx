@@ -140,10 +140,12 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
   function handleSave() {
     const e = validate()
     if (Object.keys(e).length) { setErrors(e); return }
-    if (hasSeries && isAdmin) {
+    // Terapeuta principal (admin ou não) escolhe escopo ao editar série
+    if (hasSeries && (isAdmin || user?.id === initial.therapistId)) {
       setConfirmSeriesEdit(true)
       return
     }
+    // Caso restante: terapeuta adicional ou sem série — salva como ocorrência individual
     const saveData = hasSeries ? { ...form, isSeriesException: true } : form
     if (isEdit) updateConsultation(initial.id, saveData)
     else addConsultation(saveData)

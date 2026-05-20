@@ -1610,6 +1610,11 @@ export function DataProvider({ children }) {
   // Atualiza campos estruturais das consultas futuras da série (não faturadas).
   // Nunca altera status, campos clínicos ou NF — mantém ledger intacto.
   async function updateConsultationSeries(seriesId, fromDate, data) {
+    // Terapeuta fora da equipe só atualiza ocorrências onde é o terapeuta principal
+    const { data: { session: _sessUS } } = await supabase.auth.getSession()
+    const callerUS = therapists.find(t => t.userId === _sessUS?.user?.id)
+    const isNonTeam = callerUS && !callerUS.belongsToTeam
+
     const update = {}
     if (data.time !== undefined) update.time = data.time || null
     if (data.roomId !== undefined) update.room_id = data.roomId || null
@@ -1618,13 +1623,15 @@ export function DataProvider({ children }) {
     if (data.specialty !== undefined) update.specialty = data.specialty
 
     if (Object.keys(update).length) {
-      const { error } = await supabase
+      let q = supabase
         .from('consultations')
         .update(update)
         .eq('series_id', seriesId)
         .gt('date', fromDate)
         .is('nf_number', null)
         .eq('is_series_exception', false)
+      if (isNonTeam) q = q.eq('therapist_id', callerUS.id)
+      const { error } = await q
       if (error) { toast.show(error.message); return { error: error.message } }
     }
 
@@ -1642,6 +1649,7 @@ export function DataProvider({ children }) {
 
     setConsultations(prev => prev.map(c => {
       if (c.seriesId !== seriesId || c.date <= fromDate || c.nfNumber || c.isSeriesException) return c
+      if (isNonTeam && c.therapistId !== callerUS.id) return c
       const patch = {}
       if (data.time !== undefined) patch.time = data.time
       if (data.roomId !== undefined) patch.roomId = data.roomId
