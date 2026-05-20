@@ -106,7 +106,16 @@ export function DataProvider({ children }) {
       }),
       supabase.from('guardians').select(GUARDIAN_SELECT),
       supabase.from('appointments').select('*').order('date').order('time'),
-      supabase.from('consultations').select(CONSULTATION_SELECT).order('date', { ascending: false }),
+      supabase.from('consultations').select(CONSULTATION_SELECT).order('date', { ascending: false }).then(res => {
+        // Se a query falhar (ex: tabela consultation_conflicts ainda não existe),
+        // tenta sem a relação para não quebrar o carregamento
+        if (res.error) {
+          const SELECT_FALLBACK = CONSULTATION_SELECT
+            .replace(/,\s*consultation_conflicts\([^)]*\)/, '')
+          return supabase.from('consultations').select(SELECT_FALLBACK).order('date', { ascending: false })
+        }
+        return res
+      }),
       supabase.from('therapists').select('*, therapist_specialties(specialty, credential, can_be_rt)').order('name'),
       supabase.from('specialties').select('*').order('label'),
       supabase.from('payment_methods').select('*').order('name'),
