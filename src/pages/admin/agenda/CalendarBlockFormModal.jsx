@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { FiAlertTriangle } from 'react-icons/fi'
 import Modal from '../../../components/ui/Modal'
 import Button from '../../../components/ui/Button'
@@ -14,7 +14,7 @@ const WEEKDAYS_OPTS = [
 
 const EMPTY = {
   therapistId: '',
-  blockType: 'TOTAL',
+  blockType: 'RIGID',
   description: '',
   date: '',
   startTime: '',
@@ -37,7 +37,7 @@ function hasTimeOverlap(startA, endA, startB, endB) {
 }
 
 export default function CalendarBlockFormModal({ onClose, initial = {} }) {
-  const { therapists, consultations, addCalendarBlock, addCalendarBlockSeries, updateCalendarBlock, updateCalendarBlockSeriesFuture, cancelCalendarBlock, cancelCalendarBlockSeriesFuture } = useData()
+  const { therapists, patients, consultations, addCalendarBlock, addCalendarBlockSeries, updateCalendarBlock, updateCalendarBlockSeriesFuture, cancelCalendarBlock, cancelCalendarBlockSeriesFuture } = useData()
   const { user } = useAuth()
   const toast = useToast()
   const isAdmin = user?.role === 'admin'
@@ -51,7 +51,7 @@ export default function CalendarBlockFormModal({ onClose, initial = {} }) {
     therapistId: !isAdmin && user?.id ? user.id : '',
     ...initial,
     // Map camelCase block fields to form fields
-    blockType: initial.blockType || 'TOTAL',
+    blockType: initial.blockType || 'RIGID',
     description: initial.description || '',
     date: initial.date || '',
     startTime: initial.startTime || '',
@@ -366,27 +366,30 @@ export default function CalendarBlockFormModal({ onClose, initial = {} }) {
           <div className="flex gap-2">
             <button
               type="button"
-              onClick={() => set('blockType', 'TOTAL')}
+              onClick={() => set('blockType', 'RIGID')}
               className={`flex-1 py-2 px-3 rounded-xl text-sm font-medium border transition-all ${
-                form.blockType === 'TOTAL'
-                  ? 'bg-red-500 text-white border-red-500'
+                form.blockType === 'RIGID'
+                  ? 'bg-gray-700 text-white border-gray-700'
                   : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
               }`}
             >
-              Total (dia inteiro)
+              Rígido
             </button>
             <button
               type="button"
-              onClick={() => set('blockType', 'PARTIAL')}
+              onClick={() => set('blockType', 'FLEX')}
               className={`flex-1 py-2 px-3 rounded-xl text-sm font-medium border transition-all ${
-                form.blockType === 'PARTIAL'
-                  ? 'bg-amber-500 text-white border-amber-500'
+                form.blockType === 'FLEX'
+                  ? 'bg-gray-500 text-white border-gray-500'
                   : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
               }`}
             >
-              Parcial (horário)
+              Flex
             </button>
           </div>
+          <p className="text-xs text-gray-400 mt-1.5">
+            <strong>Rígido:</strong> compromisso externo, ausência — não deve haver atendimento. <strong>Flex:</strong> reunião, home office — gera alerta.
+          </p>
         </div>
 
         {/* Descrição/Motivo */}
@@ -548,11 +551,14 @@ export default function CalendarBlockFormModal({ onClose, initial = {} }) {
                   {consultationConflicts.length} atendimento(s) agendado(s) se sobrepõem a este bloqueio.
                 </p>
                 <ul className="mt-1.5 space-y-0.5">
-                  {consultationConflicts.slice(0, 5).map(c => (
-                    <li key={`${c.id}-${c.checkDate}`} className="text-xs text-amber-700">
-                      • {c.checkDate?.split('-').reverse().join('/')} às {c.time?.slice(0, 5) || '—'}
-                    </li>
-                  ))}
+                  {consultationConflicts.slice(0, 5).map(c => {
+                    const patientName = patients.find(p => p.id === c.patientId)?.fullName || '—'
+                    return (
+                      <li key={`${c.id}-${c.checkDate}`} className="text-xs text-amber-700">
+                        • {patientName} — {c.checkDate?.split('-').reverse().join('/')} às {c.time?.slice(0, 5) || '—'}{c.specialty ? ` (${c.specialty})` : ''}
+                      </li>
+                    )
+                  })}
                   {consultationConflicts.length > 5 && (
                     <li className="text-xs text-amber-600">...e mais {consultationConflicts.length - 5}</li>
                   )}

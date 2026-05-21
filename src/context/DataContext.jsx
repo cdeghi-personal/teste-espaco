@@ -193,14 +193,15 @@ export function DataProvider({ children }) {
     }
   }
 
-  async function rebuildRelatedConflicts(relatedIds, updatedConsultations) {
+  async function rebuildRelatedConflicts(relatedIds, updatedConsultations, blocksOverride) {
+    const effectiveBlocks = blocksOverride !== undefined ? blocksOverride : calendarBlocks
     for (const relatedId of relatedIds) {
       const relatedC = updatedConsultations.find(c => c.id === relatedId)
       if (!relatedC) continue
       const relatedConflicts = detectConflicts(
         { id: relatedC.id, date: relatedC.date, time: relatedC.time, therapistId: relatedC.therapistId, roomId: relatedC.roomId, consultationTherapists: relatedC.consultationTherapists || [] },
         updatedConsultations,
-        calendarBlocks
+        effectiveBlocks
       )
       await persistConflicts(relatedId, relatedConflicts)
       setConsultations(prev => prev.map(c => c.id === relatedId ? { ...c, conflicts: relatedConflicts } : c))
@@ -1807,7 +1808,15 @@ export function DataProvider({ children }) {
       .single()
     if (error) return dbError(error, toast)
     const mapped = mapCalendarBlock(inserted)
-    setCalendarBlocks(prev => [mapped, ...prev])
+    const updatedBlocks = [mapped, ...calendarBlocks]
+    setCalendarBlocks(updatedBlocks)
+    const affected = consultations.filter(c =>
+      c.date === mapped.date && c.time &&
+      [c.therapistId, ...(c.consultationTherapists || []).map(ct => ct.therapistId)].includes(mapped.therapistId)
+    )
+    if (affected.length > 0) {
+      await rebuildRelatedConflicts(affected.map(c => c.id), consultations, updatedBlocks)
+    }
     return mapped
   }
 
@@ -1863,7 +1872,16 @@ export function DataProvider({ children }) {
     if (blocksErr) return dbError(blocksErr, toast)
 
     const mapped = (inserted || []).map(mapCalendarBlock)
-    setCalendarBlocks(prev => [...mapped, ...prev])
+    const updatedBlocks = [...mapped, ...calendarBlocks]
+    setCalendarBlocks(updatedBlocks)
+    const affectedDates = new Set(mapped.map(b => b.date))
+    const affected = consultations.filter(c =>
+      affectedDates.has(c.date) && c.time &&
+      [c.therapistId, ...(c.consultationTherapists || []).map(ct => ct.therapistId)].includes(data.therapistId)
+    )
+    if (affected.length > 0) {
+      await rebuildRelatedConflicts(affected.map(c => c.id), consultations, updatedBlocks)
+    }
     return { series: mapCalendarBlockSeries(series), blocks: mapped, count: mapped.length }
   }
 
@@ -1878,7 +1896,19 @@ export function DataProvider({ children }) {
     update.updated_at = new Date().toISOString()
     const { error } = await supabase.from('calendar_blocks').update(update).eq('id', id)
     if (error) return dbError(error, toast)
-    setCalendarBlocks(prev => prev.map(b => b.id === id ? { ...b, ...data } : b))
+    const existing = calendarBlocks.find(b => b.id === id)
+    const updatedBlocks = calendarBlocks.map(b => b.id === id ? { ...b, ...data } : b)
+    setCalendarBlocks(updatedBlocks)
+    if (existing) {
+      const dates = new Set([data.date || existing.date, existing.date].filter(Boolean))
+      const affected = consultations.filter(c =>
+        dates.has(c.date) && c.time &&
+        [c.therapistId, ...(c.consultationTherapists || []).map(ct => ct.therapistId)].includes(existing.therapistId)
+      )
+      if (affected.length > 0) {
+        await rebuildRelatedConflicts(affected.map(c => c.id), consultations, updatedBlocks)
+      }
+    }
   }
 
   async function updateCalendarBlockSeriesFuture(seriesId, fromDate, data) {
@@ -1895,22 +1925,44 @@ export function DataProvider({ children }) {
       .gte('date', fromDate)
       .eq('cancelled', false)
     if (error) return dbError(error, toast)
-    setCalendarBlocks(prev => prev.map(b =>
-      b.seriesId === seriesId && b.date >= fromDate && !b.cancelled
-        ? { ...b, ...data }
-        : b
-    ))
+    const seriesBlocks = calendarBlocks.filter(b => b.seriesId === seriesId && b.date >= fromDate && !b.cancelled)
+    const updatedBlocks = calendarBlocks.map(b =>
+      b.seriesId === seriesId && b.date >= fromDate && !b.cancelled ? { ...b, ...data } : b
+    )
+    setCalendarBlocks(updatedBlocks)
+    const affectedDates = new Set(seriesBlocks.map(b => b.date))
+    const therapistId = seriesBlocks[0]?.therapistId
+    if (therapistId && affectedDates.size > 0) {
+      const affected = consultations.filter(c =>
+        affectedDates.has(c.date) && c.time &&
+        [c.therapistId, ...(c.consultationTherapists || []).map(ct => ct.therapistId)].includes(therapistId)
+      )
+      if (affected.length > 0) {
+        await rebuildRelatedConflicts(affected.map(c => c.id), consultations, updatedBlocks)
+      }
+    }
   }
 
   async function cancelCalendarBlock(id) {
     const { data: { session } } = await supabase.auth.getSession()
     const now = new Date().toISOString()
+    const block = calendarBlocks.find(b => b.id === id)
     const { error } = await supabase
       .from('calendar_blocks')
       .update({ cancelled: true, cancelled_at: now, cancelled_by: session?.user?.id || null, updated_at: now })
       .eq('id', id)
     if (error) return dbError(error, toast)
-    setCalendarBlocks(prev => prev.filter(b => b.id !== id))
+    const updatedBlocks = calendarBlocks.filter(b => b.id !== id)
+    setCalendarBlocks(updatedBlocks)
+    if (block) {
+      const affected = consultations.filter(c =>
+        c.date === block.date && c.time &&
+        [c.therapistId, ...(c.consultationTherapists || []).map(ct => ct.therapistId)].includes(block.therapistId)
+      )
+      if (affected.length > 0) {
+        await rebuildRelatedConflicts(affected.map(c => c.id), consultations, updatedBlocks)
+      }
+    }
   }
 
   async function cancelCalendarBlockSeriesFuture(seriesId, fromDate) {
@@ -1918,6 +1970,7 @@ export function DataProvider({ children }) {
     const now = new Date().toISOString()
     const today = new Date().toISOString().slice(0, 10)
     const cutoff = fromDate > today ? fromDate : today
+    const toCancel = calendarBlocks.filter(b => b.seriesId === seriesId && b.date >= cutoff && !b.cancelled)
     const { error } = await supabase
       .from('calendar_blocks')
       .update({ cancelled: true, cancelled_at: now, cancelled_by: session?.user?.id || null, updated_at: now })
@@ -1925,7 +1978,19 @@ export function DataProvider({ children }) {
       .gte('date', cutoff)
       .eq('cancelled', false)
     if (error) return dbError(error, toast)
-    setCalendarBlocks(prev => prev.filter(b => !(b.seriesId === seriesId && b.date >= cutoff && !b.cancelled)))
+    const updatedBlocks = calendarBlocks.filter(b => !(b.seriesId === seriesId && b.date >= cutoff && !b.cancelled))
+    setCalendarBlocks(updatedBlocks)
+    const affectedDates = new Set(toCancel.map(b => b.date))
+    const therapistId = toCancel[0]?.therapistId
+    if (therapistId && affectedDates.size > 0) {
+      const affected = consultations.filter(c =>
+        affectedDates.has(c.date) && c.time &&
+        [c.therapistId, ...(c.consultationTherapists || []).map(ct => ct.therapistId)].includes(therapistId)
+      )
+      if (affected.length > 0) {
+        await rebuildRelatedConflicts(affected.map(c => c.id), consultations, updatedBlocks)
+      }
+    }
   }
 
   async function getCalendarBlockHistory(therapistId) {

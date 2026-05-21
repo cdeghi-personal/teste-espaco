@@ -8,10 +8,10 @@ export const CONFLICT_TYPES = {
 }
 
 export const CONFLICT_LABELS = {
-  THERAPIST_OVERLAP:           'Conflito de terapeuta',
-  ROOM_OVERLAP:                'Conflito de sala',
-  THERAPIST_UNAVAILABLE_TOTAL: 'Terapeuta indisponível',
-  THERAPIST_UNAVAILABLE_PARTIAL: 'Indisponibilidade parcial',
+  THERAPIST_OVERLAP:             'Conflito de terapeuta',
+  ROOM_OVERLAP:                  'Conflito de sala',
+  THERAPIST_UNAVAILABLE_TOTAL:   'Bloqueio rígido',
+  THERAPIST_UNAVAILABLE_PARTIAL: 'Bloqueio flex',
 }
 
 function timeToMinutes(time) {
@@ -115,9 +115,9 @@ export function detectConflicts(input, allConsultations, calendarBlocks = []) {
     if (blockStart === null || blockEnd === null) continue
     if (!hasTimeOverlap(startA, endA, blockStart, blockEnd)) continue
 
-    const isTotal = b.blockType === 'TOTAL'
+    const isRigid = b.blockType === 'RIGID'
     conflicts.push({
-      conflictType: isTotal
+      conflictType: isRigid
         ? CONFLICT_TYPES.THERAPIST_UNAVAILABLE_TOTAL
         : CONFLICT_TYPES.THERAPIST_UNAVAILABLE_PARTIAL,
       therapistId: b.therapistId,
@@ -126,10 +126,10 @@ export function detectConflicts(input, allConsultations, calendarBlocks = []) {
       startTime: minutesToTime(startA),
       endTime: minutesToTime(endA),
       description: b.description
-        ? `${isTotal ? 'Indisponível' : 'Bloqueio parcial'}: ${b.description}`
-        : (isTotal
-            ? 'Terapeuta com bloqueio de agenda neste horário'
-            : 'Bloqueio parcial — verificar disponibilidade'),
+        ? `${isRigid ? 'Bloqueio rígido' : 'Bloqueio flex'}: ${b.description}`
+        : (isRigid
+            ? 'Terapeuta com bloqueio rígido neste horário'
+            : 'Terapeuta com bloqueio flex neste horário'),
     })
   }
 

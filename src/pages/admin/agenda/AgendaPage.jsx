@@ -39,23 +39,33 @@ function formatDay(date) {
 
 function BlockCard({ block, therapist, onEdit, isAdmin, userId }) {
   const canEdit = isAdmin || userId === block.therapistId
+  const isRigid = block.blockType === 'RIGID'
+  const cardCls = isRigid
+    ? 'bg-gray-200 border-gray-400 text-gray-800'
+    : 'bg-gray-100 border-gray-300 text-gray-600'
+  const chipCls = isRigid
+    ? 'bg-gray-700 text-white'
+    : 'bg-gray-400 text-white'
   return (
-    <div className="rounded-lg px-2 py-1.5 text-xs bg-amber-50 border border-amber-200 text-amber-800 group relative">
+    <div className={`rounded-lg px-2 py-1.5 text-xs border group relative ${cardCls}`}>
       <div className="flex items-baseline gap-1 min-w-0">
         <span className="font-bold shrink-0">{block.startTime?.slice(0, 5)}</span>
-        <span className="opacity-60">-</span>
+        <span className="opacity-60">–</span>
         <span className="font-bold shrink-0">{block.endTime?.slice(0, 5)}</span>
-        <span className="font-medium truncate ml-1">Bloqueio</span>
+        {block.description && <span className="truncate ml-1 opacity-75">{block.description}</span>}
       </div>
-      <div className="flex items-center gap-1 mt-0.5" style={{ fontSize: '10px' }}>
-        <span className="truncate opacity-75 flex-1">{block.description || therapist?.name || ''}</span>
-        <span className={`px-1 rounded ${block.blockType === 'TOTAL' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`} style={{ fontSize: '9px' }}>
-          {block.blockType === 'TOTAL' ? 'Total' : 'Parcial'}
+      <div className="flex items-center gap-1 mt-0.5 min-w-0" style={{ fontSize: '10px' }}>
+        {therapist?.color && (
+          <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: therapist.color }} />
+        )}
+        <span className="truncate flex-1">{therapist?.name || '—'}</span>
+        <span className={`px-1 rounded shrink-0 ${chipCls}`} style={{ fontSize: '9px' }}>
+          {isRigid ? 'Rígido' : 'Flex'}
         </span>
       </div>
       {canEdit && (
         <div className="absolute top-1 right-1 hidden group-hover:flex gap-0.5">
-          <button onClick={onEdit} className="w-5 h-5 rounded flex items-center justify-center bg-amber-200 hover:bg-amber-300 transition-colors">
+          <button onClick={onEdit} className="w-5 h-5 rounded flex items-center justify-center bg-gray-300 hover:bg-gray-400 transition-colors">
             <FiEdit2 size={10} />
           </button>
         </div>
@@ -666,27 +676,31 @@ export default function AgendaPage() {
                 {mobileBlocks.map(block => {
                   const blockTherapist = getTherapist(block.therapistId)
                   const canEditBlock = user?.role === 'admin' || user?.id === block.therapistId
+                  const isRigid = block.blockType === 'RIGID'
                   return (
-                    <div key={block.id} className="flex items-center gap-3 p-4 bg-amber-50/50">
-                      <div className="w-1 self-stretch rounded-full shrink-0 bg-amber-400" />
+                    <div key={block.id} className="flex items-center gap-3 p-4 bg-gray-50">
+                      <div className={`w-1 self-stretch rounded-full shrink-0 ${isRigid ? 'bg-gray-500' : 'bg-gray-300'}`} />
                       <div className="flex-1 min-w-0">
-                        <div className="font-semibold text-sm text-amber-800">
+                        <div className="font-semibold text-sm text-gray-800">
                           {block.startTime?.slice(0, 5)}–{block.endTime?.slice(0, 5)} — Bloqueio
                         </div>
-                        <div className="text-xs text-amber-700">
-                          {blockTherapist?.name || '—'}{block.description ? ` • ${block.description}` : ''}
+                        <div className="flex items-center gap-1.5 text-xs text-gray-600 mt-0.5">
+                          {blockTherapist?.color && (
+                            <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: blockTherapist.color }} />
+                          )}
+                          <span>{blockTherapist?.name || '—'}{block.description ? ` • ${block.description}` : ''}</span>
                         </div>
                         <span className={`mt-1 inline-block px-1.5 py-0.5 rounded text-xs font-medium ${
-                          block.blockType === 'TOTAL' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'
+                          isRigid ? 'bg-gray-200 text-gray-700' : 'bg-gray-100 text-gray-500'
                         }`}>
-                          {block.blockType === 'TOTAL' ? 'Total' : 'Parcial'}
+                          {isRigid ? 'Rígido' : 'Flex'}
                         </span>
                       </div>
                       {canEditBlock && (
                         <div className="flex gap-1 shrink-0">
                           <button
                             onClick={() => { setEditBlock(block); setShowBlockModal(true) }}
-                            className="p-2 rounded-lg text-gray-400 hover:text-amber-600 hover:bg-amber-50"
+                            className="p-2 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100"
                           >
                             <FiEdit2 size={15} />
                           </button>
