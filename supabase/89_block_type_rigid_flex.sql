@@ -25,6 +25,12 @@ BEGIN
   END LOOP;
 END $$;
 
+-- Migra dados existentes: TOTAL → RIGID, PARTIAL → FLEX
+UPDATE calendar_blocks       SET block_type = 'RIGID' WHERE block_type = 'TOTAL';
+UPDATE calendar_blocks       SET block_type = 'FLEX'  WHERE block_type = 'PARTIAL';
+UPDATE calendar_block_series SET block_type = 'RIGID' WHERE block_type = 'TOTAL';
+UPDATE calendar_block_series SET block_type = 'FLEX'  WHERE block_type = 'PARTIAL';
+
 -- Adiciona novas constraints com os valores finais
 ALTER TABLE calendar_blocks
   ADD CONSTRAINT calendar_blocks_block_type_check
