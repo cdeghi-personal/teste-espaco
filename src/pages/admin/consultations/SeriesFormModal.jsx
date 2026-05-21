@@ -21,7 +21,7 @@ const WEEKDAYS = [
 ]
 
 export default function SeriesFormModal({ onClose }) {
-  const { patients, therapists, specialtiesData, rooms, consultationStatuses, appointmentTypes, addConsultationSeries, consultations, unavailabilities } = useData()
+  const { patients, therapists, specialtiesData, rooms, consultationStatuses, appointmentTypes, addConsultationSeries, consultations, calendarBlocks } = useData()
   const { user } = useAuth()
   const toast = useToast()
 
@@ -135,7 +135,7 @@ export default function SeriesFormModal({ onClose }) {
 
     // Detecta conflitos em todas as datas da série
     if (!showConflictWarning) {
-      const detected = detectSeriesConflicts(form, previewDates, consultations, unavailabilities)
+      const detected = detectSeriesConflicts(form, previewDates, consultations, calendarBlocks)
       if (detected.length > 0) {
         setSeriesConflicts(detected)
         setShowConflictWarning(true)

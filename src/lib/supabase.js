@@ -187,28 +187,12 @@ export function mapConsultation(row) {
         relatedConsultationId: c.related_consultation_id || null,
         therapistId: c.therapist_id || null,
         roomId: c.room_id || null,
-        unavailabilityId: c.unavailability_id || null,
+        calendarBlockId: c.calendar_block_id || null,
         conflictDate: c.conflict_date,
         startTime: c.start_time,
         endTime: c.end_time,
         description: c.description || '',
       })),
-    createdAt: row.created_at,
-  }
-}
-
-export function mapUnavailability(row) {
-  return {
-    id: row.id,
-    therapistId: row.therapist_id,
-    unavailableType: row.unavailable_type,
-    reason: row.reason || '',
-    startDate: row.start_date,
-    endDate: row.end_date || null,
-    startTime: row.start_time || null,
-    endTime: row.end_time || null,
-    weekdays: row.weekdays || null,
-    active: row.active !== false,
     createdAt: row.created_at,
   }
 }
@@ -234,6 +218,47 @@ export function mapConsultationSeries(row) {
     createdBy: row.created_by,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+  }
+}
+
+export function mapCalendarBlock(row) {
+  return {
+    id: row.id,
+    seriesId: row.series_id || null,
+    therapistId: row.therapist_id,
+    blockType: row.block_type,
+    description: row.description || '',
+    date: row.date,
+    startTime: row.start_time,
+    endTime: row.end_time,
+    seriesOriginalDate: row.series_original_date || null,
+    isSeriesException: row.is_series_exception || false,
+    active: row.active !== false,
+    cancelled: row.cancelled || false,
+    cancelledAt: row.cancelled_at || null,
+    cancelledBy: row.cancelled_by || null,
+    createdBy: row.created_by || null,
+    createdAt: row.created_at,
+  }
+}
+
+export function mapCalendarBlockSeries(row) {
+  return {
+    id: row.id,
+    therapistId: row.therapist_id,
+    blockType: row.block_type,
+    description: row.description || '',
+    startDate: row.start_date,
+    endDate: row.end_date || null,
+    recurrenceType: row.recurrence_type || null,
+    recurrenceDays: row.recurrence_days || [],
+    sessionCount: row.session_count || null,
+    startTime: row.start_time,
+    endTime: row.end_time,
+    active: row.active !== false,
+    cancelled: row.cancelled || false,
+    createdBy: row.created_by || null,
+    createdAt: row.created_at,
   }
 }
 

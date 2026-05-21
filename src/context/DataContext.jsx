@@ -2,9 +2,9 @@ import { createContext, useContext, useState, useEffect, useCallback } from 'rea
 import {
   supabase,
   mapPatient, mapGuardian, mapTherapist, mapAppointment, mapConsultation, mapConsultationSeries,
+  mapCalendarBlock, mapCalendarBlockSeries,
   mapSpecialty, mapPaymentMethod, mapDiagnosis, mapPatientStatus, mapRoom,
   mapConsultationStatus, mapAppointmentType, mapExam, mapMedication, mapConduct,
-  mapUnavailability,
   syncPatientRelations, syncGuardianPatients,
   syncTherapistSpecialties, syncExternalTherapists, syncInvolvedTherapists,
 } from '../lib/supabase'
@@ -66,7 +66,7 @@ const CONSULTATION_SELECT = `
   session_quality, created_at,
   consultation_activities(id, name, description, outcome, sort_order),
   consultation_therapists(id, therapist_id, specialty, is_primary),
-  consultation_conflicts(id, conflict_type, related_consultation_id, therapist_id, room_id, unavailability_id, conflict_date, start_time, end_time, description, resolved)
+  consultation_conflicts(id, conflict_type, related_consultation_id, therapist_id, room_id, calendar_block_id, conflict_date, start_time, end_time, description, resolved)
 `
 
 // ─── Provider ─────────────────────────────────────────────────────────────────
@@ -87,14 +87,14 @@ export function DataProvider({ children }) {
   const [appointmentTypes, setAppointmentTypes] = useState([])
   const [ageRanges, setAgeRanges] = useState([])
   const [companySettings, setCompanySettings] = useState({ razaoSocial: '', cnpj: '', aiSystemPrompt: '', cnes: '', therapistDiscountPercent: 0 })
-  const [unavailabilities, setUnavailabilities] = useState([])
+  const [calendarBlocks, setCalendarBlocks] = useState([])
   const [isLoading, setIsLoading] = useState(true)
 
   const fetchAll = useCallback(async () => {
     setIsLoading(true)
     const [
       patientsRes, guardiansRes, appointmentsRes, consultationsRes,
-      therapistsRes, specialtiesRes, paymentRes, diagnosesRes, statusesRes, roomsRes, consultStatusRes, apptTypesRes, ageRangesRes, companyRes, unavailRes,
+      therapistsRes, specialtiesRes, paymentRes, diagnosesRes, statusesRes, roomsRes, consultStatusRes, apptTypesRes, ageRangesRes, companyRes, calendarBlocksRes,
     ] = await Promise.all([
       supabase.from('patients').select(PATIENT_SELECT).eq('deleted', false).then(res => {
         // Se a query falhar (ex: tabela patient_involved_therapists ainda não existe),
@@ -126,7 +126,7 @@ export function DataProvider({ children }) {
       supabase.from('appointment_types').select('*').order('name'),
       supabase.from('age_ranges').select('*').order('min_age'),
       supabase.from('company_settings').select('razao_social, cnpj, ai_system_prompt, cnes, therapist_discount_percent').eq('id', 1).maybeSingle(),
-      supabase.from('therapist_unavailabilities').select('*').order('start_date'),
+      supabase.from('calendar_blocks').select('*').eq('cancelled', false).order('date', { ascending: false }),
     ])
 
     setPatients((patientsRes.data || []).map(mapPatient))
@@ -153,7 +153,7 @@ export function DataProvider({ children }) {
         therapistDiscountPercent: companyRes.data.therapist_discount_percent ?? 0,
       })
     }
-    setUnavailabilities((unavailRes.data || []).map(mapUnavailability))
+    setCalendarBlocks((calendarBlocksRes.data || []).map(mapCalendarBlock))
     setIsLoading(false)
   }, [])
 
@@ -181,7 +181,7 @@ export function DataProvider({ children }) {
           related_consultation_id: c.relatedConsultationId || null,
           therapist_id: c.therapistId || null,
           room_id: c.roomId || null,
-          unavailability_id: c.unavailabilityId || null,
+          calendar_block_id: c.calendarBlockId || null,
           conflict_date: c.conflictDate,
           start_time: c.startTime,
           end_time: c.endTime,
@@ -200,7 +200,7 @@ export function DataProvider({ children }) {
       const relatedConflicts = detectConflicts(
         { id: relatedC.id, date: relatedC.date, time: relatedC.time, therapistId: relatedC.therapistId, roomId: relatedC.roomId, consultationTherapists: relatedC.consultationTherapists || [] },
         updatedConsultations,
-        unavailabilities
+        calendarBlocks
       )
       await persistConflicts(relatedId, relatedConflicts)
       setConsultations(prev => prev.map(c => c.id === relatedId ? { ...c, conflicts: relatedConflicts } : c))
@@ -1788,61 +1788,153 @@ export function DataProvider({ children }) {
     setConsultations(prev => prev.filter(c => !ids.includes(c.id)))
   }
 
-  // ─── Unavailabilities ────────────────────────────────────────────────────────
+  // ─── Calendar Blocks ────────────────────────────────────────────────────────
 
-  async function addUnavailability(data) {
+  async function addCalendarBlock(data) {
     const { data: { session } } = await supabase.auth.getSession()
     const { data: inserted, error } = await supabase
-      .from('therapist_unavailabilities')
+      .from('calendar_blocks')
       .insert({
-        therapist_id:     data.therapistId,
-        unavailable_type: data.unavailableType,
-        reason:           data.reason || null,
-        start_date:       data.startDate,
-        end_date:         data.endDate || null,
-        start_time:       data.startTime || null,
-        end_time:         data.endTime || null,
-        weekdays:         data.weekdays?.length ? data.weekdays : null,
-        active:           data.active !== false,
-        created_by:       session?.user?.id || null,
+        therapist_id: data.therapistId,
+        block_type:   data.blockType,
+        description:  data.description || null,
+        date:         data.date,
+        start_time:   data.startTime,
+        end_time:     data.endTime,
+        created_by:   session?.user?.id || null,
       })
-      .select()
+      .select('*')
       .single()
     if (error) return dbError(error, toast)
-    const mapped = mapUnavailability(inserted)
-    setUnavailabilities(prev => [...prev, mapped])
+    const mapped = mapCalendarBlock(inserted)
+    setCalendarBlocks(prev => [mapped, ...prev])
     return mapped
   }
 
-  async function updateUnavailability(id, data) {
-    const update = {}
-    if (data.unavailableType !== undefined) update.unavailable_type = data.unavailableType
-    if (data.reason !== undefined)          update.reason = data.reason || null
-    if (data.startDate !== undefined)       update.start_date = data.startDate
-    if (data.endDate !== undefined)         update.end_date = data.endDate || null
-    if (data.startTime !== undefined)       update.start_time = data.startTime || null
-    if (data.endTime !== undefined)         update.end_time = data.endTime || null
-    if (data.weekdays !== undefined)        update.weekdays = data.weekdays?.length ? data.weekdays : null
-    if (data.active !== undefined)          update.active = data.active
-    update.updated_at = new Date().toISOString()
-    const { error } = await supabase.from('therapist_unavailabilities').update(update).eq('id', id)
-    if (error) return dbError(error, toast)
-    setUnavailabilities(prev => prev.map(u => u.id === id ? { ...u, ...data } : u))
-  }
+  async function addCalendarBlockSeries(data) {
+    const { data: { session } } = await supabase.auth.getSession()
 
-  async function deleteUnavailability(id) {
-    await supabase.from('therapist_unavailabilities').delete().eq('id', id)
-    setUnavailabilities(prev => prev.filter(u => u.id !== id))
-  }
+    // 1. Generate dates
+    const dates = generateSeriesDates({
+      recurrenceType: data.recurrenceType,
+      recurrenceDays: data.recurrenceDays,
+      startDate: data.startDate,
+      endDate: data.endDate,
+      sessionCount: data.sessionCount,
+    })
+    if (!dates || dates.length === 0) return { error: 'Nenhuma data gerada com os parâmetros informados.' }
 
-  async function getUnavailabilitiesForTherapist(therapistId) {
-    const { data, error } = await supabase
-      .from('therapist_unavailabilities')
+    // 2. Create series record
+    const { data: series, error: seriesErr } = await supabase
+      .from('calendar_block_series')
+      .insert({
+        therapist_id:     data.therapistId,
+        block_type:       data.blockType,
+        description:      data.description || null,
+        start_date:       data.startDate,
+        end_date:         data.endDate || null,
+        recurrence_type:  data.recurrenceType,
+        recurrence_days:  data.recurrenceDays,
+        session_count:    data.sessionCount || null,
+        start_time:       data.startTime,
+        end_time:         data.endTime,
+        created_by:       session?.user?.id || null,
+      })
       .select('*')
-      .eq('therapist_id', therapistId)
-      .order('start_date')
+      .single()
+    if (seriesErr) return dbError(seriesErr, toast)
+
+    // 3. Bulk insert blocks
+    const blocks = dates.map(date => ({
+      series_id:            series.id,
+      therapist_id:         data.therapistId,
+      block_type:           data.blockType,
+      description:          data.description || null,
+      date,
+      start_time:           data.startTime,
+      end_time:             data.endTime,
+      series_original_date: date,
+      created_by:           session?.user?.id || null,
+    }))
+    const { data: inserted, error: blocksErr } = await supabase
+      .from('calendar_blocks')
+      .insert(blocks)
+      .select('*')
+    if (blocksErr) return dbError(blocksErr, toast)
+
+    const mapped = (inserted || []).map(mapCalendarBlock)
+    setCalendarBlocks(prev => [...mapped, ...prev])
+    return { series: mapCalendarBlockSeries(series), blocks: mapped, count: mapped.length }
+  }
+
+  async function updateCalendarBlock(id, data) {
+    const update = {}
+    if (data.blockType !== undefined)        update.block_type          = data.blockType
+    if (data.description !== undefined)      update.description         = data.description || null
+    if (data.date !== undefined)             update.date                = data.date
+    if (data.startTime !== undefined)        update.start_time          = data.startTime
+    if (data.endTime !== undefined)          update.end_time            = data.endTime
+    if (data.isSeriesException !== undefined) update.is_series_exception = data.isSeriesException
+    update.updated_at = new Date().toISOString()
+    const { error } = await supabase.from('calendar_blocks').update(update).eq('id', id)
+    if (error) return dbError(error, toast)
+    setCalendarBlocks(prev => prev.map(b => b.id === id ? { ...b, ...data } : b))
+  }
+
+  async function updateCalendarBlockSeriesFuture(seriesId, fromDate, data) {
+    const update = {}
+    if (data.blockType !== undefined)   update.block_type   = data.blockType
+    if (data.description !== undefined) update.description  = data.description || null
+    if (data.startTime !== undefined)   update.start_time   = data.startTime
+    if (data.endTime !== undefined)     update.end_time     = data.endTime
+    update.updated_at = new Date().toISOString()
+    const { error } = await supabase
+      .from('calendar_blocks')
+      .update(update)
+      .eq('series_id', seriesId)
+      .gte('date', fromDate)
+      .eq('cancelled', false)
+    if (error) return dbError(error, toast)
+    setCalendarBlocks(prev => prev.map(b =>
+      b.seriesId === seriesId && b.date >= fromDate && !b.cancelled
+        ? { ...b, ...data }
+        : b
+    ))
+  }
+
+  async function cancelCalendarBlock(id) {
+    const { data: { session } } = await supabase.auth.getSession()
+    const now = new Date().toISOString()
+    const { error } = await supabase
+      .from('calendar_blocks')
+      .update({ cancelled: true, cancelled_at: now, cancelled_by: session?.user?.id || null, updated_at: now })
+      .eq('id', id)
+    if (error) return dbError(error, toast)
+    setCalendarBlocks(prev => prev.filter(b => b.id !== id))
+  }
+
+  async function cancelCalendarBlockSeriesFuture(seriesId, fromDate) {
+    const { data: { session } } = await supabase.auth.getSession()
+    const now = new Date().toISOString()
+    const today = new Date().toISOString().slice(0, 10)
+    const cutoff = fromDate > today ? fromDate : today
+    const { error } = await supabase
+      .from('calendar_blocks')
+      .update({ cancelled: true, cancelled_at: now, cancelled_by: session?.user?.id || null, updated_at: now })
+      .eq('series_id', seriesId)
+      .gte('date', cutoff)
+      .eq('cancelled', false)
+    if (error) return dbError(error, toast)
+    setCalendarBlocks(prev => prev.filter(b => !(b.seriesId === seriesId && b.date >= cutoff && !b.cancelled)))
+  }
+
+  async function getCalendarBlockHistory(therapistId) {
+    const query = therapistId
+      ? supabase.from('calendar_blocks').select('*').eq('therapist_id', therapistId).order('date', { ascending: false })
+      : supabase.from('calendar_blocks').select('*').order('date', { ascending: false })
+    const { data, error } = await query
     if (error) { console.error(error); return [] }
-    return (data || []).map(mapUnavailability)
+    return (data || []).map(mapCalendarBlock)
   }
 
   // ─── Audit Log ───────────────────────────────────────────────────────────────
@@ -1886,7 +1978,7 @@ export function DataProvider({ children }) {
     addPrepaidPackage, getPrepaidData, addLedgerAdjustment,
     batchFaturarConsultations, addPaymentDemonstrativo, getPaymentDemonstrativos,
     createPaymentInvoice, getPaymentInvoices, cancelPaymentInvoice, markInvoicePaid,
-    unavailabilities, addUnavailability, updateUnavailability, deleteUnavailability, getUnavailabilitiesForTherapist,
+    calendarBlocks, addCalendarBlock, addCalendarBlockSeries, updateCalendarBlock, updateCalendarBlockSeriesFuture, cancelCalendarBlock, cancelCalendarBlockSeriesFuture, getCalendarBlockHistory,
   }
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>

@@ -23,7 +23,7 @@ const EMPTY = {
 }
 
 export default function ConsultationFormModal({ onClose, initial = {}, readOnly = false }) {
-  const { patients, therapists, specialtiesData, rooms, consultationStatuses, appointmentTypes, appointments, addConsultation, updateConsultation, updateConsultationSeries, getPrepaidData, consultations, unavailabilities } = useData()
+  const { patients, therapists, specialtiesData, rooms, consultationStatuses, appointmentTypes, appointments, addConsultation, updateConsultation, updateConsultationSeries, getPrepaidData, consultations, calendarBlocks } = useData()
   const { user } = useAuth()
   const isEdit = !!initial.id
 
@@ -157,7 +157,7 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
   function handleSave() {
     const e = validate()
     if (Object.keys(e).length) { setErrors(e); return }
-    const conflicts = detectConflicts(buildConflictInput(), consultations, unavailabilities)
+    const conflicts = detectConflicts(buildConflictInput(), consultations, calendarBlocks)
     if (conflicts.length > 0) {
       setConflictsToConfirm(conflicts)
       return

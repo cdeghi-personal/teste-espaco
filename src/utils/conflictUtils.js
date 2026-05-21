@@ -30,20 +30,14 @@ function hasTimeOverlap(startA, endA, startB, endB) {
   return startA < endB && endA > startB
 }
 
-function getIsoWeekday(dateStr) {
-  const d = new Date(dateStr + 'T12:00:00')
-  const day = d.getDay()
-  return day === 0 ? 7 : day // ISO: 1=Seg…7=Dom
-}
-
 /**
  * Detecta conflitos para um atendimento contra todos os atendimentos carregados.
  * @param {object} input - { id, date, time, therapistId, roomId, consultationTherapists[] }
  * @param {array}  allConsultations - todos os atendimentos do DataContext
- * @param {array}  unavailabilities - indisponibilidades do DataContext
+ * @param {array}  calendarBlocks - bloqueios de agenda do DataContext
  * @returns {array} conflitos detectados
  */
-export function detectConflicts(input, allConsultations, unavailabilities = []) {
+export function detectConflicts(input, allConsultations, calendarBlocks = []) {
   const { id, date, time, therapistId, roomId, consultationTherapists = [] } = input
   if (!date || !time) return []
 
@@ -107,39 +101,35 @@ export function detectConflicts(input, allConsultations, unavailabilities = []) 
     }
   }
 
-  // ── 2. Indisponibilidade do terapeuta ────────────────────────────────────────
-  const isoWeekday = getIsoWeekday(date)
+  // ── 2. Bloqueio de agenda do terapeuta ──────────────────────────────────────
+  const sameDayBlocks = calendarBlocks.filter(b =>
+    b.date === date &&
+    !b.cancelled &&
+    b.active !== false &&
+    allTherapistIds.includes(b.therapistId)
+  )
 
-  for (const u of unavailabilities) {
-    if (!u.active) continue
-    if (!allTherapistIds.includes(u.therapistId)) continue
-    if (u.startDate > date) continue
-    if (u.endDate && u.endDate < date) continue
-    if (u.weekdays && u.weekdays.length > 0 && !u.weekdays.includes(isoWeekday)) continue
+  for (const b of sameDayBlocks) {
+    const blockStart = timeToMinutes(b.startTime)
+    const blockEnd   = timeToMinutes(b.endTime)
+    if (blockStart === null || blockEnd === null) continue
+    if (!hasTimeOverlap(startA, endA, blockStart, blockEnd)) continue
 
-    // Verificação de sobreposição de horário
-    if (u.startTime && u.endTime) {
-      const unavailStart = timeToMinutes(u.startTime)
-      const unavailEnd   = timeToMinutes(u.endTime)
-      if (!hasTimeOverlap(startA, endA, unavailStart, unavailEnd)) continue
-    }
-    // Sem horário = dia inteiro bloqueado, sempre conflita
-
-    const isTotal = u.unavailableType === 'TOTAL'
+    const isTotal = b.blockType === 'TOTAL'
     conflicts.push({
       conflictType: isTotal
         ? CONFLICT_TYPES.THERAPIST_UNAVAILABLE_TOTAL
         : CONFLICT_TYPES.THERAPIST_UNAVAILABLE_PARTIAL,
-      therapistId: u.therapistId,
-      unavailabilityId: u.id,
+      therapistId: b.therapistId,
+      calendarBlockId: b.id,
       conflictDate: date,
       startTime: minutesToTime(startA),
       endTime: minutesToTime(endA),
-      description: u.reason
-        ? `${isTotal ? 'Indisponível' : 'Indisponibilidade parcial'}: ${u.reason}`
+      description: b.description
+        ? `${isTotal ? 'Indisponível' : 'Bloqueio parcial'}: ${b.description}`
         : (isTotal
-            ? 'Terapeuta indisponível neste período'
-            : 'Indisponibilidade parcial — verificar se o tipo de atendimento é permitido'),
+            ? 'Terapeuta com bloqueio de agenda neste horário'
+            : 'Bloqueio parcial — verificar disponibilidade'),
     })
   }
 
@@ -150,7 +140,7 @@ export function detectConflicts(input, allConsultations, unavailabilities = []) 
  * Detecta conflitos para cada data de uma série.
  * @returns {array} [{date, conflicts[]}] — só datas com conflito
  */
-export function detectSeriesConflicts(seriesInput, dates, allConsultations, unavailabilities = []) {
+export function detectSeriesConflicts(seriesInput, dates, allConsultations, calendarBlocks = []) {
   return dates
     .map(date => ({
       date,
@@ -164,7 +154,7 @@ export function detectSeriesConflicts(seriesInput, dates, allConsultations, unav
           consultationTherapists: [],
         },
         allConsultations,
-        unavailabilities
+        calendarBlocks
       ),
     }))
     .filter(({ conflicts }) => conflicts.length > 0)

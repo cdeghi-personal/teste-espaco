@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { FiPlus, FiChevronLeft, FiChevronRight, FiSearch, FiCalendar, FiEdit2, FiRepeat } from 'react-icons/fi'
+import { FiPlus, FiChevronLeft, FiChevronRight, FiSearch, FiCalendar, FiEdit2, FiRepeat, FiSlash } from 'react-icons/fi'
 import HelpButton from '../../../components/ui/HelpButton'
 import { addDays, startOfWeek, format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
@@ -8,6 +8,8 @@ import { useAuth } from '../../../context/AuthContext'
 import Button from '../../../components/ui/Button'
 import ConsultationFormModal from '../consultations/ConsultationFormModal'
 import SeriesFormModal from '../consultations/SeriesFormModal'
+import CalendarBlockFormModal from './CalendarBlockFormModal'
+import CalendarBlockHistoryModal from './CalendarBlockHistoryModal'
 import { formatMonthYear } from '../../../utils/dateUtils'
 
 function textColorForBg(hex) {
@@ -35,8 +37,35 @@ function formatDay(date) {
   return format(date, "EEE dd/MM", { locale: ptBR })
 }
 
+function BlockCard({ block, therapist, onEdit, isAdmin, userId }) {
+  const canEdit = isAdmin || userId === block.therapistId
+  return (
+    <div className="rounded-lg px-2 py-1.5 text-xs bg-amber-50 border border-amber-200 text-amber-800 group relative">
+      <div className="flex items-baseline gap-1 min-w-0">
+        <span className="font-bold shrink-0">{block.startTime?.slice(0, 5)}</span>
+        <span className="opacity-60">-</span>
+        <span className="font-bold shrink-0">{block.endTime?.slice(0, 5)}</span>
+        <span className="font-medium truncate ml-1">Bloqueio</span>
+      </div>
+      <div className="flex items-center gap-1 mt-0.5" style={{ fontSize: '10px' }}>
+        <span className="truncate opacity-75 flex-1">{block.description || therapist?.name || ''}</span>
+        <span className={`px-1 rounded ${block.blockType === 'TOTAL' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`} style={{ fontSize: '9px' }}>
+          {block.blockType === 'TOTAL' ? 'Total' : 'Parcial'}
+        </span>
+      </div>
+      {canEdit && (
+        <div className="absolute top-1 right-1 hidden group-hover:flex gap-0.5">
+          <button onClick={onEdit} className="w-5 h-5 rounded flex items-center justify-center bg-amber-200 hover:bg-amber-300 transition-colors">
+            <FiEdit2 size={10} />
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function AgendaPage() {
-  const { consultations, patients, rooms, therapists, logAudit } = useData()
+  const { consultations, patients, rooms, therapists, calendarBlocks, logAudit } = useData()
   const { user } = useAuth()
   const [weekRef, setWeekRef] = useState(new Date())
   const [search, setSearch] = useState('')
@@ -45,6 +74,9 @@ export default function AgendaPage() {
   const [showModal, setShowModal] = useState(false)
   const [editItem, setEditItem] = useState(null)
   const [showSeriesModal, setShowSeriesModal] = useState(false)
+  const [showBlockModal, setShowBlockModal] = useState(false)
+  const [editBlock, setEditBlock] = useState(null)
+  const [showBlockHistory, setShowBlockHistory] = useState(false)
   const [selectedDayIdx, setSelectedDayIdx] = useState(() => {
     const d = new Date().getDay()
     // 0=Dom→5(FDS), 1=Seg→0, ..., 5=Sex→4, 6=Sáb→5(FDS)
@@ -113,6 +145,37 @@ export default function AgendaPage() {
       .sort((a, b) => a.date.localeCompare(b.date) || (a.time || '').localeCompare(b.time || ''))
   }
 
+  function getBlocksByDay(date) {
+    const iso = format(date, 'yyyy-MM-dd')
+    return (calendarBlocks || []).filter(b => {
+      if (b.date !== iso) return false
+      if (b.cancelled) return false
+      if (b.active === false) return false
+      if (user?.role === 'admin') return true
+      if (user?.id) {
+        if (b.therapistId === user.id) return true
+        if (user?.belongsToTeam) return true
+      }
+      return false
+    }).sort((a, b) => (a.startTime || '').localeCompare(b.startTime || ''))
+  }
+
+  function getBlocksByWeekend() {
+    const satIso = format(saturday, 'yyyy-MM-dd')
+    const sunIso = format(sunday, 'yyyy-MM-dd')
+    return (calendarBlocks || []).filter(b => {
+      if (b.date !== satIso && b.date !== sunIso) return false
+      if (b.cancelled) return false
+      if (b.active === false) return false
+      if (user?.role === 'admin') return true
+      if (user?.id) {
+        if (b.therapistId === user.id) return true
+        if (user?.belongsToTeam) return true
+      }
+      return false
+    }).sort((a, b) => a.date.localeCompare(b.date) || (a.startTime || '').localeCompare(b.startTime || ''))
+  }
+
   function cardStyle(item) {
     if (!isTeamTherapist(item.therapistId)) {
       return { backgroundColor: '#d1d5db', color: '#374151' }
@@ -148,6 +211,12 @@ export default function AgendaPage() {
             <Button variant="ghost" onClick={() => setShowSeriesModal(true)}>
               <FiRepeat size={15} />
               <span className="hidden sm:inline">Série</span>
+            </Button>
+          )}
+          {(user?.role === 'admin' || user?.id) && (
+            <Button variant="ghost" onClick={() => { setEditBlock(null); setShowBlockModal(true) }}>
+              <FiSlash size={15} />
+              <span className="hidden sm:inline">Bloqueio</span>
             </Button>
           )}
           <Button variant="primary" onClick={() => { setEditItem(null); setShowModal(true) }}>
@@ -253,11 +322,14 @@ export default function AgendaPage() {
           {weekdays.map(day => {
             const iso = format(day, 'yyyy-MM-dd')
             const dayItems = getByDay(day)
+            const dayBlocks = getBlocksByDay(day)
             return (
               <div key={iso} className={`border-r border-gray-100 p-1.5 space-y-1 ${iso === today ? 'bg-brand-blue/5' : ''}`}>
-                {dayItems.length === 0 ? (
+                {dayItems.length === 0 && dayBlocks.length === 0 ? (
                   <div className="h-full flex items-center justify-center text-xs text-gray-300 py-10">Livre</div>
-                ) : dayItems.map(item => {
+                ) : (
+                  <>
+                {dayItems.map(item => {
                   const isPrivate = !isTeamTherapist(item.therapistId)
                   const patient = isPrivate ? null : getPatient(item.patientId)
                   const room = getRoom(item.roomId)
@@ -335,18 +407,34 @@ export default function AgendaPage() {
                     </div>
                   )
                 })}
+                {/* Block cards */}
+                {dayBlocks.map(block => (
+                  <BlockCard
+                    key={block.id}
+                    block={block}
+                    therapist={getTherapist(block.therapistId)}
+                    onEdit={() => { setEditBlock(block); setShowBlockModal(true) }}
+                    isAdmin={user?.role === 'admin'}
+                    userId={user?.id}
+                  />
+                ))}
+                  </>
+                )}
               </div>
             )
           })}
           {/* Coluna Sáb+Dom */}
           {(() => {
             const weekendItems = getWeekend()
+            const weekendBlocks = getBlocksByWeekend()
             const satIso = format(saturday, 'yyyy-MM-dd')
             return (
               <div className={`p-1.5 space-y-1 ${(isTodaySat || isTodaySun) ? 'bg-brand-blue/5' : ''}`}>
-                {weekendItems.length === 0 ? (
+                {weekendItems.length === 0 && weekendBlocks.length === 0 ? (
                   <div className="h-full flex items-center justify-center text-xs text-gray-300 py-10">Livre</div>
-                ) : weekendItems.map(item => {
+                ) : (
+                  <>
+                {weekendItems.map(item => {
                   const isPrivate = !isTeamTherapist(item.therapistId)
                   const patient = isPrivate ? null : getPatient(item.patientId)
                   const room = getRoom(item.roomId)
@@ -426,6 +514,19 @@ export default function AgendaPage() {
                     </div>
                   )
                 })}
+                {/* Weekend block cards */}
+                {weekendBlocks.map(block => (
+                  <BlockCard
+                    key={block.id}
+                    block={block}
+                    therapist={getTherapist(block.therapistId)}
+                    onEdit={() => { setEditBlock(block); setShowBlockModal(true) }}
+                    isAdmin={user?.role === 'admin'}
+                    userId={user?.id}
+                  />
+                ))}
+                  </>
+                )}
               </div>
             )
           })()}
@@ -487,7 +588,8 @@ export default function AgendaPage() {
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
           {(() => {
             const dayItems = selectedDayIdx === 5 ? getWeekend() : getByDay(weekdays[selectedDayIdx])
-            if (dayItems.length === 0) return (
+            const mobileBlocks = selectedDayIdx === 5 ? getBlocksByWeekend() : getBlocksByDay(weekdays[selectedDayIdx])
+            if (dayItems.length === 0 && mobileBlocks.length === 0) return (
               <div className="py-12 text-center text-gray-400 text-sm">
                 <FiCalendar size={28} className="mx-auto mb-2 opacity-40" />
                 Nenhum agendamento neste dia
@@ -560,6 +662,39 @@ export default function AgendaPage() {
                     </div>
                   )
                 })}
+                {/* Mobile block cards */}
+                {mobileBlocks.map(block => {
+                  const blockTherapist = getTherapist(block.therapistId)
+                  const canEditBlock = user?.role === 'admin' || user?.id === block.therapistId
+                  return (
+                    <div key={block.id} className="flex items-center gap-3 p-4 bg-amber-50/50">
+                      <div className="w-1 self-stretch rounded-full shrink-0 bg-amber-400" />
+                      <div className="flex-1 min-w-0">
+                        <div className="font-semibold text-sm text-amber-800">
+                          {block.startTime?.slice(0, 5)}–{block.endTime?.slice(0, 5)} — Bloqueio
+                        </div>
+                        <div className="text-xs text-amber-700">
+                          {blockTherapist?.name || '—'}{block.description ? ` • ${block.description}` : ''}
+                        </div>
+                        <span className={`mt-1 inline-block px-1.5 py-0.5 rounded text-xs font-medium ${
+                          block.blockType === 'TOTAL' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'
+                        }`}>
+                          {block.blockType === 'TOTAL' ? 'Total' : 'Parcial'}
+                        </span>
+                      </div>
+                      {canEditBlock && (
+                        <div className="flex gap-1 shrink-0">
+                          <button
+                            onClick={() => { setEditBlock(block); setShowBlockModal(true) }}
+                            className="p-2 rounded-lg text-gray-400 hover:text-amber-600 hover:bg-amber-50"
+                          >
+                            <FiEdit2 size={15} />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
               </div>
             )
           })()}
@@ -581,6 +716,15 @@ export default function AgendaPage() {
               Consultas Particulares
             </div>
           )}
+          {(user?.role === 'admin' || user?.id) && (
+            <button
+              type="button"
+              onClick={() => setShowBlockHistory(true)}
+              className="ml-auto flex items-center gap-1 text-xs text-amber-700 hover:underline"
+            >
+              <FiSlash size={11} /> Histórico de Bloqueios
+            </button>
+          )}
         </div>
       )}
 
@@ -593,6 +737,20 @@ export default function AgendaPage() {
 
       {showSeriesModal && (
         <SeriesFormModal onClose={() => setShowSeriesModal(false)} />
+      )}
+
+      {showBlockModal && (
+        <CalendarBlockFormModal
+          onClose={() => { setShowBlockModal(false); setEditBlock(null) }}
+          initial={editBlock || {}}
+        />
+      )}
+
+      {showBlockHistory && (
+        <CalendarBlockHistoryModal
+          onClose={() => setShowBlockHistory(false)}
+          therapistId={filterTherapist || (user?.role !== 'admin' ? user?.id : null)}
+        />
       )}
     </div>
   )
