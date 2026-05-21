@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { FiEdit2, FiXCircle } from 'react-icons/fi'
 import Modal from '../../../components/ui/Modal'
 import Button from '../../../components/ui/Button'
 import { useData } from '../../../context/DataContext'
@@ -168,18 +169,20 @@ export default function CalendarBlockHistoryModal({ onClose, therapistId }) {
                     </td>
                     <td className="py-2">
                       {!b.cancelled && canEdit && (
-                        <div className="flex gap-1">
+                        <div className="flex items-center gap-1">
                           <button
+                            title="Editar bloqueio"
                             onClick={() => setEditBlock(b)}
-                            className="px-2 py-1 text-xs rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 transition-colors"
+                            className="w-7 h-7 flex items-center justify-center rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600 transition-colors"
                           >
-                            Editar
+                            <FiEdit2 size={13} />
                           </button>
                           <button
+                            title="Cancelar bloqueio"
                             onClick={() => setCancelConfirm(b)}
-                            className="px-2 py-1 text-xs rounded-lg bg-red-50 hover:bg-red-100 text-red-600 transition-colors"
+                            className="w-7 h-7 flex items-center justify-center rounded-lg bg-red-50 hover:bg-red-100 text-red-500 transition-colors"
                           >
-                            Cancelar
+                            <FiXCircle size={13} />
                           </button>
                         </div>
                       )}

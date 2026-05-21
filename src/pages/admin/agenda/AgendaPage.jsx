@@ -59,6 +59,16 @@ function BlockCard({ block, therapist, onEdit, isAdmin, userId }) {
           <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: therapist.color }} />
         )}
         <span className="truncate flex-1">{therapist?.name || '—'}</span>
+        {block.seriesId && !block.isSeriesException && (
+          <span title="Bloqueio recorrente" className="shrink-0 text-indigo-400">
+            <FiRepeat size={9} />
+          </span>
+        )}
+        {block.seriesId && block.isSeriesException && (
+          <span title="Ocorrência de bloqueio alterada individualmente" className="shrink-0 text-amber-500 flex items-center gap-px">
+            <FiRepeat size={9} /><span style={{ fontSize: '8px' }}>!</span>
+          </span>
+        )}
         <span className={`px-1 rounded shrink-0 ${chipCls}`} style={{ fontSize: '9px' }}>
           {isRigid ? 'Rígido' : 'Flex'}
         </span>
