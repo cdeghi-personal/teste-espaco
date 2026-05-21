@@ -59,7 +59,7 @@ src/
     auth/     LoginPage, ResetPasswordPage
     admin/
       DashboardPage.jsx
-      agenda/           AgendaPage, AppointmentFormModal
+      agenda/           AgendaPage, AppointmentFormModal, CalendarBlockFormModal, CalendarBlockHistoryModal
       patients/         PatientsPage, PatientDetailPage, PatientFormModal, PatientAdvancedSearchPage
       guardians/        GuardiansPage, GuardianFormModal
       consultations/    ConsultationsPage, ConsultationFormModal
@@ -152,8 +152,13 @@ supabase/
   81_audit_series.sql                  # fn_audit_log: consultation_series → "Paciente | Especialidade | Início: DD/MM/YYYY"; consultation_therapists → "Paciente | DD/MM/YYYY | Terapeuta"; triggers nas duas tabelas
   82_fix_ct_team_select.sql            # Fix RLS: expande ct_therapist_select para incluir consultas de colegas da equipe (teamMember vê consultationTherapists[] preenchido)
   83_fix_series_therapist_write.sql    # Fix RLS: adiciona INSERT/UPDATE em consultation_series para terapeuta (faltava no 80)
-  84_therapist_unavailabilities.sql    # Tabela therapist_unavailabilities + RLS (admin tudo; próprio terapeuta SELECT; membro da equipe SELECT)
+  84_therapist_unavailabilities.sql    # Legado — substituído por 88; tabela removida pelo 87
   85_consultation_conflicts.sql        # Tabela consultation_conflicts + RLS + RPC persist_consultation_conflicts (SECURITY DEFINER)
+  86_fix_ct_team_inline.sql            # Fix RLS: ct_therapist_select sem funções inexistentes (my_belongs_to_team) — usa subquery inline
+  87_cleanup_unavailabilities.sql      # Remove tabela therapist_unavailabilities e coluna unavailability_id de consultation_conflicts
+  88_calendar_blocks.sql               # Tabelas calendar_block_series + calendar_blocks; RLS; GRANT; persist_consultation_conflicts com calendar_block_id; triggers de auditoria
+  89_block_type_rigid_flex.sql         # Converte dados TOTAL→RIGID / PARTIAL→FLEX; recria CHECK constraints
+  90_fix_audit_calendar_blocks.sql     # Fix triggers de auditoria: ignora operações sem JWT (SQL Editor/migrations); completa migração 89
   functions/
     invite-therapist/index.ts    # Edge Function — envia convite por e-mail ao criar terapeuta
     suggest-convenio/index.ts    # Edge Function — gera sugestões de texto para relatório de convênio via OpenAI gpt-4o-mini
@@ -213,8 +218,9 @@ Encontrar em: Supabase Dashboard → Project Settings → API.
 | `payment_invoices` | Notas fiscais / faturas — nf_number (globalmente único via índice parcial), patient_id, nf_issue_date, status (ISSUED/PAID/CANCELLED), total_amount, payment_demonstrative_id, consultation_ids (UUID[]), snapshot (JSONB), created_by, cancelled_at, cancelled_by, paid_at, paid_by; admin only |
 | `consultation_series` | Séries recorrentes — patient_id, primary_therapist_id, specialty, appointment_type_id, consultation_status_id, room_id, time, duration, recurrence_type ('by_count'/'by_date'), recurrence_days (integer[] ISO 1=Seg…7=Dom), start_date, end_date, session_count, active, notes, created_by; RLS: admin tudo; terapeuta SELECT das próprias séries |
 | `consultation_therapists` | Participantes por consulta — consultation_id, therapist_id, specialty, is_primary; UNIQUE (consultation_id, therapist_id); sempre deve existir exatamente 1 is_primary=true; ON DELETE CASCADE de consultations |
-| `therapist_unavailabilities` | Indisponibilidades de terapeutas — therapist_id, unavailable_type ('TOTAL'/'PARTIAL'), reason, start_date, end_date (nullable), start_time, end_time, weekdays (integer[] ISO 1=Seg…7=Dom), active; RLS: admin tudo; próprio terapeuta SELECT; membro da equipe SELECT |
-| `consultation_conflicts` | Conflitos de agenda detectados — consultation_id (CASCADE), conflict_type ('THERAPIST_OVERLAP'/'ROOM_OVERLAP'/'THERAPIST_UNAVAILABLE_TOTAL'/'THERAPIST_UNAVAILABLE_PARTIAL'), related_consultation_id (SET NULL), therapist_id, room_id, unavailability_id, conflict_date, start_time, end_time, description, resolved; RLS: admin tudo; terapeuta SELECT para próprias/equipe |
+| `calendar_block_series` | Séries de bloqueios recorrentes — therapist_id, block_type ('RIGID'/'FLEX'), description, start_date, end_date, recurrence_type, recurrence_days (integer[]), session_count, start_time, end_time, active, cancelled, created_by |
+| `calendar_blocks` | Bloqueios de agenda por data — therapist_id, series_id (nullable), block_type ('RIGID'/'FLEX'), description, date, start_time, end_time, series_original_date, is_series_exception, active, cancelled, cancelled_at, cancelled_by, created_by; soft-delete via cancelled=true (nunca DELETE físico); RLS: admin tudo; próprio terapeuta SELECT/INSERT/UPDATE; membro da equipe SELECT |
+| `consultation_conflicts` | Conflitos de agenda detectados — consultation_id (CASCADE), conflict_type ('THERAPIST_OVERLAP'/'ROOM_OVERLAP'/'THERAPIST_UNAVAILABLE_TOTAL'/'THERAPIST_UNAVAILABLE_PARTIAL'), related_consultation_id (SET NULL), therapist_id, room_id, calendar_block_id (SET NULL), conflict_date, start_time, end_time, description, resolved; RLS: admin tudo; terapeuta SELECT para próprias/equipe |
 
 ### Mappers (DB → App)
 
@@ -226,8 +232,9 @@ Todos em `src/lib/supabase.js`. Convertem snake_case do banco para camelCase do 
 - `mapConsultation` também inclui `nfNumber`, `nfIssueDate`, `previousStatusBeforeInvoice`, `seriesId`, `seriesOriginalDate`, `isSeriesException`, `consultationTherapists[{id, therapistId, specialty, isPrimary}]`
 - `mapConsultationSeries` — novo mapper para `consultation_series`
 - `mapConsultationStatus` (inclui `automatic`), `mapAppointmentType`, `mapExam`, `mapMedication`, `mapConduct`
-- `mapUnavailability` — mapper para `therapist_unavailabilities` (camelCase; `weekdays[]`)
-- `mapConsultation` inclui também `conflicts[{id, conflictType, relatedConsultationId, therapistId, roomId, unavailabilityId, conflictDate, startTime, endTime, description, resolved}]` — filtrados por `!resolved` no mapper
+- `mapCalendarBlock` — mapper para `calendar_blocks` (camelCase; inclui `seriesId`, `blockType`, `startTime`, `endTime`, `cancelled`, `cancelledAt`, `cancelledBy`)
+- `mapCalendarBlockSeries` — mapper para `calendar_block_series`
+- `mapConsultation` inclui também `conflicts[{id, conflictType, relatedConsultationId, therapistId, roomId, calendarBlockId, conflictDate, startTime, endTime, description, resolved}]` — filtrados por `!resolved` no mapper
 - `age_ranges` mapeado inline no DataContext: `{ id, name, minAge, maxAge, color }`
 - `company_settings` exposto como `companySettings` (`{ razaoSocial, cnpj, aiSystemPrompt }`) via `useData()`; função `updateCompanySettings({ razaoSocial, cnpj, aiSystemPrompt })` faz `.update().eq('id', 1)`
 - `syncPatientRelations(patientId, { specialties, conditionIds })` — specialties agora `[{ key, patientValue, therapistValue }]`
@@ -821,8 +828,8 @@ Não é mais editável. Texto padrão fixo definido em `DESEMPENHO_FIXO` em `gen
 |---|---|
 | `THERAPIST_OVERLAP` | Terapeuta já tem outro atendimento no mesmo horário |
 | `ROOM_OVERLAP` | Sala já está ocupada no mesmo horário |
-| `THERAPIST_UNAVAILABLE_TOTAL` | Terapeuta tem indisponibilidade total que cobre o horário |
-| `THERAPIST_UNAVAILABLE_PARTIAL` | Terapeuta tem indisponibilidade parcial que se sobrepõe |
+| `THERAPIST_UNAVAILABLE_TOTAL` | Terapeuta tem bloqueio rígido (RIGID) que cobre o horário |
+| `THERAPIST_UNAVAILABLE_PARTIAL` | Terapeuta tem bloqueio flex (FLEX) que se sobrepõe |
 
 - Conflitos cobrem o terapeuta primário **e** todos os secundários (`consultationTherapists`).
 - Conflito de sala apenas quando a sala está definida em ambos os atendimentos.
@@ -831,16 +838,21 @@ Não é mais editável. Texto padrão fixo definido em `DESEMPENHO_FIXO` em `gen
 
 - `CONFLICT_DURATION` — constante 50 (minutos)
 - `CONFLICT_LABELS` — mapa tipo → label legível em PT-BR
-- `detectConflicts(input, allConsultations, unavailabilities)` — retorna array de conflitos para um único atendimento
-- `detectSeriesConflicts(seriesInput, dates, allConsultations, unavailabilities)` — retorna `[{ date, conflicts[] }]` filtrado para datas com conflito
+- `detectConflicts(input, allConsultations, calendarBlocks = [])` — retorna array de conflitos para um único atendimento
+- `detectSeriesConflicts(seriesInput, dates, allConsultations, calendarBlocks = [])` — retorna `[{ date, conflicts[] }]` filtrado para datas com conflito
 
 ### DataContext — novos valores e funções
 
-- `unavailabilities` — array carregado no `fetchAll` (active=true apenas); disponível via `useData()`
+- `calendarBlocks` — array de bloqueios ativos (não cancelados) carregado no `fetchAll`; disponível via `useData()`
 - `persistConflicts(consultationId, conflicts[])` — chama RPC `persist_consultation_conflicts` (SECURITY DEFINER); substitui conflitos do atendimento atomicamente
-- `rebuildRelatedConflicts(relatedIds, updatedConsultations)` — reprocessa conflitos de atendimentos afetados por uma mudança (ex: após excluir um atendimento que era o `related_consultation_id` de outros)
-- `addUnavailability(data)`, `updateUnavailability(id, data)`, `deleteUnavailability(id)` — CRUD admin-only
-- `getUnavailabilitiesForTherapist(therapistId)` — busca TODAS as indisponibilidades do terapeuta (incluindo inativas); usado na tela de edição do terapeuta
+- `rebuildRelatedConflicts(relatedIds, updatedConsultations, blocksOverride?)` — reprocessa conflitos de atendimentos afetados; `blocksOverride` permite passar o array de bloqueios atualizado sincronamente antes do React re-renderizar (evita race condition após setState)
+- `addCalendarBlock(data)` — cria bloqueio avulso; após salvar, reconstrói conflitos das consultas afetadas
+- `addCalendarBlockSeries(data)` — cria série de bloqueios via `generateSeriesDates`; reconstrói conflitos de todas as datas geradas
+- `updateCalendarBlock(id, data)` — edita bloqueio individual; reconstrói conflitos das consultas na(s) data(s) afetada(s)
+- `updateCalendarBlockSeriesFuture(seriesId, fromDate, data)` — edita bloqueios da série a partir de uma data; reconstrói conflitos de todas as datas afetadas
+- `cancelCalendarBlock(id)` — soft-delete individual (`cancelled=true`); reconstrói conflitos das consultas na data do bloqueio
+- `cancelCalendarBlockSeriesFuture(seriesId, fromDate)` — cancela bloqueios futuros da série; reconstrói conflitos
+- `getCalendarBlockHistory(therapistId?)` — busca todos os bloqueios incluindo cancelados (sem filtro de `cancelled`); usado pelo `CalendarBlockHistoryModal`
 
 ### Fluxo de salvamento com conflitos
 
@@ -860,12 +872,19 @@ Não é mais editável. Texto padrão fixo definido em `DESEMPENHO_FIXO` em `gen
 - **`⚠ Conflito`** — chip vermelho nos cards de `ConsultationsPage` e `AgendaPage` quando `(c.conflicts || []).length > 0`.
 - Chips de série/múltiplos terapeutas e de conflito coexistem na mesma linha de badges.
 
-### Indisponibilidades (`TherapistFormModal`)
+### Bloqueios de Agenda (`CalendarBlockFormModal`, `CalendarBlockHistoryModal`)
 
-- Seção colapsável "Indisponibilidades" visível apenas em modo edição (`isEdit`).
-- Admin: CRUD completo (adicionar, editar, excluir, ativar/desativar).
-- Terapeuta: somente leitura.
-- Campos: Tipo (Total/Parcial), Motivo, Data início, Data fim (opcional), Horário início/fim (apenas Parcial), Dias da semana (checkboxes ISO 1=Seg…7=Dom).
+- Entidade independente — não está embutida no cadastro do terapeuta.
+- Botão "Bloqueio" (`FiSlash`) no header da `AgendaPage`; abre `CalendarBlockFormModal`.
+- Tipos: **RIGID** (cinza escuro — bloqueio forte, ex: aula, ausência) e **FLEX** (cinza médio — alerta, ex: reunião, home office).
+- Suporta criação avulsa ou em série (reutiliza `generateSeriesDates`).
+- Edição de série: diálogo de escopo "Apenas este" / "Este e os próximos".
+- **Soft-delete**: cancelamento via `cancelled=true` (nunca DELETE físico); bloqueios cancelados não aparecem na agenda mas ficam no histórico.
+- Ao criar/editar/cancelar, exibe aviso âmbar com nomes dos pacientes afetados **antes** de salvar.
+- Após salvar, reconstrói automaticamente os conflitos das consultas afetadas (`rebuildRelatedConflicts`).
+- `CalendarBlockHistoryModal`: listagem de todos os bloqueios (ativos + cancelados) com botões Editar e Cancelar por linha (cancelamento sempre individual, nunca em série).
+- Cards na Agenda: cinza escuro (RIGID) / cinza médio (FLEX), linha 2 exibe chip de cor do terapeuta + nome.
+- Admin gerencia qualquer bloqueio; terapeuta gerencia apenas os próprios.
 
 ## Múltiplos Terapeutas por Atendimento
 
@@ -893,7 +912,7 @@ Não é mais editável. Texto padrão fixo definido em `DESEMPENHO_FIXO` em `gen
 ## Atenção — SELECTs explícitos no DataContext
 
 `CONSULTATION_SELECT` lista colunas explicitamente. Ao adicionar novas colunas ao banco, **sempre incluir no SELECT** correspondente.
-Constantes: `PATIENT_SELECT` (inclui `patient_specialties(specialty, patient_value, therapist_value)`), `GUARDIAN_SELECT`, `CONSULTATION_SELECT` (inclui `consultation_activities(...)`, `consultation_therapists(id, therapist_id, specialty, is_primary)` e `consultation_conflicts(id, conflict_type, related_consultation_id, therapist_id, room_id, unavailability_id, conflict_date, start_time, end_time, description, resolved)`).
+Constantes: `PATIENT_SELECT` (inclui `patient_specialties(specialty, patient_value, therapist_value)`), `GUARDIAN_SELECT`, `CONSULTATION_SELECT` (inclui `consultation_activities(...)`, `consultation_therapists(id, therapist_id, specialty, is_primary)` e `consultation_conflicts(id, conflict_type, related_consultation_id, therapist_id, room_id, calendar_block_id, conflict_date, start_time, end_time, description, resolved)`).
 
 ## Especialidades (tabela `specialties` no banco)
 
