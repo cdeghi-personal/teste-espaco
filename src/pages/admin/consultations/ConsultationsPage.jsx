@@ -265,7 +265,9 @@ export default function ConsultationsPage() {
               <div className="px-5 py-4 flex items-center gap-4">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap mb-1">
-                    <span className="font-semibold text-gray-900 text-sm">{patient?.fullName || '—'}</span>
+                    <span className="font-semibold text-gray-900 text-sm">
+                      {c.eventType === 'INTERVIEW' && c.intervieweeName ? c.intervieweeName : (patient?.fullName || '—')}
+                    </span>
                     <Badge specialty={c.specialty} />
                     {status && (
                       <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${status.color}`}>{status.name}</span>
@@ -274,10 +276,13 @@ export default function ConsultationsPage() {
                       <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">{apptType.name}</span>
                     )}
                     {c.eventType === 'INTERVIEW' && (
-                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs font-medium bg-teal-50 text-teal-700">
+                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs font-medium bg-orange-50 text-orange-700">
                         {c.interviewFormat === 'REMOTE' ? <FiVideo size={10} /> : <FiMapPin size={10} />}
                         Entrevista
                       </span>
+                    )}
+                    {c.eventType === 'INTERVIEW' && c.interviewFormat === 'REMOTE' && (
+                      <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-orange-50 text-orange-600">Remota</span>
                     )}
                     {c.eventType === 'INTERVIEW' && c.interviewFormat === 'REMOTE' && c.meetingLink && (
                       <a
@@ -285,7 +290,7 @@ export default function ConsultationsPage() {
                         target="_blank"
                         rel="noopener noreferrer"
                         onClick={e => e.stopPropagation()}
-                        className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs font-medium bg-teal-600 text-white hover:bg-teal-700"
+                        className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs font-medium bg-orange-600 text-white hover:bg-orange-700"
                       >
                         <FiExternalLink size={10} /> Entrar
                       </a>

@@ -402,6 +402,7 @@ export default function AgendaPage() {
                   const conflictTooltip = buildConflictTooltip(itemConflicts, { therapists, rooms, patients, consultations, calendarBlocks })
                   const isInterview = item.eventType === 'INTERVIEW'
                   const isRemote = isInterview && item.interviewFormat === 'REMOTE'
+                  const cardName = isPrivate ? 'Consulta Particular' : (isInterview && item.intervieweeName ? item.intervieweeName : shortName(patient?.fullName))
                   return (
                     <div
                       key={item.id}
@@ -411,9 +412,7 @@ export default function AgendaPage() {
                       <div className="flex items-baseline gap-1 min-w-0">
                         <span className="font-bold shrink-0">{fmtTime(item.time)}</span>
                         <span className="opacity-60">-</span>
-                        <span className={`font-medium truncate ${isPrivate ? 'italic' : ''}`}>
-                          {isPrivate ? 'Consulta Particular' : shortName(patient?.fullName)}
-                        </span>
+                        <span className={`font-medium truncate ${isPrivate ? 'italic' : ''}`}>{cardName}</span>
                       </div>
                       {(room || isInterview || item.seriesId || (item.consultationTherapists || []).length > 1 || itemConflicts.length > 0) && (
                         <div className="flex items-center justify-between gap-1 mt-0.5">
@@ -422,10 +421,13 @@ export default function AgendaPage() {
                           </span>
                           <div className="flex items-center gap-0.5 shrink-0">
                             {isInterview && (
-                              <span title={isRemote ? 'Entrevista Remota' : 'Entrevista Presencial'} className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded bg-teal-500/80 text-white" style={{ fontSize: '9px' }}>
+                              <span title={isRemote ? 'Entrevista Remota' : 'Entrevista Presencial'} className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded bg-orange-500/80 text-white" style={{ fontSize: '9px' }}>
                                 {isRemote ? <FiVideo size={7} /> : <FiMapPin size={7} />}
-                                <span>Entrev.</span>
+                                <span>Entrevista</span>
                               </span>
+                            )}
+                            {isRemote && (
+                              <span className="inline-flex items-center px-1 py-0.5 rounded bg-orange-300/80 text-white" style={{ fontSize: '9px' }}>Remota</span>
                             )}
                             {isRemote && item.meetingLink && (
                               <a href={item.meetingLink} target="_blank" rel="noopener noreferrer" title="Entrar na reunião" onClick={e => e.stopPropagation()} className="inline-flex items-center px-1 py-0.5 rounded bg-teal-600/80 text-white hover:bg-teal-700/80" style={{ fontSize: '9px' }}>
@@ -527,6 +529,8 @@ export default function AgendaPage() {
                   const conflictTooltip = buildConflictTooltip(itemConflicts, { therapists, rooms, patients, consultations, calendarBlocks })
                   const isInterview = item.eventType === 'INTERVIEW'
                   const isRemote = isInterview && item.interviewFormat === 'REMOTE'
+                  const dayLabel = isSun ? 'Dom' : 'Sáb'
+                  const cardName = isPrivate ? 'Consulta Particular' : (isInterview && item.intervieweeName ? item.intervieweeName : shortName(patient?.fullName))
                   return (
                     <div
                       key={item.id}
@@ -534,11 +538,9 @@ export default function AgendaPage() {
                       style={style}
                     >
                       <div className="flex items-baseline gap-1 min-w-0">
-                        <span className="font-bold shrink-0">{fmtTime(item.time)}</span>
+                        <span className="font-bold shrink-0">{fmtTime(item.time)} · {dayLabel}</span>
                         <span className="opacity-60">-</span>
-                        <span className={`font-medium truncate ${isPrivate ? 'italic' : ''}`}>
-                          {isPrivate ? 'Consulta Particular' : shortName(patient?.fullName)}
-                        </span>
+                        <span className={`font-medium truncate ${isPrivate ? 'italic' : ''}`}>{cardName}</span>
                       </div>
                       {(room || isInterview || item.seriesId || (item.consultationTherapists || []).length > 1 || itemConflicts.length > 0) && (
                         <div className="flex items-center justify-between gap-1 mt-0.5">
@@ -547,10 +549,13 @@ export default function AgendaPage() {
                           </span>
                           <div className="flex items-center gap-0.5 shrink-0">
                             {isInterview && (
-                              <span title={isRemote ? 'Entrevista Remota' : 'Entrevista Presencial'} className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded bg-teal-500/80 text-white" style={{ fontSize: '9px' }}>
+                              <span title={isRemote ? 'Entrevista Remota' : 'Entrevista Presencial'} className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded bg-orange-500/80 text-white" style={{ fontSize: '9px' }}>
                                 {isRemote ? <FiVideo size={7} /> : <FiMapPin size={7} />}
-                                <span>Entrev.</span>
+                                <span>Entrevista</span>
                               </span>
+                            )}
+                            {isRemote && (
+                              <span className="inline-flex items-center px-1 py-0.5 rounded bg-orange-300/80 text-white" style={{ fontSize: '9px' }}>Remota</span>
                             )}
                             {isRemote && item.meetingLink && (
                               <a href={item.meetingLink} target="_blank" rel="noopener noreferrer" title="Entrar na reunião" onClick={e => e.stopPropagation()} className="inline-flex items-center px-1 py-0.5 rounded bg-teal-600/80 text-white hover:bg-teal-700/80" style={{ fontSize: '9px' }}>
@@ -588,7 +593,6 @@ export default function AgendaPage() {
                           </div>
                         </div>
                       )}
-                      <div className="opacity-60 mt-0.5" style={{ fontSize: '10px' }}>{isSun ? 'Dom' : 'Sáb'}</div>
                       {!isPrivate && (user?.role === 'admin' || user?.id === item.therapistId) && (
                         <div className="absolute top-1 right-1 hidden group-hover:flex gap-0.5">
                           <button
@@ -709,13 +713,14 @@ export default function AgendaPage() {
                   const conflictTooltip = buildConflictTooltip(itemConflicts, { therapists, rooms, patients, consultations, calendarBlocks })
                   const isInterview = item.eventType === 'INTERVIEW'
                   const isRemote = isInterview && item.interviewFormat === 'REMOTE'
+                  const mobileName = isPrivate ? 'Consulta Particular' : (isInterview && item.intervieweeName ? item.intervieweeName : patient?.fullName)
                   return (
                     <div key={item.id} className="flex items-center gap-3 p-4">
                       <div className="w-1 self-stretch rounded-full shrink-0" style={{ backgroundColor: style.backgroundColor }} />
                       <div className="flex-1 min-w-0">
                         <div className="font-semibold text-sm text-gray-900">{fmtTime(item.time)}</div>
                         <div className={`text-sm truncate ${isPrivate ? 'text-gray-400 italic' : 'text-gray-700'}`}>
-                          {isPrivate ? 'Consulta Particular' : patient?.fullName}
+                          {mobileName}
                         </div>
                         <div className="text-xs text-gray-500 truncate">
                           {isPrivate
@@ -725,13 +730,16 @@ export default function AgendaPage() {
                         {(isInterview || item.seriesId || (item.consultationTherapists || []).length > 1 || itemConflicts.length > 0) && (
                           <div className="flex items-center gap-1 mt-1 flex-wrap">
                             {isInterview && (
-                              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs bg-teal-50 text-teal-700">
+                              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs bg-orange-50 text-orange-700">
                                 {isRemote ? <FiVideo size={9} /> : <FiMapPin size={9} />}
                                 Entrevista
                               </span>
                             )}
+                            {isRemote && (
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs bg-orange-50 text-orange-600">Remota</span>
+                            )}
                             {isRemote && item.meetingLink && (
-                              <a href={item.meetingLink} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs bg-teal-600 text-white">
+                              <a href={item.meetingLink} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs bg-orange-600 text-white">
                                 <FiExternalLink size={9} /> Entrar
                               </a>
                             )}

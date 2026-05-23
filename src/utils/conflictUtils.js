@@ -162,6 +162,8 @@ export function detectSeriesConflicts(seriesInput, dates, allConsultations, cale
           time: seriesInput.time,
           therapistId: seriesInput.primaryTherapistId,
           roomId: seriesInput.roomId || null,
+          eventType: seriesInput.eventType || 'SESSION',
+          interviewFormat: seriesInput.interviewFormat || null,
           consultationTherapists: [],
         },
         allConsultations,
@@ -242,6 +244,34 @@ export function getCalendarBlockConflicts(block, allConsultations, allBlocks = [
   return conflicts
 }
 
+function fmtDatePT(isoDate) {
+  if (!isoDate) return ''
+  const [y, m, d] = isoDate.split('-')
+  return `${d}/${m}/${y}`
+}
+
+function fmtTimePT(time) {
+  return time ? time.slice(0, 5) : '?'
+}
+
+function addMinutes(time, mins) {
+  const t = timeToMinutes(time)
+  if (t === null) return null
+  return minutesToTime(t + mins)
+}
+
+function eventTypeLabel(c) {
+  if (!c || c.eventType !== 'INTERVIEW') return 'Atendimento'
+  return c.interviewFormat === 'REMOTE' ? 'Entrevista Remota' : 'Entrevista Presencial'
+}
+
+function consultationSubject(c, patients) {
+  if (!c) return null
+  if (c.intervieweeName) return c.intervieweeName
+  const patient = patients.find(p => p.id === c.patientId)
+  return patient?.fullName || null
+}
+
 /**
  * Constrói texto de tooltip rico para chips de conflito.
  * @param {array}  conflicts
@@ -254,78 +284,85 @@ export function buildConflictTooltip(conflicts, {
 
   const fT = id => therapists.find(t => t.id === id)
   const fR = id => rooms.find(r => r.id === id)
-  const fP = id => patients.find(p => p.id === id)
   const fC = id => consultations.find(c => c.id === id)
   const fB = id => calendarBlocks.find(b => b.id === id)
 
   return conflicts.map(cf => {
     const therapist = fT(cf.therapistId)
     const tName = therapist?.name || 'Terapeuta'
+    const dateStr = fmtDatePT(cf.conflictDate)
 
     switch (cf.conflictType) {
 
       case CONFLICT_TYPES.THERAPIST_OVERLAP: {
         const relC = fC(cf.relatedConsultationId)
-        const relPatient = relC ? fP(relC.patientId) : null
-        const relTherapist = relC ? fT(relC.therapistId) : null
-        const parts = [`⚠ Conflito de terapeuta — ${tName}`]
-        if (relPatient)   parts.push(`Paciente conflitante: ${relPatient.fullName}`)
-        if (relC?.time)   parts.push(`Horário: ${relC.time.slice(0, 5)}`)
-        if (relTherapist && relTherapist.id !== cf.therapistId)
-          parts.push(`(terapeuta do outro atendimento: ${relTherapist.name})`)
-        return parts.join(' | ')
+        const subject = consultationSubject(relC, patients)
+        const relType = eventTypeLabel(relC)
+        const relEnd = relC?.time ? addMinutes(relC.time, CONFLICT_DURATION) : null
+        let msg = `⚠ ${tName} já possui ${relType}`
+        if (subject) msg += ` de ${subject}`
+        if (dateStr) msg += ` em ${dateStr}`
+        if (relC?.time) msg += ` das ${fmtTimePT(relC.time)} às ${relEnd ? fmtTimePT(relEnd) : '?'}`
+        return msg + '.'
       }
 
       case CONFLICT_TYPES.ROOM_OVERLAP: {
         const relC = fC(cf.relatedConsultationId)
-        const relPatient = relC ? fP(relC.patientId) : null
+        const subject = consultationSubject(relC, patients)
         const relTherapist = relC ? fT(relC.therapistId) : null
         const room = fR(cf.roomId)
-        const parts = [`⚠ Conflito de sala${room ? ` — ${room.name}` : ''}`]
-        if (relPatient)   parts.push(`Paciente conflitante: ${relPatient.fullName}`)
-        if (relTherapist) parts.push(`Terapeuta: ${relTherapist.name}`)
-        if (relC?.time)   parts.push(`Horário: ${relC.time.slice(0, 5)}`)
-        return parts.join(' | ')
+        const relType = eventTypeLabel(relC)
+        const relEnd = relC?.time ? addMinutes(relC.time, CONFLICT_DURATION) : null
+        let msg = `⚠ Sala ${room?.name || '?'} ocupada: ${relType}`
+        if (subject) msg += ` de ${subject}`
+        if (relTherapist) msg += ` (${relTherapist.name})`
+        if (dateStr) msg += ` em ${dateStr}`
+        if (relC?.time) msg += ` das ${fmtTimePT(relC.time)} às ${relEnd ? fmtTimePT(relEnd) : '?'}`
+        return msg + '.'
       }
 
       case CONFLICT_TYPES.THERAPIST_UNAVAILABLE_TOTAL:
       case CONFLICT_TYPES.THERAPIST_UNAVAILABLE_PARTIAL: {
         const isRigid = cf.conflictType === CONFLICT_TYPES.THERAPIST_UNAVAILABLE_TOTAL
-        const label = isRigid ? '⚠ Bloqueio rígido' : '⚠ Bloqueio flex'
-        const parts = [`${label} — ${tName}`]
+        const blockLabel = isRigid ? 'Bloqueio Rígido' : 'Bloqueio Flex'
 
         if (cf.calendarBlockId) {
-          // perspectiva do atendimento: exibe detalhes do bloqueio
+          // perspectiva do atendimento: mostra detalhes do bloqueio
           const blk = fB(cf.calendarBlockId)
-          if (blk) {
-            const timeStr = `${blk.startTime?.slice(0, 5)}–${blk.endTime?.slice(0, 5)}`
-            parts.push(`Bloqueio: ${timeStr}${blk.description ? ` (${blk.description})` : ''}`)
-          }
-        } else if (cf.relatedConsultationId) {
-          // perspectiva do bloqueio: exibe paciente e horário do atendimento
-          const relC = fC(cf.relatedConsultationId)
-          const relPatient = relC ? fP(relC.patientId) : null
-          if (relPatient) parts.push(`Paciente conflitante: ${relPatient.fullName}`)
-          if (relC?.time) parts.push(`Horário atendimento: ${relC.time.slice(0, 5)}`)
+          let msg = `⚠ ${tName} possui ${blockLabel}`
+          if (dateStr) msg += ` em ${dateStr}`
+          if (blk) msg += ` das ${fmtTimePT(blk.startTime)} às ${fmtTimePT(blk.endTime)}`
+          if (blk?.description) msg += ` (${blk.description})`
+          return msg + '.'
         }
-        return parts.join(' | ')
+
+        // perspectiva do bloqueio: mostra detalhes do atendimento conflitante
+        const relC = fC(cf.relatedConsultationId)
+        const subject = consultationSubject(relC, patients)
+        const relType = eventTypeLabel(relC)
+        const relEnd = relC?.time ? addMinutes(relC.time, CONFLICT_DURATION) : null
+        let msg = `⚠ ${blockLabel} de ${tName} conflita com ${relType}`
+        if (subject) msg += ` de ${subject}`
+        if (dateStr) msg += ` em ${dateStr}`
+        if (relC?.time) msg += ` das ${fmtTimePT(relC.time)} às ${relEnd ? fmtTimePT(relEnd) : '?'}`
+        return msg + '.'
       }
 
       case CONFLICT_TYPES.BLOCK_OVERLAP: {
         const other = fB(cf.relatedBlockId)
-        const parts = [`⚠ Bloqueios sobrepostos — ${tName}`]
-        if (other) {
-          const timeStr = `${other.startTime?.slice(0, 5)}–${other.endTime?.slice(0, 5)}`
-          parts.push(`Outro bloqueio: ${timeStr}${other.description ? ` (${other.description})` : ''}`)
-        }
-        return parts.join(' | ')
+        const otherLabel = other?.blockType === 'RIGID' ? 'Bloqueio Rígido' : 'Bloqueio Flex'
+        let msg = `⚠ Bloqueio de ${tName} se sobrepõe a ${otherLabel}`
+        if (dateStr) msg += ` em ${dateStr}`
+        if (other) msg += ` das ${fmtTimePT(other.startTime)} às ${fmtTimePT(other.endTime)}`
+        if (other?.description) msg += ` (${other.description})`
+        return msg + '.'
       }
 
       default: {
         const room = fR(cf.roomId)
         const parts = [CONFLICT_LABELS[cf.conflictType] || cf.conflictType]
-        if (therapist)    parts.push(`Terapeuta: ${therapist.name}`)
-        if (room)         parts.push(`Sala: ${room.name}`)
+        if (therapist)      parts.push(`Terapeuta: ${therapist.name}`)
+        if (room)           parts.push(`Sala: ${room.name}`)
         if (cf.description) parts.push(cf.description)
         return parts.join(' | ')
       }

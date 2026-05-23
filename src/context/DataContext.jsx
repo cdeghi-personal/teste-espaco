@@ -62,7 +62,7 @@ const CONSULTATION_SELECT = `
   consultation_status_id, appointment_type_id, prepaid_session_consumed,
   nf_number, nf_issue_date, previous_status_before_invoice,
   series_id, series_original_date, is_series_exception,
-  event_type, interview_format, meeting_platform, meeting_link,
+  event_type, interview_format, meeting_platform, meeting_link, interviewee_name,
   main_objective, evolution_notes, next_objectives, guardian_feedback,
   session_quality, created_at,
   consultation_activities(id, name, description, outcome, sort_order),
@@ -687,6 +687,7 @@ export function DataProvider({ children }) {
         interview_format: rest.interviewFormat || null,
         meeting_platform: rest.meetingPlatform || null,
         meeting_link: rest.meetingLink || null,
+        interviewee_name: rest.intervieweeName || null,
         main_objective: rest.mainObjective || null,
         evolution_notes: rest.evolutionNotes || null,
         next_objectives: rest.nextObjectives || null,
@@ -798,6 +799,7 @@ export function DataProvider({ children }) {
     if (rest.interviewFormat !== undefined) update.interview_format = rest.interviewFormat || null
     if (rest.meetingPlatform !== undefined) update.meeting_platform = rest.meetingPlatform || null
     if (rest.meetingLink !== undefined) update.meeting_link = rest.meetingLink || null
+    if (rest.intervieweeName !== undefined) update.interviewee_name = rest.intervieweeName || null
     if (rest.sessionNumber !== undefined) update.session_number = rest.sessionNumber
     if (rest.consultationStatusId !== undefined) update.consultation_status_id = rest.consultationStatusId || null
     if (rest.appointmentTypeId !== undefined) update.appointment_type_id = rest.appointmentTypeId || null
@@ -1614,7 +1616,7 @@ export function DataProvider({ children }) {
       patientId, primaryTherapistId, specialty,
       consultationStatusId, appointmentTypeId, roomId,
       time, recurrenceType, recurrenceDays, startDate, endDate, sessionCount, notes,
-      eventType, interviewFormat, meetingPlatform, meetingLink,
+      eventType, interviewFormat, meetingPlatform, meetingLink, intervieweeName,
       conflictsPerDate = [],
     } = data
 
@@ -1648,6 +1650,7 @@ export function DataProvider({ children }) {
         interview_format:       interviewFormat || null,
         meeting_platform:       meetingPlatform || null,
         meeting_link:           meetingLink || null,
+        interviewee_name:       intervieweeName || null,
         recurrence_type:        recurrenceType,
         recurrence_days:        recurrenceDays,
         start_date:             startDate,
@@ -1672,6 +1675,7 @@ export function DataProvider({ children }) {
       interview_format:       interviewFormat || null,
       meeting_platform:       meetingPlatform || null,
       meeting_link:           meetingLink || null,
+      interviewee_name:       intervieweeName || null,
       consultation_status_id: consultationStatusId || null,
       appointment_type_id:    appointmentTypeId || null,
       series_id:              series.id,

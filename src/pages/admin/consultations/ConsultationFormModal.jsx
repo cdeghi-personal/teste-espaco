@@ -9,14 +9,14 @@ import { useData } from '../../../context/DataContext'
 import { useAuth } from '../../../context/AuthContext'
 import { generateId } from '../../../utils/storageUtils'
 import { isoToday } from '../../../utils/dateUtils'
-import { detectConflicts, CONFLICT_LABELS } from '../../../utils/conflictUtils'
+import { detectConflicts, buildConflictTooltip } from '../../../utils/conflictUtils'
 
 const EMPTY_ACTIVITY = { id: '', name: '', description: '', outcome: 'achieved' }
 
 const EMPTY = {
   patientId: '', therapistId: '', specialty: '', date: isoToday(), time: '',
   consultationStatusId: '', appointmentTypeId: '', roomId: '',
-  eventType: 'SESSION', interviewFormat: '', meetingPlatform: '', meetingLink: '',
+  eventType: 'SESSION', interviewFormat: '', meetingPlatform: '', meetingLink: '', intervieweeName: '',
   mainObjective: '', activities: [],
   evolutionNotes: '', nextObjectives: '',
   sessionQuality: 'good', guardianFeedback: '', appointmentId: '',
@@ -100,7 +100,8 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
 
   function validate() {
     const e = {}
-    if (!form.patientId) e.patientId = 'Selecione o paciente'
+    if (!form.patientId && form.eventType !== 'INTERVIEW') e.patientId = 'Selecione o paciente'
+    if (form.eventType === 'INTERVIEW' && !form.intervieweeName?.trim()) e.intervieweeName = 'Informe o nome do(s) entrevistado(s)'
     if (!form.therapistId) e.therapistId = 'Selecione o terapeuta'
     if (!form.specialty) e.specialty = 'Selecione a especialidade'
     if (!form.time) e.time = 'Informe o horário'
@@ -348,7 +349,7 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
               {conflictsToConfirm.map((c, i) => (
                 <li key={i} className="flex items-start gap-1.5">
                   <span className="shrink-0">•</span>
-                  <span>{CONFLICT_LABELS[c.conflictType] || c.conflictType}{c.description ? ` — ${c.description}` : ''}</span>
+                  <span>{buildConflictTooltip([c], { therapists, rooms, patients, consultations, calendarBlocks })}</span>
                 </li>
               ))}
             </ul>
@@ -390,12 +391,29 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
             Dados do Atendimento
           </h3>
           <div className="space-y-3">
-            <Select label="Paciente *" value={form.patientId} onChange={e => set('patientId', e.target.value)} error={errors.patientId} disabled={readOnly}>
+            <Select
+              label={form.eventType === 'INTERVIEW' ? 'Paciente (opcional)' : 'Paciente *'}
+              value={form.patientId}
+              onChange={e => set('patientId', e.target.value)}
+              error={errors.patientId}
+              disabled={readOnly}
+            >
               <option value="">Selecione o paciente</option>
               {patients.filter(p => !p.deleted).map(p => (
                 <option key={p.id} value={p.id}>{p.fullName}</option>
               ))}
             </Select>
+
+            {(form.eventType === 'INTERVIEW' || form.intervieweeName) && (
+              <Input
+                label={readOnly ? 'Entrevistado(s)' : 'Nome(s) do(s) entrevistado(s) *'}
+                value={form.intervieweeName || ''}
+                onChange={e => set('intervieweeName', e.target.value)}
+                error={errors.intervieweeName}
+                placeholder="Ex: Maria (responsável)"
+                disabled={readOnly}
+              />
+            )}
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <Select label="Terapeuta *" value={form.therapistId} onChange={e => set('therapistId', e.target.value)} error={errors.therapistId} disabled={readOnly || !isAdminOrTeam}>

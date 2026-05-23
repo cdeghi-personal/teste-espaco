@@ -169,6 +169,7 @@ export function mapConsultation(row) {
     interviewFormat: row.interview_format || null,
     meetingPlatform: row.meeting_platform || null,
     meetingLink: row.meeting_link || null,
+    intervieweeName: row.interviewee_name || null,
     nfNumber: row.nf_number || null,
     nfIssueDate: row.nf_issue_date || null,
     previousStatusBeforeInvoice: row.previous_status_before_invoice || null,

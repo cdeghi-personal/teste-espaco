@@ -9,7 +9,7 @@ import { useData } from '../../../context/DataContext'
 import { useAuth } from '../../../context/AuthContext'
 import { useToast } from '../../../components/ui/Toast'
 import { isoToday, generateSeriesDates } from '../../../utils/dateUtils'
-import { detectSeriesConflicts, CONFLICT_LABELS } from '../../../utils/conflictUtils'
+import { detectSeriesConflicts, buildConflictTooltip } from '../../../utils/conflictUtils'
 
 const WEEKDAYS = [
   { value: 1, label: 'Seg' },
@@ -38,6 +38,7 @@ export default function SeriesFormModal({ onClose }) {
     interviewFormat: '',
     meetingPlatform: '',
     meetingLink: '',
+    intervieweeName: '',
     recurrenceType: 'by_count',
     recurrenceDays: [1],
     startDate: isoToday(),
@@ -162,6 +163,7 @@ export default function SeriesFormModal({ onClose }) {
         interviewFormat:       form.interviewFormat || null,
         meetingPlatform:       form.meetingPlatform || null,
         meetingLink:           form.meetingLink || null,
+        intervieweeName:       form.intervieweeName || null,
         recurrenceType:        form.recurrenceType,
         recurrenceDays:        form.recurrenceDays,
         startDate:             form.startDate,
@@ -217,7 +219,7 @@ export default function SeriesFormModal({ onClose }) {
                   <div className="font-medium">{date.split('-').reverse().join('/')}</div>
                   <ul className="pl-3 space-y-0.5">
                     {conflicts.map((c, i) => (
-                      <li key={i}>• {CONFLICT_LABELS[c.conflictType] || c.conflictType}{c.description ? ` — ${c.description}` : ''}</li>
+                      <li key={i}>• {buildConflictTooltip([c], { therapists, rooms, patients, consultations, calendarBlocks })}</li>
                     ))}
                   </ul>
                 </div>
@@ -312,6 +314,14 @@ export default function SeriesFormModal({ onClose }) {
                 </>
               )}
             </div>
+            {form.eventType === 'INTERVIEW' && (
+              <Input
+                label="Nome(s) do(s) entrevistado(s)"
+                value={form.intervieweeName}
+                onChange={e => set('intervieweeName', e.target.value)}
+                placeholder="Ex: Maria (responsável)"
+              />
+            )}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <Input label="Horário *" type="time" value={form.time} onChange={e => set('time', e.target.value)} error={errors.time} />
               {form.eventType === 'INTERVIEW' && form.interviewFormat === 'REMOTE' ? (
