@@ -674,7 +674,7 @@ export function DataProvider({ children }) {
     const { data: inserted, error } = await supabase
       .from('consultations')
       .insert({
-        patient_id: rest.patientId,
+        patient_id: rest.patientId || null,
         therapist_id: rest.therapistId,
         specialty: rest.specialty,
         date: rest.date,
@@ -789,7 +789,7 @@ export function DataProvider({ children }) {
     }
 
     const update = {}
-    if (rest.patientId !== undefined) update.patient_id = rest.patientId
+    if (rest.patientId !== undefined) update.patient_id = rest.patientId || null
     if (rest.therapistId !== undefined) update.therapist_id = rest.therapistId
     if (rest.specialty !== undefined) update.specialty = rest.specialty
     if (rest.date !== undefined) update.date = rest.date
