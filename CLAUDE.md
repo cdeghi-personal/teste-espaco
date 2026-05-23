@@ -407,11 +407,15 @@ Authentication → URL Configuration:
 - Item "Suporte" — visível para **todos** os usuários autenticados; badge laranja para admin puro mostrando contagem de tickets com status `novo` ou `reprovado_usuario`
 - Seção "Administração" — colapsável, visível a **todos** os autenticados; contém: Terapeutas, Especialidades, Formas de Pagamento, Diagnósticos, Status do Paciente, Status Atendimento, Tipos de Atendimento, Salas, Faixas Etárias (read-only para terapeutas) + Log de Auditoria (admin only) + **Dados da Empresa** (admin only, ícone `FiBriefcase`)
 - "Sair" sempre visível no rodapé — redireciona para `/login` (não para a home pública)
+- **"Powered by ©DGT"** — texto `text-xs text-gray-400` exibido abaixo do botão Sair
 
 ## Site Público
 
 - Telefone de contato: **(11) 9 7579-9590** — link abre WhatsApp (`https://wa.me/5511975799590`)
+- **Endereço:** Rua Almirante Protógenes, 143, Jardim, Santo André - SP, CEP 09090-760
+- **E-mail:** contatocasa.amarela2024@gmail.com
 - Botão "Área Restrita" **removido** do header público (desktop e mobile)
+- `PublicFooter`: rodapé inferior em layout flex — copyright à esquerda, "Powered by ©DGT" à direita
 
 ## Faixas Etárias (`/admin/faixaetaria`)
 
@@ -693,6 +697,7 @@ Não é mais editável. Texto padrão fixo definido em `DESEMPENHO_FIXO` em `gen
 - Card na listagem: Paciente, Especialidade, Status, Tipo / Data + Hora, Terapeuta, Sala
 - Editar/excluir: visível apenas para o terapeuta responsável ou admin
 - **Visibilidade para terapeutas:** lista inclui consultas onde o terapeuta é primário **ou** participante secundário em `consultation_therapists`
+- **Filtro de mês:** botões Mês-2 / Mês-1 / Mês Atual / Mês+1 acima da barra de busca; `filterDateFrom`/`filterDateTo` com padrão = mês corrente. Filtro aplicado sobre `c.date` na listagem.
 - **Toggle "Meus Atendimentos":** visível apenas para admin que também é terapeuta (`canFilterMine = isAdmin && !!user?.id`); padrão `false`; filtra consultas onde o admin é primário ou secundário. Terapeutas já têm filtro implícito — toggle não é exibido para eles.
 - **Chips visuais no card:** chip indigo FiRepeat para série regular (`seriesId && !isSeriesException`); chip amber FiRepeat+`!` para ocorrência alterada individualmente (`seriesId && isSeriesException`); chip 👥 N (azul) com tooltip dos nomes para múltiplos terapeutas (`consultationTherapists.length > 1`); chip vermelho `⚠ Conflito` quando `(c.conflicts || []).length > 0`.
 - **Campos obrigatórios quando status = "Realizada":** Objetivo da Sessão, Relato da Sessão / Evolução, Objetivo da Próxima Sessão
@@ -709,7 +714,7 @@ Não é mais editável. Texto padrão fixo definido em `DESEMPENHO_FIXO` em `gen
 ## Pagamentos / Notas Fiscais (`/admin/pagamentos`)
 
 - **Acesso:** admin only (`PaymentsPage.jsx`).
-- **Filtros:** busca livre (NF ou nome do paciente), status (ISSUED/PAID/CANCELLED/Todos), período (dateFrom/dateTo).
+- **Filtros:** botões Mês-2 / Mês-1 / Mês Atual (padrão = mês corrente) + busca livre (NF ou nome do paciente) + status (ISSUED/PAID/CANCELLED/Todos) + período manual (dateFrom/dateTo). Container `max-w-5xl`.
 - **StatusBadge:** ISSUED=azul, PAID=verde, CANCELLED=cinza.
 - **InvoiceCard:** paciente, período/mês, total, status, número/data da NF; botões Ver detalhes / Marcar como Pago / Cancelar NF (Marcar Pago e Cancelar só para ISSUED).
 - **InvoiceDetailModal:** snapshot completo — paciente, período, NF, total, lista de consultas (data/hora/especialidade/terapeuta/status/valor), data de geração.
@@ -724,7 +729,8 @@ Não é mais editável. Texto padrão fixo definido em `DESEMPENHO_FIXO` em `gen
 - Card: `HH:MM - PrimeiroNome Ultimo` + sala em 10px
 - Legenda inferior exibe nome completo do terapeuta
 - **Toggle "Minha Agenda":** visível para qualquer usuário com `user.id` preenchido (`canFilterMine = !!user?.id`); padrão `true` para não-admin (terapeutas veem só os seus por padrão), `false` para admin. Ao ativar, `filterConsultation` exige que o usuário seja primário ou participante secundário (`consultationTherapists`).
-- **Chips visuais nos cards:** desktop — `bg-white/25` (funciona em qualquer cor de fundo do terapeuta); mobile — `bg-indigo-50`/`bg-amber-50`/`bg-blue-50`. Mesma semântica dos chips de ConsultationsPage: indigo = série, amber+`!` = ocorrência alterada, 👥 N = múltiplos terapeutas, vermelho `⚠` = conflito. Chips de série/múltiplos terapeutas exibidos apenas quando `!isPrivate`; chip de conflito sempre visível.
+- **Chips visuais nos cards de consulta:** desktop — `bg-white/25` (funciona em qualquer cor de fundo do terapeuta); mobile — `bg-indigo-50`/`bg-amber-50`/`bg-blue-50`. Semântica: indigo = série, amber+`!` = ocorrência alterada, 👥 N = múltiplos terapeutas, vermelho `⚠` = conflito. Chips de série/múltiplos terapeutas exibidos apenas quando `!isPrivate`; chip de conflito sempre visível.
+- **Chips visuais nos BlockCards (bloqueios):** chip `⚠` vermelho pequeno quando `consultations.some(c => c.conflicts.some(cf => !cf.resolved && cf.calendarBlockId === block.id))`. Desktop: inline na linha de chips do BlockCard. Mobile: chip "⚠ Conflito" na linha de badges abaixo do tipo RIGID/FLEX.
 
 ## CRM de Contatos (`/admin/contatos`)
 
@@ -869,7 +875,8 @@ Não é mais editável. Texto padrão fixo definido em `DESEMPENHO_FIXO` em `gen
 
 ### Chips visuais
 
-- **`⚠ Conflito`** — chip vermelho nos cards de `ConsultationsPage` e `AgendaPage` quando `(c.conflicts || []).length > 0`.
+- **`⚠ Conflito` em consultas** — chip vermelho nos cards de `ConsultationsPage` e `AgendaPage` quando `(c.conflicts || []).length > 0`.
+- **`⚠` em bloqueios** — chip vermelho no `BlockCard` quando alguma consulta tem conflito com `calendarBlockId === block.id`.
 - Chips de série/múltiplos terapeutas e de conflito coexistem na mesma linha de badges.
 
 ### Bloqueios de Agenda (`CalendarBlockFormModal`, `CalendarBlockHistoryModal`)
@@ -882,7 +889,7 @@ Não é mais editável. Texto padrão fixo definido em `DESEMPENHO_FIXO` em `gen
 - **Soft-delete**: cancelamento via `cancelled=true` (nunca DELETE físico); bloqueios cancelados não aparecem na agenda mas ficam no histórico.
 - Ao criar/editar/cancelar, exibe aviso âmbar com nomes dos pacientes afetados **antes** de salvar.
 - Após salvar, reconstrói automaticamente os conflitos das consultas afetadas (`rebuildRelatedConflicts`).
-- `CalendarBlockHistoryModal`: listagem de todos os bloqueios (ativos + cancelados) com botões Editar e Cancelar por linha (cancelamento sempre individual, nunca em série).
+- `CalendarBlockHistoryModal`: listagem de todos os bloqueios (ativos + cancelados) com botões Editar e Cancelar por linha (cancelamento sempre individual, nunca em série). Filtros: busca por descrição/terapeuta, status (Todos/Ativo/Cancelado), tipo (Todos/Rígido/Flex), terapeuta (admin only), botões de mês Mês-2/Mês-1/Mês Atual/Mês+1 + intervalo de datas manual; padrão = mês corrente.
 - Cards na Agenda: cinza escuro (RIGID) / cinza médio (FLEX), linha 2 exibe chip de cor do terapeuta + nome.
 - Admin gerencia qualquer bloqueio; terapeuta gerencia apenas os próprios.
 
