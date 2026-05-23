@@ -1,6 +1,11 @@
-import { FiUsers, FiCalendar, FiClipboard, FiTrendingUp, FiMessageSquare, FiArrowRight, FiBell, FiLifeBuoy } from 'react-icons/fi'
-import { useState, useEffect } from 'react'
-import { format } from 'date-fns'
+import {
+  FiUsers, FiCalendar, FiClipboard, FiTrendingUp,
+  FiMessageSquare, FiArrowRight, FiBell, FiLifeBuoy,
+  FiDollarSign, FiCheckCircle, FiAlertTriangle,
+  FiArrowUp, FiArrowDown, FiMinus, FiActivity,
+} from 'react-icons/fi'
+import { useState, useEffect, useMemo } from 'react'
+import { format, subMonths, addDays, subDays } from 'date-fns'
 import { Link } from 'react-router-dom'
 import { useData } from '../../context/DataContext'
 import { useAuth } from '../../context/AuthContext'
@@ -8,6 +13,16 @@ import Badge from '../../components/ui/Badge'
 import { formatDateShort } from '../../utils/dateUtils'
 import { supabase } from '../../lib/supabase'
 import { ROUTES } from '../../constants/routes'
+
+// ── helpers ──────────────────────────────────────────────────────────────────
+
+function norm(s) {
+  return (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+}
+
+function fmtCurrency(v) {
+  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v || 0)
+}
 
 function textColorForBg(hex) {
   if (!hex) return '#1f2937'
@@ -19,11 +34,71 @@ function textColorForBg(hex) {
   return (0.299 * r + 0.587 * g + 0.114 * b) > 140 ? '#1f2937' : '#ffffff'
 }
 
+// ── sub-components ────────────────────────────────────────────────────────────
+
+function Trend({ curr, prev, label = 'vs mês anterior' }) {
+  if (prev == null) return null
+  const diff = curr - prev
+  if (prev === 0 && diff === 0) return null
+  if (prev === 0) return (
+    <span className="text-xs text-green-600 font-medium flex items-center gap-0.5">
+      <FiArrowUp size={10} /> novo
+    </span>
+  )
+  const pct = Math.round(Math.abs(diff) / prev * 100)
+  if (diff > 0) return (
+    <span className="text-xs text-green-600 font-medium flex items-center gap-0.5">
+      <FiArrowUp size={10} /> {pct}% {label}
+    </span>
+  )
+  if (diff < 0) return (
+    <span className="text-xs text-red-500 font-medium flex items-center gap-0.5">
+      <FiArrowDown size={10} /> {pct}% {label}
+    </span>
+  )
+  return (
+    <span className="text-xs text-gray-400 flex items-center gap-0.5">
+      <FiMinus size={10} /> igual ao anterior
+    </span>
+  )
+}
+
+function StatCard({ icon: Icon, label, value, color, bg, trend, prevValue, link, suffix = '' }) {
+  const content = (
+    <div className="bg-white rounded-2xl p-4 md:p-5 border border-gray-100 shadow-sm hover:shadow-md transition-shadow h-full">
+      <div className={`w-9 h-9 ${bg} rounded-xl flex items-center justify-center mb-3`}>
+        <Icon size={16} className={color} />
+      </div>
+      <div className="text-2xl font-bold text-gray-900">{value}{suffix}</div>
+      <div className="text-xs text-gray-500 mt-0.5 leading-tight">{label}</div>
+      {trend && (
+        <div className="mt-2">
+          <Trend curr={value} prev={prevValue} />
+        </div>
+      )}
+    </div>
+  )
+  return link ? <Link to={link} className="block">{content}</Link> : content
+}
+
+function SectionHeader({ title, icon, action }) {
+  return (
+    <div className="flex items-center justify-between mb-3">
+      <h2 className="font-semibold text-gray-900 text-sm md:text-base flex items-center gap-2">
+        {icon && <span className="text-base">{icon}</span>}
+        {title}
+      </h2>
+      {action}
+    </div>
+  )
+}
+
+// ── greeting constants ────────────────────────────────────────────────────────
+
 const GREETING_CATEGORIAS = [
   'motivacional', 'pessoal', 'bemEstar', 'geografia',
   'cinema', 'musica', 'tecnologia', 'historia', 'ciencia', 'gastronomia',
 ]
-
 const LOADING_MSGS = [
   'Hmm, deixa eu ver o que vou te falar hoje... 🤔',
   'Um segundo, estou consultando o calendário cósmico... 🔭',
@@ -31,12 +106,10 @@ const LOADING_MSGS = [
   'Pensando, pensando... quase lá! 💭',
   'Deixa eu vasculhar minha enciclopédia mental... 📚',
 ]
-
 const CENTURIES = ['XIII', 'XIV', 'XV', 'XVI', 'XVII', 'XVIII', 'XIX', 'XX', 'XXI']
-const DECADES   = ['1800', '1810', '1820', '1830', '1840', '1850', '1860', '1870', '1880', '1890',
-                   '1900', '1910', '1920', '1930', '1940', '1950', '1960', '1970', '1980', '1990',
-                   '2000', '2010', '2020']
-
+const DECADES   = ['1800','1810','1820','1830','1840','1850','1860','1870','1880','1890',
+                   '1900','1910','1920','1930','1940','1950','1960','1970','1980','1990',
+                   '2000','2010','2020']
 const HINT_MAP = {
   geografia:    { pool: CENTURIES, fmt: v => `Prefira algo do século ${v}.` },
   historia:     { pool: CENTURIES, fmt: v => `Prefira fatos do século ${v}.` },
@@ -46,53 +119,220 @@ const HINT_MAP = {
   ciencia:      { pool: DECADES,   fmt: v => `Prefira uma descoberta ou estudo da década de ${v}.` },
   tecnologia:   { pool: DECADES,   fmt: v => `Prefira uma invenção ou inovação da década de ${v}.` },
   motivacional: {
-    pool: ['dedicação', 'comprometimento', 'aprendizado contínuo', 'foco', 'resiliência',
-           'paciência', 'empatia', 'persistência', 'trabalho em equipe', 'propósito'],
+    pool: ['dedicação','comprometimento','aprendizado contínuo','foco','resiliência',
+           'paciência','empatia','persistência','trabalho em equipe','propósito'],
     fmt: v => `Tema da mensagem: ${v}.`,
   },
   pessoal: {
-    pool: ['hobbies', 'artes', 'literatura', 'hábitos saudáveis', 'clima', 'culinária',
-           'viagens', 'animais de estimação', 'filmes e séries', 'esportes'],
+    pool: ['hobbies','artes','literatura','hábitos saudáveis','clima','culinária',
+           'viagens','animais de estimação','filmes e séries','esportes'],
     fmt: v => `Assunto da pergunta: ${v}.`,
   },
   bemEstar: {
-    pool: ['cuidado com o corpo', 'saúde mental', 'alimentação saudável', 'relação com a família',
-           'amizades', 'qualidade do sono', 'exercício físico', 'momentos de lazer',
-           'respiração e relaxamento', 'hidratação'],
+    pool: ['cuidado com o corpo','saúde mental','alimentação saudável','relação com a família',
+           'amizades','qualidade do sono','exercício físico','momentos de lazer',
+           'respiração e relaxamento','hidratação'],
     fmt: v => `A dica deve ser sobre: ${v}.`,
   },
 }
-
-function pickHint(categoria) {
-  const entry = HINT_MAP[categoria]
-  if (!entry) return null
-  const value = entry.pool[Math.floor(Math.random() * entry.pool.length)]
-  return entry.fmt(value)
+function pickHint(cat) {
+  const e = HINT_MAP[cat]
+  if (!e) return null
+  return e.fmt(e.pool[Math.floor(Math.random() * e.pool.length)])
 }
+
+// ── main component ────────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
   const { user } = useAuth()
-  const { patients, consultations, therapists, rooms, patientStatuses, specialtiesData } = useData()
+  const {
+    patients, consultations, therapists, rooms,
+    patientStatuses, specialtiesData, consultationStatuses,
+  } = useData()
 
-  const now = new Date()
-  const today = format(now, 'yyyy-MM-dd')
-  const nowTime = format(now, 'HH:mm')
-  const thisMonth = format(now, 'yyyy-MM')
+  const now        = new Date()
+  const today      = format(now, 'yyyy-MM-dd')
+  const nowTime    = format(now, 'HH:mm')
+  const thisMonth  = format(now, 'yyyy-MM')
+  const lastMonth  = format(subMonths(now, 1), 'yyyy-MM')
+  const next7Days  = format(addDays(now, 7), 'yyyy-MM-dd')
+  const ago30      = format(subDays(now, 30), 'yyyy-MM-dd')
 
-  const dayOfWeek = now.getDay()
-  const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek
-  const weekStart = new Date(now)
-  weekStart.setDate(now.getDate() + diffToMonday)
-  const weekStartIso = format(weekStart, 'yyyy-MM-dd')
-  const weekEnd = new Date(weekStart)
-  weekEnd.setDate(weekStart.getDate() + 6)
-  const weekEndIso = format(weekEnd, 'yyyy-MM-dd')
-
-  const isAdmin = user?.role === 'admin'
+  const isAdmin       = user?.role === 'admin'
   const isSupportAdmin = isAdmin && !user?.id
 
-  // Greeting dinâmico — categoria e sub-hint sorteados no frontend para variedade entre usuários
-  const [greetingMsg, setGreetingMsg] = useState('')
+  // ── fuzzy status matching ────────────────────────────────────────────────
+  const realizadaIds = useMemo(() =>
+    consultationStatuses.filter(s => norm(s.name).includes('realiz')).map(s => s.id),
+  [consultationStatuses])
+
+  const faltaIds = useMemo(() =>
+    consultationStatuses.filter(s =>
+      norm(s.name).includes('falt') || norm(s.name).includes('ausen')
+    ).map(s => s.id),
+  [consultationStatuses])
+
+  const cancelaIds = useMemo(() =>
+    consultationStatuses.filter(s => norm(s.name).includes('cancel')).map(s => s.id),
+  [consultationStatuses])
+
+  // ── visibility filters ───────────────────────────────────────────────────
+  const activePatients = useMemo(() => {
+    const activeStatusId = patientStatuses.find(s => norm(s.name).includes('ativ'))?.id
+    const base = patients.filter(p => !p.deleted)
+    const mine = (isAdmin || user?.belongsToTeam)
+      ? base
+      : base.filter(p =>
+          p.therapistId === user?.id ||
+          (p.involvedTherapistIds || []).includes(user?.id)
+        )
+    return activeStatusId ? mine.filter(p => p.statusId === activeStatusId) : mine
+  }, [patients, patientStatuses, isAdmin, user])
+
+  const mySessions = useMemo(() => {
+    const base = (isAdmin || user?.belongsToTeam)
+      ? consultations
+      : consultations.filter(c =>
+          c.therapistId === user?.id ||
+          (c.consultationTherapists || []).some(ct => ct.therapistId === user?.id)
+        )
+    return base.filter(c => c.eventType !== 'INTERVIEW')
+  }, [consultations, isAdmin, user])
+
+  // ── month slices ─────────────────────────────────────────────────────────
+  const thisMonthSessions = useMemo(() =>
+    mySessions.filter(c => c.date?.startsWith(thisMonth)),
+  [mySessions, thisMonth])
+
+  const lastMonthSessions = useMemo(() =>
+    mySessions.filter(c => c.date?.startsWith(lastMonth)),
+  [mySessions, lastMonth])
+
+  const realizadasMes     = useMemo(() => thisMonthSessions.filter(c => realizadaIds.includes(c.consultationStatusId)), [thisMonthSessions, realizadaIds])
+  const realizadasAnterior = useMemo(() => lastMonthSessions.filter(c => realizadaIds.includes(c.consultationStatusId)), [lastMonthSessions, realizadaIds])
+  const faltasMes         = useMemo(() => thisMonthSessions.filter(c => faltaIds.includes(c.consultationStatusId)), [thisMonthSessions, faltaIds])
+  const cancelasMes       = useMemo(() => thisMonthSessions.filter(c => cancelaIds.includes(c.consultationStatusId)), [thisMonthSessions, cancelaIds])
+  const negativosMes      = faltasMes.length + cancelasMes.length
+
+  const taxaRealizacao = thisMonthSessions.length > 0
+    ? Math.round(realizadasMes.length / thisMonthSessions.length * 100)
+    : 0
+  const taxaAnterior = lastMonthSessions.length > 0
+    ? Math.round(realizadasAnterior.length / lastMonthSessions.length * 100)
+    : 0
+
+  // ── upcoming ─────────────────────────────────────────────────────────────
+  const next7Sessions = useMemo(() =>
+    mySessions.filter(c => c.date > today && c.date <= next7Days),
+  [mySessions, today, next7Days])
+
+  const todaySessions = useMemo(() =>
+    consultations
+      .filter(c => c.date === today && c.eventType !== 'INTERVIEW' &&
+        (isAdmin || user?.belongsToTeam || c.therapistId === user?.id ||
+         (c.consultationTherapists || []).some(ct => ct.therapistId === user?.id))
+      )
+      .sort((a, b) => (a.time || '').localeCompare(b.time || '')),
+  [consultations, today, isAdmin, user])
+
+  const upcomingAll = useMemo(() =>
+    mySessions
+      .filter(c => {
+        if (c.date > today) return true
+        if (c.date === today) return !c.time || c.time >= nowTime
+        return false
+      })
+      .sort((a, b) => a.date.localeCompare(b.date) || (a.time || '').localeCompare(b.time || ''))
+      .slice(0, 5),
+  [mySessions, today, nowTime])
+
+  // ── new patients this month ───────────────────────────────────────────────
+  const newPatientsThisMonth = useMemo(() =>
+    patients.filter(p => !p.deleted && (p.createdAt || '').startsWith(thisMonth)).length,
+  [patients, thisMonth])
+
+  // ── evasion risk ─────────────────────────────────────────────────────────
+  const evasionRisk = useMemo(() => {
+    return activePatients
+      .filter(p => {
+        const last = mySessions
+          .filter(c => c.patientId === p.id && c.date <= today)
+          .sort((a, b) => b.date.localeCompare(a.date))[0]
+        if (!last) return false
+        return last.date < ago30
+      })
+      .slice(0, 5)
+  }, [activePatients, mySessions, today, ago30])
+
+  // ── conflicts ────────────────────────────────────────────────────────────
+  const withConflicts = useMemo(() =>
+    mySessions.filter(c => (c.conflicts || []).length > 0 && c.date >= today).length,
+  [mySessions, today])
+
+  // ── admin: therapist ranking ──────────────────────────────────────────────
+  const therapistRanking = useMemo(() => {
+    if (!isAdmin) return []
+    return therapists
+      .map(t => {
+        const tSessions = consultations.filter(c =>
+          c.therapistId === t.id &&
+          c.date?.startsWith(thisMonth) &&
+          c.eventType !== 'INTERVIEW'
+        )
+        const realized = tSessions.filter(c => realizadaIds.includes(c.consultationStatusId))
+        const rate = tSessions.length > 0 ? Math.round(realized.length / tSessions.length * 100) : 0
+        return { therapist: t, total: tSessions.length, realized: realized.length, rate }
+      })
+      .filter(x => x.total > 0)
+      .sort((a, b) => b.realized - a.realized)
+      .slice(0, 8)
+  }, [isAdmin, therapists, consultations, thisMonth, realizadaIds])
+
+  // ── specialty distribution (admin=sessions, therapist=patients) ───────────
+  const activeSpecialties = specialtiesData.filter(s => s.active !== false)
+
+  const specialtyDist = useMemo(() => {
+    if (isAdmin) {
+      return activeSpecialties
+        .map(spec => ({ ...spec, count: thisMonthSessions.filter(c => c.specialty === spec.key).length }))
+        .filter(s => s.count > 0)
+        .sort((a, b) => b.count - a.count)
+    }
+    return activeSpecialties
+      .map(spec => ({
+        ...spec,
+        count: activePatients.filter(p => p.specialties?.some(s => s.key === spec.key)).length,
+      }))
+      .filter(s => s.count > 0)
+      .sort((a, b) => b.count - a.count)
+  }, [isAdmin, activeSpecialties, thisMonthSessions, activePatients])
+
+  // ── admin: financial data ─────────────────────────────────────────────────
+  const [financial, setFinancial] = useState(null)
+  useEffect(() => {
+    if (!isAdmin) return
+    async function load() {
+      const { data } = await supabase
+        .from('payment_invoices')
+        .select('total_amount, status, nf_issue_date')
+      const invoices = data || []
+      const faturadoMes = invoices
+        .filter(i => i.nf_issue_date?.startsWith(thisMonth) && ['ISSUED', 'PAID'].includes(i.status))
+        .reduce((s, i) => s + Number(i.total_amount || 0), 0)
+      const pendentes = invoices.filter(i => i.status === 'ISSUED').length
+      const aFaturarCount = consultations.filter(c =>
+        c.date?.startsWith(thisMonth) &&
+        !c.nfNumber &&
+        realizadaIds.includes(c.consultationStatusId) &&
+        c.eventType !== 'INTERVIEW'
+      ).length
+      setFinancial({ faturadoMes, pendentes, aFaturarCount })
+    }
+    load()
+  }, [isAdmin, thisMonth, consultations, realizadaIds])
+
+  // ── greeting ──────────────────────────────────────────────────────────────
+  const [greetingMsg, setGreetingMsg]     = useState('')
   const [greetingLoading, setGreetingLoading] = useState(false)
   const [loadingMsg] = useState(() => LOADING_MSGS[Math.floor(Math.random() * LOADING_MSGS.length)])
   useEffect(() => {
@@ -100,7 +340,6 @@ export default function DashboardPage() {
     const cacheKey = `greeting_${today}_${user.authId}`
     const cached = localStorage.getItem(cacheKey)
     if (cached) { setGreetingMsg(cached); return }
-    // Limpa entradas antigas do mesmo usuário (dias anteriores)
     Object.keys(localStorage)
       .filter(k => k.startsWith('greeting_') && k.endsWith(`_${user.authId}`) && k !== cacheKey)
       .forEach(k => localStorage.removeItem(k))
@@ -119,91 +358,44 @@ export default function DashboardPage() {
     })
   }, [user?.authId]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ── alert banner counts ───────────────────────────────────────────────────
   const [newLeadsCount, setNewLeadsCount] = useState(0)
   useEffect(() => {
     if (!isAdmin) return
-    supabase
-      .from('contact_leads')
-      .select('id', { count: 'exact', head: true })
-      .eq('status', 'novo')
+    supabase.from('contact_leads').select('id', { count: 'exact', head: true }).eq('status', 'novo')
       .then(({ count }) => setNewLeadsCount(count || 0))
   }, [isAdmin])
 
-  // Card âmbar: para terapeutas E admin que também são terapeutas
   const [unreadSupportCount, setUnreadSupportCount] = useState(0)
   useEffect(() => {
     if (isSupportAdmin || !user?.authId) return
-    supabase
-      .from('support_tickets')
-      .select('id', { count: 'exact', head: true })
-      .eq('nova_resposta', true)
-      .eq('created_by_id', user.authId)
+    supabase.from('support_tickets').select('id', { count: 'exact', head: true })
+      .eq('nova_resposta', true).eq('created_by_id', user.authId)
       .then(({ count }) => setUnreadSupportCount(count || 0))
   }, [isSupportAdmin, user?.authId])
 
-  // Banners de gestão: apenas para admin puro
-  const [novoSupportCount, setNovoSupportCount] = useState(0)
+  const [novoSupportCount, setNovoSupportCount]         = useState(0)
   const [reprovadoSupportCount, setReprovadoSupportCount] = useState(0)
   useEffect(() => {
     if (!isSupportAdmin) return
-    supabase
-      .from('support_tickets')
-      .select('id', { count: 'exact', head: true })
-      .eq('status', 'novo')
+    supabase.from('support_tickets').select('id', { count: 'exact', head: true }).eq('status', 'novo')
       .then(({ count }) => setNovoSupportCount(count || 0))
-    supabase
-      .from('support_tickets')
-      .select('id', { count: 'exact', head: true })
-      .eq('status', 'reprovado_usuario')
+    supabase.from('support_tickets').select('id', { count: 'exact', head: true }).eq('status', 'reprovado_usuario')
       .then(({ count }) => setReprovadoSupportCount(count || 0))
   }, [isSupportAdmin])
 
-  const visiblePatients = isAdmin || user?.belongsToTeam
-    ? patients.filter(p => !p.deleted)
-    : patients.filter(p => !p.deleted && (p.therapistId === user?.id || (p.involvedTherapistIds || []).includes(user?.id)))
-
-  const visibleConsultations = isAdmin || user?.belongsToTeam
-    ? consultations
-    : consultations.filter(c => c.therapistId === user?.id)
-
-  const activeStatusId = patientStatuses.find(s => s.name?.toLowerCase().includes('ativo'))?.id
-  const activePatients = activeStatusId
-    ? visiblePatients.filter(p => p.statusId === activeStatusId)
-    : visiblePatients
-
-  const todayConsultations = visibleConsultations.filter(c => c.date === today)
-  const thisWeekConsultations = visibleConsultations.filter(c => c.date >= weekStartIso && c.date <= weekEndIso)
-  const monthConsultations = visibleConsultations.filter(c => c.date?.startsWith(thisMonth))
-
-  const stats = [
-    { icon: FiUsers,      label: 'Pacientes Ativos',  value: activePatients.length,       color: 'text-brand-blue',  bg: 'bg-blue-50'   },
-    { icon: FiCalendar,   label: 'Atendimentos Hoje', value: todayConsultations.length,    color: 'text-green-600',   bg: 'bg-green-50'  },
-    { icon: FiTrendingUp, label: 'Esta Semana',        value: thisWeekConsultations.length, color: 'text-purple-600',  bg: 'bg-purple-50' },
-    { icon: FiClipboard,  label: 'Registros no Mês',  value: monthConsultations.length,    color: 'text-orange-600',  bg: 'bg-orange-50' },
-  ]
-
-  // Próximos atendimentos: data futura OU hoje com horário >= agora
-  const upcomingConsultations = visibleConsultations
-    .filter(c => {
-      if (c.date > today) return true
-      if (c.date === today) return !c.time || c.time >= nowTime
-      return false
-    })
-    .sort((a, b) => a.date.localeCompare(b.date) || (a.time || '').localeCompare(b.time || ''))
-    .slice(0, 5)
-
-  function getPatient(id) { return patients.find(p => p.id === id) }
-  function getTherapist(id) { return therapists.find(t => t.id === id) }
-  function getRoom(id) { return rooms.find(r => r.id === id) }
-
+  // ── helpers ───────────────────────────────────────────────────────────────
   const hour = now.getHours()
   const greeting = hour < 12 ? 'Bom dia' : hour < 18 ? 'Boa tarde' : 'Boa noite'
+  const getPatient   = id => patients.find(p => p.id === id)
+  const getTherapist = id => therapists.find(t => t.id === id)
+  const getRoom      = id => rooms.find(r => r.id === id)
 
-  const activeSpecialties = specialtiesData.filter(s => s.active !== false)
-
+  // ── render ────────────────────────────────────────────────────────────────
   return (
     <div className="p-3 md:p-6 space-y-4 md:space-y-6">
-      {/* Header */}
+
+      {/* ── Greeting ─────────────────────────────────────────────────────── */}
       <div>
         <h1 className={`text-xl md:text-2xl font-bold transition-colors duration-300 ${greetingLoading ? 'text-gray-400 italic' : 'text-gray-900'}`}>
           {greetingLoading
@@ -214,151 +406,373 @@ export default function DashboardPage() {
           {now.toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
         </p>
         {!isAdmin && !user?.belongsToTeam && (
-          <p className="text-xs text-brand-blue mt-1 font-medium">
-            Exibindo apenas seus pacientes e consultas
-          </p>
+          <p className="text-xs text-brand-blue mt-1 font-medium">Exibindo apenas seus pacientes e consultas</p>
         )}
       </div>
 
-      {/* Alerta de novos contatos — apenas admin */}
+      {/* ── Alert banners ────────────────────────────────────────────────── */}
       {isAdmin && newLeadsCount > 0 && (
-        <Link
-          to={ROUTES.CONTACT_LEADS}
-          className="flex items-center gap-3 bg-red-500 text-white px-4 py-3.5 rounded-2xl shadow-sm hover:bg-red-600 transition-colors"
-        >
-          <div className="w-9 h-9 bg-white/20 rounded-xl flex items-center justify-center shrink-0">
-            <FiMessageSquare size={18} />
-          </div>
+        <Link to={ROUTES.CONTACT_LEADS} className="flex items-center gap-3 bg-red-500 text-white px-4 py-3.5 rounded-2xl shadow-sm hover:bg-red-600 transition-colors">
+          <div className="w-9 h-9 bg-white/20 rounded-xl flex items-center justify-center shrink-0"><FiMessageSquare size={18} /></div>
           <div className="flex-1">
-            <div className="font-bold text-sm">
-              {newLeadsCount} {newLeadsCount === 1 ? 'nova mensagem de contato' : 'novas mensagens de contato'}
-            </div>
+            <div className="font-bold text-sm">{newLeadsCount} {newLeadsCount === 1 ? 'nova mensagem de contato' : 'novas mensagens de contato'}</div>
             <div className="text-xs text-red-100">Clique para visualizar e tratar</div>
           </div>
           <FiArrowRight size={18} className="opacity-70 shrink-0" />
         </Link>
       )}
-
-      {/* Alerta de chamados novos de suporte — apenas admin puro */}
       {isSupportAdmin && novoSupportCount > 0 && (
-        <Link
-          to={ROUTES.SUPPORT}
-          className="flex items-center gap-3 bg-red-500 text-white px-4 py-3.5 rounded-2xl shadow-sm hover:bg-red-600 transition-colors"
-        >
-          <div className="w-9 h-9 bg-white/20 rounded-xl flex items-center justify-center shrink-0">
-            <FiLifeBuoy size={18} />
-          </div>
+        <Link to={ROUTES.SUPPORT} className="flex items-center gap-3 bg-red-500 text-white px-4 py-3.5 rounded-2xl shadow-sm hover:bg-red-600 transition-colors">
+          <div className="w-9 h-9 bg-white/20 rounded-xl flex items-center justify-center shrink-0"><FiLifeBuoy size={18} /></div>
           <div className="flex-1">
-            <div className="font-bold text-sm">
-              {novoSupportCount === 1 ? '1 novo chamado de suporte' : `${novoSupportCount} novos chamados de suporte`}
-            </div>
+            <div className="font-bold text-sm">{novoSupportCount === 1 ? '1 novo chamado de suporte' : `${novoSupportCount} novos chamados de suporte`}</div>
             <div className="text-xs text-red-100">Clique para visualizar e responder</div>
           </div>
           <FiArrowRight size={18} className="opacity-70 shrink-0" />
         </Link>
       )}
-
-      {/* Alerta de chamados reprovados — apenas admin puro */}
       {isSupportAdmin && reprovadoSupportCount > 0 && (
-        <Link
-          to={ROUTES.SUPPORT}
-          className="flex items-center gap-3 bg-orange-500 text-white px-4 py-3.5 rounded-2xl shadow-sm hover:bg-orange-600 transition-colors"
-        >
-          <div className="w-9 h-9 bg-white/20 rounded-xl flex items-center justify-center shrink-0">
-            <FiBell size={18} />
-          </div>
+        <Link to={ROUTES.SUPPORT} className="flex items-center gap-3 bg-orange-500 text-white px-4 py-3.5 rounded-2xl shadow-sm hover:bg-orange-600 transition-colors">
+          <div className="w-9 h-9 bg-white/20 rounded-xl flex items-center justify-center shrink-0"><FiBell size={18} /></div>
           <div className="flex-1">
-            <div className="font-bold text-sm">
-              {reprovadoSupportCount === 1 ? '1 chamado reprovado pelo usuário' : `${reprovadoSupportCount} chamados reprovados pelo usuário`}
-            </div>
+            <div className="font-bold text-sm">{reprovadoSupportCount === 1 ? '1 chamado reprovado pelo usuário' : `${reprovadoSupportCount} chamados reprovados pelo usuário`}</div>
             <div className="text-xs text-orange-100">Clique para visualizar e responder</div>
           </div>
           <FiArrowRight size={18} className="opacity-70 shrink-0" />
         </Link>
       )}
-
-      {/* Alerta de respostas de suporte — terapeuta e admin+terapeuta */}
       {!isSupportAdmin && unreadSupportCount > 0 && (
-        <Link
-          to={ROUTES.SUPPORT}
-          className="flex items-center gap-3 bg-amber-500 text-white px-4 py-3.5 rounded-2xl shadow-sm hover:bg-amber-600 transition-colors"
-        >
-          <div className="w-9 h-9 bg-white/20 rounded-xl flex items-center justify-center shrink-0">
-            <FiBell size={18} />
-          </div>
+        <Link to={ROUTES.SUPPORT} className="flex items-center gap-3 bg-amber-500 text-white px-4 py-3.5 rounded-2xl shadow-sm hover:bg-amber-600 transition-colors">
+          <div className="w-9 h-9 bg-white/20 rounded-xl flex items-center justify-center shrink-0"><FiBell size={18} /></div>
           <div className="flex-1">
-            <div className="font-bold text-sm">
-              {unreadSupportCount === 1 ? '1 chamado com nova resposta' : `${unreadSupportCount} chamados com novas respostas`}
-            </div>
+            <div className="font-bold text-sm">{unreadSupportCount === 1 ? '1 chamado com nova resposta' : `${unreadSupportCount} chamados com novas respostas`}</div>
             <div className="text-xs text-amber-100">Clique para visualizar</div>
           </div>
           <FiArrowRight size={18} className="opacity-70 shrink-0" />
         </Link>
       )}
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 md:gap-4">
-        {stats.map(({ icon: Icon, label, value, color, bg }) => (
-          <div key={label} className="bg-white rounded-2xl p-3 md:p-5 border border-gray-100 shadow-sm">
-            <div className={`w-8 h-8 md:w-10 md:h-10 ${bg} rounded-xl flex items-center justify-center mb-2 md:mb-3`}>
-              <Icon size={16} className={color} />
-            </div>
-            <div className="text-xl md:text-2xl font-bold text-gray-900">{value}</div>
-            <div className="text-xs text-gray-500 mt-0.5 leading-tight">{label}</div>
+      {/* ══════════════════════ ADMIN VIEW ══════════════════════════════════ */}
+      {isAdmin && (
+        <>
+          {/* ── Stat cards (admin) ─────────────────────────────────────── */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 md:gap-4">
+            <StatCard icon={FiClipboard}  label="Sessões no mês"       value={thisMonthSessions.length}  color="text-brand-blue"   bg="bg-blue-50"    trend prevValue={lastMonthSessions.length} />
+            <StatCard icon={FiActivity}   label="Taxa de realização"    value={taxaRealizacao}             color="text-green-600"    bg="bg-green-50"   suffix="%" trend prevValue={taxaAnterior} />
+            <StatCard icon={FiUsers}      label="Pacientes ativos"      value={activePatients.length}      color="text-purple-600"   bg="bg-purple-50" />
+            <StatCard icon={FiTrendingUp} label="Novos pacientes"       value={newPatientsThisMonth}       color="text-orange-600"   bg="bg-orange-50"  suffix={newPatientsThisMonth === 1 ? ' este mês' : ' este mês'} />
           </div>
-        ))}
-      </div>
 
-      {/* Próximos Atendimentos — formato tabela */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-        <div className="px-4 md:px-6 py-3 md:py-4 border-b border-gray-100 flex items-center justify-between">
-          <h2 className="font-semibold text-gray-900 text-sm md:text-base">Próximos Atendimentos</h2>
-          <span className="text-xs text-gray-400">{upcomingConsultations.length}</span>
-        </div>
-        {upcomingConsultations.length === 0 ? (
-          <div className="px-4 py-8 text-center text-gray-400 text-sm">Nenhum atendimento agendado</div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <tbody className="divide-y divide-gray-50">
-                {upcomingConsultations.map(c => {
+          {/* ── Visão financeira (admin) ───────────────────────────────── */}
+          <div>
+            <SectionHeader title="Visão Financeira do Mês" icon="💰" action={
+              <Link to={ROUTES.PAYMENTS} className="text-xs text-brand-blue hover:underline flex items-center gap-1">
+                Ver Pagamentos <FiArrowRight size={11} />
+              </Link>
+            } />
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-8 h-8 bg-green-50 rounded-xl flex items-center justify-center">
+                    <FiCheckCircle size={15} className="text-green-600" />
+                  </div>
+                  <span className="text-xs text-gray-500 font-medium">Faturado no mês</span>
+                </div>
+                <div className="text-xl font-bold text-gray-900">
+                  {financial ? fmtCurrency(financial.faturadoMes) : '—'}
+                </div>
+                <div className="text-xs text-gray-400 mt-0.5">NFs emitidas ou pagas em {now.toLocaleDateString('pt-BR', { month: 'long' })}</div>
+              </div>
+              <Link to={ROUTES.REPORTS} className="bg-white rounded-2xl p-4 border border-orange-100 shadow-sm hover:border-orange-300 transition-colors">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-8 h-8 bg-orange-50 rounded-xl flex items-center justify-center">
+                    <FiClipboard size={15} className="text-orange-600" />
+                  </div>
+                  <span className="text-xs text-gray-500 font-medium">A faturar</span>
+                </div>
+                <div className="text-xl font-bold text-gray-900">
+                  {financial != null ? financial.aFaturarCount : '—'}
+                  <span className="text-sm font-normal text-gray-500 ml-1">sessões</span>
+                </div>
+                <div className="text-xs text-gray-400 mt-0.5">Realizadas sem NF este mês</div>
+              </Link>
+              <Link to={ROUTES.PAYMENTS} className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm hover:border-amber-200 transition-colors">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-8 h-8 bg-amber-50 rounded-xl flex items-center justify-center">
+                    <FiDollarSign size={15} className="text-amber-600" />
+                  </div>
+                  <span className="text-xs text-gray-500 font-medium">Pendentes de pagamento</span>
+                </div>
+                <div className="text-xl font-bold text-gray-900">
+                  {financial != null ? financial.pendentes : '—'}
+                  <span className="text-sm font-normal text-gray-500 ml-1">fatura(s)</span>
+                </div>
+                <div className="text-xs text-gray-400 mt-0.5">NFs emitidas aguardando pagamento</div>
+              </Link>
+            </div>
+          </div>
+
+          {/* ── Ranking terapeutas + distribuição especialidade ────────── */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+
+            {/* Ranking */}
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+              <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+                <h2 className="font-semibold text-gray-900 text-sm">🏆 Terapeutas — {now.toLocaleDateString('pt-BR', { month: 'long' })}</h2>
+              </div>
+              {therapistRanking.length === 0 ? (
+                <div className="px-4 py-8 text-center text-gray-400 text-sm">Nenhuma sessão registrada no mês</div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="bg-gray-50 text-gray-400 uppercase tracking-wide">
+                        <th className="px-4 py-2 text-left font-semibold">Terapeuta</th>
+                        <th className="px-3 py-2 text-center font-semibold">Total</th>
+                        <th className="px-3 py-2 text-center font-semibold">Realizadas</th>
+                        <th className="px-4 py-2 text-center font-semibold">Taxa</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {therapistRanking.map(({ therapist: t, total, realized, rate }, i) => (
+                        <tr key={t.id} className="hover:bg-gray-50/60 transition-colors">
+                          <td className="px-4 py-2.5">
+                            <div className="flex items-center gap-2">
+                              {i < 3 && <span className="text-base">{['🥇','🥈','🥉'][i]}</span>}
+                              <div className="flex items-center gap-1.5">
+                                {t.color && <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: t.color }} />}
+                                <span className="font-medium text-gray-900 truncate max-w-[110px]">{t.name}</span>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-3 py-2.5 text-center text-gray-600">{total}</td>
+                          <td className="px-3 py-2.5 text-center font-semibold text-green-700">{realized}</td>
+                          <td className="px-4 py-2.5 text-center">
+                            <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
+                              rate >= 80 ? 'bg-green-100 text-green-700' :
+                              rate >= 60 ? 'bg-amber-100 text-amber-700' :
+                              'bg-red-100 text-red-600'
+                            }`}>{rate}%</span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            {/* Distribuição por especialidade */}
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+              <div className="px-4 py-3 border-b border-gray-100">
+                <h2 className="font-semibold text-gray-900 text-sm">📊 Sessões por Especialidade — {now.toLocaleDateString('pt-BR', { month: 'long' })}</h2>
+              </div>
+              {specialtyDist.length === 0 ? (
+                <div className="px-4 py-8 text-center text-gray-400 text-sm">Nenhuma sessão no mês</div>
+              ) : (
+                <div className="p-4 grid grid-cols-2 gap-2">
+                  {specialtyDist.map(spec => {
+                    const bg = spec.color || '#e5e7eb'
+                    const tc = textColorForBg(bg)
+                    const total = thisMonthSessions.filter(c => c.specialty === spec.key).length
+                    const pct = thisMonthSessions.length > 0 ? Math.round(total / thisMonthSessions.length * 100) : 0
+                    return (
+                      <div key={spec.key} className="rounded-xl px-3 py-2.5 border border-gray-100" style={{ backgroundColor: bg }}>
+                        <div className="text-xl font-bold" style={{ color: tc }}>{spec.count}</div>
+                        <div className="text-xs font-medium leading-tight" style={{ color: tc, opacity: .85 }}>{spec.label}</div>
+                        <div className="text-xs mt-0.5" style={{ color: tc, opacity: .6 }}>{pct}% das sessões</div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* ── Próximos atendimentos (admin) ─────────────────────────── */}
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="px-4 md:px-6 py-3 border-b border-gray-100 flex items-center justify-between">
+              <h2 className="font-semibold text-gray-900 text-sm md:text-base">Próximos Atendimentos</h2>
+              <Link to={ROUTES.AGENDA} className="text-xs text-brand-blue hover:underline flex items-center gap-1">Ver agenda <FiArrowRight size={11} /></Link>
+            </div>
+            {upcomingAll.length === 0 ? (
+              <div className="px-4 py-8 text-center text-gray-400 text-sm">Nenhum atendimento agendado</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <tbody className="divide-y divide-gray-50">
+                    {upcomingAll.map(c => {
+                      const patient   = getPatient(c.patientId)
+                      const therapist = getTherapist(c.therapistId)
+                      const room      = getRoom(c.roomId)
+                      return (
+                        <tr key={c.id} className="hover:bg-gray-50/50 transition-colors">
+                          <td className="px-4 md:px-6 py-3 text-gray-700 whitespace-nowrap">{formatDateShort(c.date)}</td>
+                          <td className="px-3 py-3 text-gray-700 whitespace-nowrap font-medium">{c.time || '—'}</td>
+                          <td className="px-3 py-3 text-gray-900 font-medium max-w-[140px] truncate">{patient?.fullName || '—'}</td>
+                          <td className="px-3 py-3 text-gray-600 hidden sm:table-cell max-w-[110px] truncate">{therapist?.name || '—'}</td>
+                          <td className="px-3 py-3 hidden md:table-cell"><Badge specialty={c.specialty} /></td>
+                          <td className="px-3 md:px-6 py-3 text-gray-500 hidden lg:table-cell">{room?.name || '—'}</td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {/* ── Conflitos não resolvidos (admin) ──────────────────────── */}
+          {withConflicts > 0 && (
+            <Link to={ROUTES.AGENDA} className="flex items-center gap-3 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-2xl hover:bg-red-100 transition-colors">
+              <FiAlertTriangle size={18} className="shrink-0" />
+              <div className="flex-1 text-sm font-medium">
+                {withConflicts} {withConflicts === 1 ? 'atendimento com conflito' : 'atendimentos com conflito'} de agenda não resolvido{withConflicts > 1 ? 's' : ''}
+              </div>
+              <FiArrowRight size={16} className="shrink-0 opacity-60" />
+            </Link>
+          )}
+        </>
+      )}
+
+      {/* ══════════════════════ THERAPIST VIEW ══════════════════════════════ */}
+      {!isAdmin && (
+        <>
+          {/* ── Stat cards (therapist) ─────────────────────────────────── */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 md:gap-4">
+            <StatCard icon={FiCheckCircle} label="Realizadas no mês"  value={realizadasMes.length}  color="text-green-600"  bg="bg-green-50"  trend prevValue={realizadasAnterior.length} />
+            <StatCard icon={FiClipboard}   label="Faltas + canceladas" value={negativosMes}           color="text-red-500"    bg="bg-red-50" />
+            <StatCard icon={FiCalendar}    label="Próximos 7 dias"     value={next7Sessions.length}   color="text-brand-blue" bg="bg-blue-50" />
+            <StatCard icon={FiUsers}       label="Meus pacientes"      value={activePatients.length}  color="text-purple-600" bg="bg-purple-50" />
+          </div>
+
+          {/* ── Agenda do dia ──────────────────────────────────────────── */}
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+              <h2 className="font-semibold text-gray-900 text-sm md:text-base">
+                📅 Agenda de hoje
+                <span className="ml-2 text-xs font-normal text-gray-400">
+                  {now.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}
+                </span>
+              </h2>
+              <Link to={ROUTES.AGENDA} className="text-xs text-brand-blue hover:underline flex items-center gap-1">Ver agenda <FiArrowRight size={11} /></Link>
+            </div>
+            {todaySessions.length === 0 ? (
+              <div className="px-4 py-8 text-center text-gray-400 text-sm">Nenhum atendimento para hoje</div>
+            ) : (
+              <div className="divide-y divide-gray-50">
+                {todaySessions.slice(0, 8).map(c => {
                   const patient = getPatient(c.patientId)
-                  const therapist = getTherapist(c.therapistId)
-                  const room = getRoom(c.roomId)
+                  const room    = getRoom(c.roomId)
+                  const status  = consultationStatuses.find(s => s.id === c.consultationStatusId)
+                  const isConflict = (c.conflicts || []).length > 0
                   return (
-                    <tr key={c.id} className="hover:bg-gray-50/50 transition-colors">
-                      <td className="px-4 md:px-6 py-3 text-gray-700 whitespace-nowrap">{formatDateShort(c.date)}</td>
-                      <td className="px-3 py-3 text-gray-700 whitespace-nowrap font-medium">{c.time || '—'}</td>
-                      <td className="px-3 py-3 text-gray-900 font-medium max-w-[140px] truncate">{patient?.fullName || '—'}</td>
-                      <td className="px-3 py-3 text-gray-600 hidden sm:table-cell max-w-[120px] truncate">{therapist?.name || '—'}</td>
-                      <td className="px-3 py-3 hidden md:table-cell"><Badge specialty={c.specialty} /></td>
-                      <td className="px-3 md:px-6 py-3 text-gray-500 hidden lg:table-cell">{room?.name || '—'}</td>
-                    </tr>
+                    <div key={c.id} className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50/60 transition-colors">
+                      <div className="text-sm font-bold text-gray-900 w-12 shrink-0 tabular-nums">
+                        {c.time ? c.time.slice(0, 5) : '—'}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-gray-900 truncate text-sm">
+                          {patient?.fullName || '—'}
+                        </div>
+                        <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                          <Badge specialty={c.specialty} />
+                          {room && <span className="text-xs text-gray-400">{room.name}</span>}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {isConflict && (
+                          <span className="text-xs px-1.5 py-0.5 rounded bg-red-100 text-red-600 font-medium">⚠</span>
+                        )}
+                        {status && (
+                          <span
+                            className="text-xs px-2 py-0.5 rounded-full font-medium whitespace-nowrap"
+                            style={{ backgroundColor: status.color ? `${status.color}22` : '#f3f4f6', color: status.color || '#374151' }}
+                          >
+                            {status.name}
+                          </span>
+                        )}
+                      </div>
+                    </div>
                   )
                 })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-
-      {/* Perfil dos Pacientes */}
-      <div>
-        <h2 className="font-semibold text-gray-900 text-sm md:text-base mb-2">Perfil dos Pacientes</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-8 gap-2">
-          {activeSpecialties.map(spec => {
-            const count = visiblePatients.filter(p => p.specialties?.includes(spec.key)).length
-            const bg = spec.color || '#e5e7eb'
-            const textColor = textColorForBg(bg)
-            return (
-              <div key={spec.key} className="rounded-xl px-2 py-2.5 text-center border border-gray-100 shadow-sm" style={{ backgroundColor: bg }}>
-                <div className="text-lg font-bold" style={{ color: textColor }}>{count}</div>
-                <div className="text-xs font-medium leading-tight mt-0.5" style={{ color: textColor, opacity: 0.85 }}>{spec.label}</div>
+                {todaySessions.length > 8 && (
+                  <div className="px-4 py-2 text-xs text-gray-400 text-center">
+                    + {todaySessions.length - 8} atendimento(s) — <Link to={ROUTES.AGENDA} className="text-brand-blue hover:underline">ver agenda completa</Link>
+                  </div>
+                )}
               </div>
-            )
-          })}
-        </div>
-      </div>
+            )}
+          </div>
+
+          {/* ── Alertas clínicos ───────────────────────────────────────── */}
+          {(evasionRisk.length > 0 || withConflicts > 0) && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Risco de evasão */}
+              {evasionRisk.length > 0 && (
+                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <FiAlertTriangle size={15} className="text-amber-600 shrink-0" />
+                    <span className="text-sm font-semibold text-amber-800">Pacientes sem atendimento há 30+ dias</span>
+                  </div>
+                  <div className="space-y-2">
+                    {evasionRisk.map(p => {
+                      const last = mySessions
+                        .filter(c => c.patientId === p.id && c.date <= today)
+                        .sort((a, b) => b.date.localeCompare(a.date))[0]
+                      const dias = last
+                        ? Math.floor((new Date(today) - new Date(last.date)) / 86400000)
+                        : null
+                      return (
+                        <div key={p.id} className="flex items-center justify-between text-xs">
+                          <span className="font-medium text-amber-900 truncate">{p.fullName}</span>
+                          {dias != null && <span className="text-amber-700 shrink-0 ml-2">{dias} dias</span>}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Conflitos de agenda */}
+              {withConflicts > 0 && (
+                <Link to={ROUTES.AGENDA} className="bg-red-50 border border-red-200 rounded-2xl p-4 hover:bg-red-100 transition-colors flex flex-col justify-center">
+                  <div className="flex items-center gap-2 mb-1">
+                    <FiAlertTriangle size={15} className="text-red-600 shrink-0" />
+                    <span className="text-sm font-semibold text-red-800">Conflitos de agenda</span>
+                  </div>
+                  <p className="text-xs text-red-700">
+                    {withConflicts} {withConflicts === 1 ? 'atendimento futuro com' : 'atendimentos futuros com'} conflito não resolvido
+                  </p>
+                  <span className="mt-2 text-xs text-red-600 flex items-center gap-1 font-medium">
+                    Ver na agenda <FiArrowRight size={11} />
+                  </span>
+                </Link>
+              )}
+            </div>
+          )}
+
+          {/* ── Distribuição de pacientes por especialidade ─────────────── */}
+          {specialtyDist.length > 0 && (
+            <div>
+              <SectionHeader title="Meus Pacientes por Especialidade" icon="👥" />
+              <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-2">
+                {specialtyDist.map(spec => {
+                  const bg = spec.color || '#e5e7eb'
+                  const tc = textColorForBg(bg)
+                  return (
+                    <div key={spec.key} className="rounded-xl px-3 py-2.5 text-center border border-gray-100 shadow-sm" style={{ backgroundColor: bg }}>
+                      <div className="text-xl font-bold" style={{ color: tc }}>{spec.count}</div>
+                      <div className="text-xs font-medium leading-tight mt-0.5" style={{ color: tc, opacity: .85 }}>{spec.label}</div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
     </div>
   )
 }
