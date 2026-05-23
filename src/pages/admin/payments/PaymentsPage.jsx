@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { FiDollarSign, FiRefreshCw, FiSearch, FiEye, FiXCircle, FiCheckCircle, FiX } from 'react-icons/fi'
+import HelpButton from '../../../components/ui/HelpButton'
 import { useData } from '../../../context/DataContext'
 import { useToast } from '../../../components/ui/Toast'
 import Modal from '../../../components/ui/Modal'
@@ -287,12 +288,22 @@ export default function PaymentsPage() {
             <p className="text-xs text-gray-500 mt-0.5">{invoices.length} fatura(s)</p>
           </div>
         </div>
-        <button
-          onClick={loadInvoices}
-          className="p-2 rounded-xl border border-gray-200 bg-white text-gray-500 hover:bg-gray-50 transition-colors"
-        >
-          <FiRefreshCw size={16} className={loading ? 'animate-spin' : ''} />
-        </button>
+        <div className="flex items-center gap-2">
+          <HelpButton title="Como usar Pagamentos">
+            <p><strong>O que é esta tela:</strong> lista todas as faturas geradas a partir dos Demonstrativos Definitivos em Relatórios. Cada fatura corresponde a um período faturado para um paciente.</p>
+            <p><strong>Status das faturas:</strong> <em>Emitida</em> (NF gerada, aguardando pagamento), <em>Paga</em> (pagamento confirmado) ou <em>Cancelada</em> (NF estornada — atendimentos voltam ao status anterior).</p>
+            <p><strong>Ver detalhes:</strong> clique em <em>Ver detalhes</em> para abrir o snapshot completo da fatura, incluindo a lista de atendimentos com data, horário, especialidade, terapeuta e valor.</p>
+            <p><strong>Marcar como Pago:</strong> disponível para faturas com status <em>Emitida</em>. Confirme para registrar o recebimento e atualizar o status para <em>Paga</em>.</p>
+            <p><strong>Cancelar NF:</strong> disponível para faturas com status <em>Emitida</em>. Cancela a fatura e restaura automaticamente o status original de cada atendimento, removendo os dados da NF.</p>
+            <p><strong>Filtros:</strong> use os botões de mês (Mês-2 / Mês-1 / Atual) ou defina um período manual. Filtre por status ou busque pelo número da NF ou nome do paciente.</p>
+          </HelpButton>
+          <button
+            onClick={loadInvoices}
+            className="p-2 rounded-xl border border-gray-200 bg-white text-gray-500 hover:bg-gray-50 transition-colors"
+          >
+            <FiRefreshCw size={16} className={loading ? 'animate-spin' : ''} />
+          </button>
+        </div>
       </div>
 
       {/* Filtros */}

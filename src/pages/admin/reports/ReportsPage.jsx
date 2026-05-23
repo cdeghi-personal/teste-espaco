@@ -538,12 +538,14 @@ export default function ReportsPage() {
           <p className="text-sm text-gray-500 mt-1">Gere relatórios de atendimentos por paciente ou terapeuta.</p>
         </div>
         <HelpButton title="Como gerar Relatórios">
-          <p><strong>Tipo de relatório:</strong> escolha entre <em>Demonstrativo de Pagamento</em> (mostra o valor cobrado do paciente por atendimento) ou <em>Consultas por Terapeuta</em> (mostra o valor do repasse ao terapeuta).</p>
+          <p><strong>Tipo de relatório:</strong> escolha entre <em>Demonstrativo de Pagamento</em> (valor cobrado do paciente por atendimento — somente admin) ou <em>Consultas por Terapeuta</em> (valor de repasse ao terapeuta).</p>
+          <p><strong>Entrevistas:</strong> entrevistas são excluídas automaticamente dos dois tipos de relatório — apenas atendimentos regulares são listados.</p>
           <p><strong>Selecionar:</strong> use o campo de busca para encontrar o paciente ou terapeuta desejado.</p>
-          <p><strong>Período:</strong> selecione <em>Por mês</em> para escolher um mês específico, ou <em>Intervalo de datas</em> para definir um período personalizado.</p>
-          <p><strong>Status:</strong> filtre por um ou mais status de atendimento para incluir apenas os registros desejados. Deixe em branco para incluir todos.</p>
-          <p><strong>Valores:</strong> os valores por especialidade são configurados no cadastro de cada paciente (seção Terapeutas → Especialidades em Atendimento).</p>
-          <p><strong>PDF:</strong> clique em <em>Gerar PDF</em> para baixar o arquivo.</p>
+          <p><strong>Período:</strong> selecione <em>Por mês</em> para um mês específico ou <em>Intervalo de datas</em> para um período personalizado.</p>
+          <p><strong>Status:</strong> filtre por um ou mais status. Deixe em branco para incluir todos.</p>
+          <p><strong>Valores:</strong> configurados no cadastro do paciente (seção Terapeutas → Especialidades em Atendimento).</p>
+          <p><strong>DRAFT:</strong> clique em <em>Gerar PDF</em> para visualizar o demonstrativo em pré-visualização. No rodapé do modal, use <em>Gerar DRAFT</em> para baixar com marca d'água de rascunho sem registrar histórico.</p>
+          <p><strong>Faturar:</strong> clique em <em>Faturar</em> no modal de pré-visualização, informe opcionalmente o número e a data da NF, e confirme. Os atendimentos são marcados como faturados e a fatura é registrada em Pagamentos.</p>
         </HelpButton>
       </div>
 

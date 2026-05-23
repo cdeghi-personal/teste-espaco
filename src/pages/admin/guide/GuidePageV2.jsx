@@ -308,6 +308,9 @@ export default function GuidePageV2() {
             <Card delay={0.15} icon="🎨" bg="#faf5ff" title="Legenda por terapeuta" desc="Cada terapeuta tem uma cor própria. A legenda inferior mostra o nome completo de cada profissional." />
             <Card delay={0.20} icon="🔍" bg="#fff7ed" title={'Filtro "Minha Agenda"'} desc="Terapeutas veem automaticamente apenas seus próprios atendimentos. Administradores têm visão de toda a equipe." tags={[['Personalizado', 'orange']]} />
             <Card delay={0.25} icon="🎤" bg="#fff7ed" title="Entrevistas" desc="Registre entrevistas com responsáveis ou candidatos — presenciais ou remotas. Chip laranja identifica entrevistas na agenda. Entrevistas remotas exibem plataforma e link de acesso direto pelo card." tags={[['Presencial ou Remota', 'orange']]} />
+            <Card delay={0.30} icon="🚫" bg="#f3f4f6" title="Bloqueios de Agenda" desc="Bloqueios RÍGIDO (cinza escuro — ausência, aula) impedem o agendamento. Bloqueios FLEX (cinza médio — reunião, home office) apenas alertam. Crie bloqueios avulsos ou em série. O histórico lista todos os bloqueios, incluindo cancelados, com filtros por mês e tipo." tags={[['RIGID / FLEX', ''], ['Recorrência', 'blue']]} />
+            <Card delay={0.35} icon="🏷️" bg="#faf5ff" title="Chips e alertas nos cards" desc="Chips visuais identificam o tipo de cada evento: 🔵 série recorrente (indigo), 🟡 ocorrência alterada individualmente (âmbar + !), 👥 múltiplos terapeutas (azul), 🔴 conflito de agenda (vermelho ⚠), 🟠 entrevista (laranja). Passe o mouse nos chips de conflito para ver o detalhamento." tags={[['Visual instantâneo', 'violet']]} />
+            <Card delay={0.40} icon="👁️" bg="#eff6ff" title="Visualização rápida" desc="Duplo-clique em qualquer card (desktop) ou toque simples (mobile) abre os detalhes completos do evento em modo leitura. Use o botão Editar para abrir diretamente no formulário — disponível para admin e para o próprio terapeuta responsável." tags={[['Sem perder o lugar', 'blue']]} />
           </div>
         </div>
 
@@ -347,6 +350,7 @@ export default function GuidePageV2() {
             <Card delay={0.25} icon="🔁" bg="#eff6ff" title="Recorrência em Série" desc='Crie múltiplos atendimentos recorrentes de uma vez com o botão "Série". Escolha dias da semana, número de sessões ou data final. Edite um item ou todos os próximos.' tags={[['Agilidade', 'blue']]} />
             <Card delay={0.30} icon="👥" bg="#f0fdf4" title="Múltiplos Terapeutas" desc="Adicione terapeutas secundários a um atendimento quando a sessão é multidisciplinar. Cada participante aparece no relatório com sua própria especialidade e valor de repasse." tags={[['Multidisciplinar', 'green']]} />
             <Card delay={0.35} icon="🎤" bg="#fff7ed" title="Entrevistas" desc="Registre entrevistas com responsáveis ou candidatos. Paciente é opcional; o campo entrevistado é obrigatório. Entrevistas remotas têm plataforma + link de acesso e não exigem sala. Não impactam ledger pré-pago nem faturamento." tags={[['Presencial ou Remota', 'orange']]} />
+            <Card delay={0.40} icon="🏷️" bg="#faf5ff" title="Chips e alertas nos cards" desc="Chips visuais identificam o tipo de cada registro: 🔵 série recorrente (indigo), 🟡 ocorrência alterada individualmente (âmbar + !), 👥 múltiplos terapeutas com tooltip dos nomes (azul), 🔴 conflito de agenda (vermelho ⚠). Passe o mouse no chip ⚠ para ver o detalhamento do conflito." tags={[['Visual instantâneo', 'violet']]} />
           </div>
         </div>
 
@@ -394,8 +398,8 @@ export default function GuidePageV2() {
           {/* 4 mini prints lado a lado */}
           <div className="mini-imgs">
             <div className="mini-img-item">
-              <img src="/Print_Relatorio_Paciente.png" alt="Relatório por Paciente" loading="lazy" />
-              <div className="mini-img-label">Consultas por Paciente</div>
+              <img src="/Print_Relatorio_Paciente.png" alt="Demonstrativo de Pagamento" loading="lazy" />
+              <div className="mini-img-label">Demonstrativo de Pagamento</div>
             </div>
             <div className="mini-img-item">
               <img src="/Print_Relatorio_Terapeuta.png" alt="Relatório por Terapeuta" loading="lazy" />
@@ -412,9 +416,9 @@ export default function GuidePageV2() {
           </div>
 
           <div className="grid">
-            <Card delay={0.05} icon="👤" bg="#eff6ff" title="Consultas por Paciente" desc="Lista atendimentos do paciente no período com data, especialidade, terapeuta e valor cobrado. Totalizadores no rodapé." tags={[['Somente admin', 'blue']]} />
-            <Card delay={0.10} icon="👩‍⚕️" bg="#f0fdf4" title="Consultas por Terapeuta" desc="Lista atendimentos com valor de repasse por especialidade. Terapeutas veem apenas o próprio relatório — pré-preenchido automaticamente." tags={[['Disponível para terapeutas', 'green']]} />
-            <Card delay={0.15} icon="🗓️" bg="#faf5ff" title="Filtros de período" desc="Mês específico ou intervalo personalizado. Combine com filtro de status de múltipla seleção, incluindo status automáticos." tags={[['Flexível', 'violet']]} />
+            <Card delay={0.05} icon="💰" bg="#eff6ff" title="Demonstrativo de Pagamento" desc="Lista atendimentos do paciente no período com data, especialidade, terapeuta e valor cobrado. Gere um DRAFT para conferência ou clique em Faturar para emitir definitivamente — informe o número e a data da NF (opcionais) e os atendimentos são marcados como faturados. A fatura é registrada automaticamente em Pagamentos." tags={[['Somente admin', 'blue']]} />
+            <Card delay={0.10} icon="👩‍⚕️" bg="#f0fdf4" title="Consultas por Terapeuta" desc="Lista atendimentos com valor de repasse por especialidade, incluindo participações como terapeuta secundário. Terapeutas veem apenas o próprio relatório — pré-preenchido automaticamente." tags={[['Disponível para terapeutas', 'green']]} />
+            <Card delay={0.15} icon="🗓️" bg="#faf5ff" title="Filtros de período" desc="Mês específico ou intervalo personalizado. Combine com filtro de status de múltipla seleção, incluindo status automáticos. Entrevistas não são incluídas nos relatórios financeiros." tags={[['Flexível', 'violet']]} />
           </div>
 
           <p className="sec-title" style={{ fontSize: 17, marginTop: 32 }}>📄 Relatório de Convênio</p>
@@ -505,6 +509,17 @@ export default function GuidePageV2() {
           </div>
 
           <div className="divider" style={{ marginTop: 32 }} />
+
+          {/* Pagamentos */}
+          <p className="sec-title">💳 Controle de Pagamentos</p>
+          <p className="sec-sub">Histórico centralizado de todas as faturas geradas a partir dos Demonstrativos de Pagamento.</p>
+          <div className="grid">
+            <Card delay={0.05} icon="📄" bg="#eff6ff" title="Faturas registradas" desc="Cada Demonstrativo Definitivo gera uma fatura (NF) automaticamente. Acompanhe número da NF, paciente, período, total e status em uma lista paginada." tags={[['Histórico completo', 'blue']]} />
+            <Card delay={0.10} icon="🔄" bg="#f0fdf4" title="Ciclo de vida da fatura" desc="Emitida → Paga (ao confirmar recebimento) ou Cancelada (restaura o status anterior dos atendimentos e limpa os campos de NF). Cada transição exige confirmação explícita." tags={[['Rastreável', 'green']]} />
+            <Card delay={0.15} icon="🔍" bg="#fff7ed" title="Filtros e busca" desc="Filtre por mês (Mês-2 / Mês-1 / Atual), status (Emitida/Paga/Cancelada) ou busque por número de NF e nome do paciente. Clique em Ver detalhes para ver todos os atendimentos incluídos na fatura." tags={[['Transparência', 'orange']]} />
+          </div>
+
+          <div className="divider" />
 
           {/* Auditoria */}
           <p className="sec-title">🔐 Log de Auditoria</p>

@@ -257,12 +257,14 @@ export default function AgendaPage() {
         </div>
         <div className="flex items-center gap-2">
           <HelpButton title="Como usar a Agenda">
-            <p><strong>Visualização semanal:</strong> a agenda exibe os atendimentos da semana atual. Use as setas para navegar entre semanas. No mobile, as abas mostram os dias separadamente.</p>
+            <p><strong>Visualização semanal:</strong> seis colunas (Seg–Sex + Sáb/Dom) com atendimentos e bloqueios organizados por dia. No mobile, abas por dia.</p>
             <p><strong>Criar atendimento:</strong> clique em <em>Novo Atendimento</em> e preencha paciente, terapeuta, especialidade, data e horário.</p>
             <p><strong>Criar série:</strong> clique em <em>Série</em> para criar atendimentos recorrentes (ex.: toda segunda por 10 semanas).</p>
-            <p><strong>Entrevistas:</strong> use o tipo "Entrevista" para registrar entrevistas com responsáveis ou candidatos. O chip laranja identifica entrevistas na agenda. Entrevistas presenciais ocupam uma sala; entrevistas remotas exibem plataforma e link de acesso direto pelo card.</p>
-            <p><strong>Editar:</strong> clique no lápis (✏) no card do atendimento para abrir o formulário de edição.</p>
-            <p><strong>Filtro "Minha Agenda":</strong> terapeutas veem apenas seus próprios atendimentos. Admins veem todos.</p>
+            <p><strong>Entrevistas:</strong> use o tipo "Entrevista" para registrar entrevistas com responsáveis ou candidatos. Chip laranja identifica entrevistas. Entrevistas remotas exibem plataforma e link de acesso no card e não exigem sala.</p>
+            <p><strong>Bloqueios de Agenda:</strong> clique em <em>Bloqueio</em> para registrar ausências ou restrições. <strong>RÍGIDO</strong> (cinza escuro) = bloqueio forte (aula, viagem). <strong>FLEX</strong> (cinza médio) = apenas alerta (reunião, home office). Crie bloqueios avulsos ou em série. Acesse o histórico completo pelo botão <em>Histórico de Bloqueios</em>.</p>
+            <p><strong>Chips nos cards:</strong> 🔵 indigo = série regular; 🟡 âmbar + ! = ocorrência alterada individualmente; 👥 N = múltiplos terapeutas (passe o mouse para ver os nomes); 🔴 ⚠ = conflito de agenda (passe o mouse para detalhes); 🟠 chip laranja = entrevista.</p>
+            <p><strong>Visualização rápida:</strong> duplo-clique em um card (desktop) ou toque simples (mobile) abre os detalhes em modo leitura. Use o botão <em>Editar</em> para abrir no formulário de edição.</p>
+            <p><strong>Filtro "Minha Agenda":</strong> terapeutas veem automaticamente apenas seus próprios atendimentos. Admins veem todos.</p>
             <p><strong>Legenda:</strong> as cores na legenda inferior identificam cada terapeuta.</p>
           </HelpButton>
           {isAdminOrTeam && (

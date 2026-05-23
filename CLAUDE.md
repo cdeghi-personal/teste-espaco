@@ -712,6 +712,9 @@ Não é mais editável. Texto padrão fixo definido em `DESEMPENHO_FIXO` em `gen
   - Validação: se há secundários, o primário deve ser da equipe (`belongsToTeam`)
   - Diálogo de escopo na edição de série: exibido para admin **ou** para o próprio terapeuta primário (`user?.id === initial.therapistId`)
 - **Seção Nota Fiscal / Faturamento (ConsultationFormModal):** visível apenas em edição quando admin ou quando a consulta já tem NF. Admin pode editar Número da NF e Data de Emissão; terapeuta vê read-only. Exibe status anterior (antes do faturamento) quando `previous_status_before_invoice` está preenchido.
+- **Sala:** obrigatória para `event_type === 'SESSION'` e para `event_type === 'INTERVIEW' && interviewFormat === 'PRESENTIAL'`; opcional para entrevistas remotas.
+- **Tipo de Atendimento:** campo oculto quando `event_type === 'INTERVIEW'`; sem validação nesse caso.
+- **`onEditRequest` prop:** quando definido, o rodapé em modo `readOnly` exibe botão "Editar" que invoca a callback — usado pela `AgendaPage` para transicionar do modal view-only para o formulário de edição.
 
 ### Entrevistas
 
@@ -720,7 +723,7 @@ Não é mais editável. Texto padrão fixo definido em `DESEMPENHO_FIXO` em `gen
 - **`meeting_platform` / `meeting_link`:** campos opcionais para entrevistas remotas.
 - **`interviewee_name`:** obrigatório quando `event_type === 'INTERVIEW'`; campo de texto livre para nome(s) do(s) entrevistado(s).
 - **Paciente:** opcional para entrevistas (label muda para "Paciente (opcional)"; sem validação de campo vazio quando `event_type === 'INTERVIEW'`).
-- **Impacto financeiro:** zero — entrevistas não afetam ledger pré-pago, faturamento nem demonstrativos.
+- **Impacto financeiro:** zero — entrevistas não afetam ledger pré-pago, faturamento nem demonstrativos. `filterConsultations` em `ReportsPage` exclui `event_type === 'INTERVIEW'` de ambos os tipos de relatório PDF.
 - **Chips visuais (laranja):** chip "Entrevista" (`bg-orange-50 text-orange-700`); chip adicional "Remota" para `interview_format === 'REMOTE'`. Exibidos nos cards de `ConsultationsPage` e `AgendaPage`.
 - **Título do card:** usa `intervieweeName` quando preenchido; cai para `patient.fullName` se não houver.
 - **Conflitos:** entrevistas REMOTE são isentas de `ROOM_OVERLAP` e `THERAPIST_UNAVAILABLE_PARTIAL` (FLEX). Entrevistas PRESENTIAL seguem as mesmas regras de sessão.
@@ -747,6 +750,8 @@ Não é mais editável. Texto padrão fixo definido em `DESEMPENHO_FIXO` em `gen
 - **Toggle "Minha Agenda":** visível para qualquer usuário com `user.id` preenchido (`canFilterMine = !!user?.id`); padrão `true` para não-admin (terapeutas veem só os seus por padrão), `false` para admin. Ao ativar, `filterConsultation` exige que o usuário seja primário ou participante secundário (`consultationTherapists`).
 - **Chips visuais nos cards de consulta:** desktop — `bg-white/25`; mobile — `bg-indigo-50`/`bg-amber-50`/`bg-blue-50`/`bg-orange-50`. Semântica: indigo = série, amber+`!` = ocorrência alterada, 👥 N = múltiplos terapeutas, vermelho `⚠` = conflito, laranja "Entrevista" = `event_type === 'INTERVIEW'`, laranja "Remota" = entrevista remota. Chips de série/múltiplos terapeutas/entrevista exibidos apenas quando `!isPrivate`; chip de conflito sempre visível.
 - **Chips visuais nos BlockCards (bloqueios):** chip `⚠` vermelho pequeno quando `consultations.some(c => c.conflicts.some(cf => !cf.resolved && cf.calendarBlockId === block.id))`. Desktop: inline na linha de chips do BlockCard. Mobile: chip "⚠ Conflito" na linha de badges abaixo do tipo RIGID/FLEX.
+- **Visualização rápida:** duplo-clique num card de consulta (desktop) ou toque simples (mobile) abre `ConsultationFormModal` com `readOnly=true` + `onEditRequest` que fecha o modal de visualização e abre o de edição. Mesmo comportamento para `BlockCard` via `CalendarBlockFormModal` com props `viewOnly=true` + `onEditRequest`. Estados: `viewItem` e `viewBlock` em `AgendaPage`.
+- **`CalendarBlockFormModal` `viewOnly` prop:** desabilita todos os inputs; exibe rodapé simplificado com "Fechar" e "Editar" (quando `onEditRequest` definido); oculta seção de recorrência.
 
 ## CRM de Contatos (`/admin/contatos`)
 
