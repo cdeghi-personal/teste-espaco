@@ -244,6 +244,7 @@ export default function ReportsPage() {
 
   function filterConsultations(list) {
     return list.filter(c => {
+      if (c.eventType === 'INTERVIEW') return false
       if (periodType === 'month') {
         if (!c.date || !c.date.startsWith(periodMonth)) return false
       } else {

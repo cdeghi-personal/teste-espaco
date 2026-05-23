@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { FiPlus, FiSearch, FiClipboard, FiChevronDown, FiChevronUp, FiEdit2, FiTrash2, FiEye, FiRepeat } from 'react-icons/fi'
+import { FiPlus, FiSearch, FiClipboard, FiChevronDown, FiChevronUp, FiEdit2, FiTrash2, FiEye, FiRepeat, FiVideo, FiMapPin, FiExternalLink } from 'react-icons/fi'
 
 function monthRange(offset) {
   const d = new Date()
@@ -38,6 +38,7 @@ export default function ConsultationsPage() {
   const [filterSpecialty, setFilterSpecialty] = useState('')
   const [filterStatus, setFilterStatus] = useState('')
   const [filterTherapist, setFilterTherapist] = useState('')
+  const [filterEventType, setFilterEventType] = useState('')
   const [filterDateFrom, setFilterDateFrom] = useState(() => monthRange(0).from)
   const [filterDateTo, setFilterDateTo]     = useState(() => monthRange(0).to)
   const [showModal, setShowModal] = useState(false)
@@ -82,7 +83,8 @@ export default function ConsultationsPage() {
       const matchStatus = !filterStatus || c.consultationStatusId === filterStatus
       const matchTherapist = !filterTherapist || c.therapistId === filterTherapist || (c.consultationTherapists || []).some(ct => ct.therapistId === filterTherapist)
       const matchDate = (!filterDateFrom || c.date >= filterDateFrom) && (!filterDateTo || c.date <= filterDateTo)
-      return matchSearch && matchSpecialty && matchStatus && matchTherapist && matchDate
+      const matchEventType = !filterEventType || (c.eventType || 'SESSION') === filterEventType
+      return matchSearch && matchSpecialty && matchStatus && matchTherapist && matchDate && matchEventType
     })
     .sort((a, b) => b.date.localeCompare(a.date))
 
@@ -215,6 +217,15 @@ export default function ConsultationsPage() {
             <option value="">Especialidade</option>
             {activeSpecialties.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
           </select>
+          <select
+            value={filterEventType}
+            onChange={e => setFilterEventType(e.target.value)}
+            className="px-2.5 py-1.5 text-sm border border-gray-200 rounded-lg bg-white focus:ring-2 focus:ring-brand-blue outline-none"
+          >
+            <option value="">Tipo</option>
+            <option value="SESSION">Atendimento</option>
+            <option value="INTERVIEW">Entrevista</option>
+          </select>
           {canFilterMine && (
             <button
               type="button"
@@ -261,6 +272,23 @@ export default function ConsultationsPage() {
                     )}
                     {apptType && (
                       <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">{apptType.name}</span>
+                    )}
+                    {c.eventType === 'INTERVIEW' && (
+                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs font-medium bg-teal-50 text-teal-700">
+                        {c.interviewFormat === 'REMOTE' ? <FiVideo size={10} /> : <FiMapPin size={10} />}
+                        Entrevista
+                      </span>
+                    )}
+                    {c.eventType === 'INTERVIEW' && c.interviewFormat === 'REMOTE' && c.meetingLink && (
+                      <a
+                        href={c.meetingLink}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={e => e.stopPropagation()}
+                        className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs font-medium bg-teal-600 text-white hover:bg-teal-700"
+                      >
+                        <FiExternalLink size={10} /> Entrar
+                      </a>
                     )}
                     {c.seriesId && !c.isSeriesException && (
                       <span title="Recorrente" className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs font-medium bg-indigo-50 text-indigo-500">

@@ -40,8 +40,9 @@ function hasTimeOverlap(startA, endA, startB, endB) {
  * @returns {array} conflitos detectados
  */
 export function detectConflicts(input, allConsultations, calendarBlocks = []) {
-  const { id, date, time, therapistId, roomId, consultationTherapists = [] } = input
+  const { id, date, time, therapistId, roomId, consultationTherapists = [], eventType, interviewFormat } = input
   if (!date || !time) return []
+  const isRemoteInterview = eventType === 'INTERVIEW' && interviewFormat === 'REMOTE'
 
   const startA = timeToMinutes(time)
   if (startA === null) return []
@@ -91,8 +92,8 @@ export function detectConflicts(input, allConsultations, calendarBlocks = []) {
       }
     }
 
-    // Conflito de sala
-    if (roomId && c.roomId && roomId === c.roomId) {
+    // Conflito de sala (entrevistas remotas não ocupam sala)
+    if (!isRemoteInterview && roomId && c.roomId && roomId === c.roomId) {
       const cf = {
         conflictType: CONFLICT_TYPES.ROOM_OVERLAP,
         relatedConsultationId: c.id,
@@ -116,6 +117,8 @@ export function detectConflicts(input, allConsultations, calendarBlocks = []) {
   )
 
   for (const b of sameDayBlocks) {
+    // Entrevista remota não conflita com bloqueio Flex
+    if (isRemoteInterview && b.blockType === 'FLEX') continue
     const blockStart = timeToMinutes(b.startTime)
     const blockEnd   = timeToMinutes(b.endTime)
     if (blockStart === null || blockEnd === null) continue
@@ -184,6 +187,8 @@ export function getCalendarBlockConflicts(block, allConsultations, allBlocks = [
   // 1. Conflito com atendimentos
   for (const c of allConsultations) {
     if (c.date !== block.date || !c.time) continue
+    // Bloqueio Flex não conflita com entrevista remota
+    if (block.blockType === 'FLEX' && c.eventType === 'INTERVIEW' && c.interviewFormat === 'REMOTE') continue
     const cStart = timeToMinutes(c.time)
     if (cStart === null) continue
     const cEnd = cStart + CONFLICT_DURATION

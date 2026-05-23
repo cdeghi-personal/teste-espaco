@@ -252,7 +252,7 @@ export default function ConvenioReportPage() {
 
     const { from, to } = getDateRange()
     const found = consultations
-      .filter(c => c.patientId === patientId && c.therapistId === therapistId && c.specialty === specialty && c.date >= from && c.date <= to)
+      .filter(c => c.patientId === patientId && c.therapistId === therapistId && c.specialty === specialty && c.date >= from && c.date <= to && c.eventType !== 'INTERVIEW')
       .sort((a, b) => a.date.localeCompare(b.date))
 
     const patient = patients.find(p => p.id === patientId)

@@ -62,6 +62,7 @@ const CONSULTATION_SELECT = `
   consultation_status_id, appointment_type_id, prepaid_session_consumed,
   nf_number, nf_issue_date, previous_status_before_invoice,
   series_id, series_original_date, is_series_exception,
+  event_type, interview_format, meeting_platform, meeting_link,
   main_objective, evolution_notes, next_objectives, guardian_feedback,
   session_quality, created_at,
   consultation_activities(id, name, description, outcome, sort_order),
@@ -682,6 +683,10 @@ export function DataProvider({ children }) {
         appointment_type_id: rest.appointmentTypeId || null,
         time: rest.time || null,
         room_id: rest.roomId || null,
+        event_type: rest.eventType || 'SESSION',
+        interview_format: rest.interviewFormat || null,
+        meeting_platform: rest.meetingPlatform || null,
+        meeting_link: rest.meetingLink || null,
         main_objective: rest.mainObjective || null,
         evolution_notes: rest.evolutionNotes || null,
         next_objectives: rest.nextObjectives || null,
@@ -740,7 +745,7 @@ export function DataProvider({ children }) {
       await rebuildRelatedConflicts(relatedIds, updatedAll)
     }
 
-    if (rest.consultationStatusId) {
+    if (rest.consultationStatusId && rest.eventType !== 'INTERVIEW') {
       const status = consultationStatuses.find(s => s.id === rest.consultationStatusId)
       const therapist = therapists.find(t => t.id === rest.therapistId)
       await handlePrepaidConsumption(inserted.id, {
@@ -789,6 +794,10 @@ export function DataProvider({ children }) {
     if (rest.date !== undefined) update.date = rest.date
     if (rest.time !== undefined) update.time = rest.time || null
     if (rest.roomId !== undefined) update.room_id = rest.roomId || null
+    if (rest.eventType !== undefined) update.event_type = rest.eventType || 'SESSION'
+    if (rest.interviewFormat !== undefined) update.interview_format = rest.interviewFormat || null
+    if (rest.meetingPlatform !== undefined) update.meeting_platform = rest.meetingPlatform || null
+    if (rest.meetingLink !== undefined) update.meeting_link = rest.meetingLink || null
     if (rest.sessionNumber !== undefined) update.session_number = rest.sessionNumber
     if (rest.consultationStatusId !== undefined) update.consultation_status_id = rest.consultationStatusId || null
     if (rest.appointmentTypeId !== undefined) update.appointment_type_id = rest.appointmentTypeId || null
@@ -862,7 +871,8 @@ export function DataProvider({ children }) {
       }
     }
 
-    if (rest.consultationStatusId !== undefined && existing) {
+    const resolvedEventType = rest.eventType !== undefined ? rest.eventType : (existing?.eventType || 'SESSION')
+    if (rest.consultationStatusId !== undefined && existing && resolvedEventType !== 'INTERVIEW') {
       const newPatientId = rest.patientId || existing.patientId
       const newSpecialty = rest.specialty || existing.specialty
       const status = consultationStatuses.find(s => s.id === rest.consultationStatusId)
@@ -1604,6 +1614,7 @@ export function DataProvider({ children }) {
       patientId, primaryTherapistId, specialty,
       consultationStatusId, appointmentTypeId, roomId,
       time, recurrenceType, recurrenceDays, startDate, endDate, sessionCount, notes,
+      eventType, interviewFormat, meetingPlatform, meetingLink,
       conflictsPerDate = [],
     } = data
 
@@ -1633,6 +1644,10 @@ export function DataProvider({ children }) {
         consultation_status_id: consultationStatusId || null,
         room_id:                roomId || null,
         time:                   time || null,
+        event_type:             eventType || 'SESSION',
+        interview_format:       interviewFormat || null,
+        meeting_platform:       meetingPlatform || null,
+        meeting_link:           meetingLink || null,
         recurrence_type:        recurrenceType,
         recurrence_days:        recurrenceDays,
         start_date:             startDate,
@@ -1653,6 +1668,10 @@ export function DataProvider({ children }) {
       date,
       time:                   time || null,
       room_id:                roomId || null,
+      event_type:             eventType || 'SESSION',
+      interview_format:       interviewFormat || null,
+      meeting_platform:       meetingPlatform || null,
+      meeting_link:           meetingLink || null,
       consultation_status_id: consultationStatusId || null,
       appointment_type_id:    appointmentTypeId || null,
       series_id:              series.id,

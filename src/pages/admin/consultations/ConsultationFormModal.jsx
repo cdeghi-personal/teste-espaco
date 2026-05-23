@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { FiPlus, FiTrash2, FiRepeat } from 'react-icons/fi'
+import { FiPlus, FiTrash2, FiRepeat, FiVideo, FiMapPin, FiExternalLink } from 'react-icons/fi'
 import Modal from '../../../components/ui/Modal'
 import Button from '../../../components/ui/Button'
 import Input from '../../../components/ui/Input'
@@ -16,6 +16,7 @@ const EMPTY_ACTIVITY = { id: '', name: '', description: '', outcome: 'achieved' 
 const EMPTY = {
   patientId: '', therapistId: '', specialty: '', date: isoToday(), time: '',
   consultationStatusId: '', appointmentTypeId: '', roomId: '',
+  eventType: 'SESSION', interviewFormat: '', meetingPlatform: '', meetingLink: '',
   mainObjective: '', activities: [],
   evolutionNotes: '', nextObjectives: '',
   sessionQuality: 'good', guardianFeedback: '', appointmentId: '',
@@ -95,13 +96,16 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
     set('secondaryTherapists', form.secondaryTherapists.filter(t => t.tempId !== tempId))
   }
 
+  const isRemoteInterview = form.eventType === 'INTERVIEW' && form.interviewFormat === 'REMOTE'
+
   function validate() {
     const e = {}
     if (!form.patientId) e.patientId = 'Selecione o paciente'
     if (!form.therapistId) e.therapistId = 'Selecione o terapeuta'
     if (!form.specialty) e.specialty = 'Selecione a especialidade'
     if (!form.time) e.time = 'Informe o horário'
-    if (!form.roomId) e.roomId = 'Selecione a sala'
+    if (form.eventType === 'INTERVIEW' && !form.interviewFormat) e.interviewFormat = 'Selecione o formato'
+    if (form.eventType !== 'INTERVIEW' && !form.roomId) e.roomId = 'Selecione a sala'
     if (!form.consultationStatusId) e.consultationStatusId = 'Selecione o status'
     if (!form.appointmentTypeId) e.appointmentTypeId = 'Selecione o tipo'
     const selectedStatus = consultationStatuses.find(s => s.id === form.consultationStatusId)
@@ -147,6 +151,8 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
       time: form.time,
       therapistId: form.therapistId,
       roomId: form.roomId,
+      eventType: form.eventType,
+      interviewFormat: form.interviewFormat,
       consultationTherapists: [
         { therapistId: form.therapistId, isPrimary: true },
         ...(form.secondaryTherapists || []).filter(t => t.therapistId).map(t => ({ therapistId: t.therapistId, isPrimary: false })),
@@ -263,6 +269,69 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
             Consulta recorrente
           </div>
         )}
+        {/* Tipo do Evento */}
+        {!readOnly && (
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Tipo:</span>
+            {[{ v: 'SESSION', l: 'Atendimento' }, { v: 'INTERVIEW', l: 'Entrevista' }].map(({ v, l }) => (
+              <button
+                key={v}
+                type="button"
+                onClick={() => {
+                  set('eventType', v)
+                  if (v === 'SESSION') {
+                    set('interviewFormat', '')
+                    set('meetingPlatform', '')
+                    set('meetingLink', '')
+                  }
+                }}
+                className={`px-3 py-1 rounded-lg text-xs font-medium border transition-all ${
+                  form.eventType === v
+                    ? 'bg-teal-600 text-white border-teal-600'
+                    : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'
+                }`}
+              >
+                {l}
+              </button>
+            ))}
+            {form.eventType === 'INTERVIEW' && (
+              <>
+                <span className="text-gray-300 mx-1">|</span>
+                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Formato:</span>
+                {[{ v: 'PRESENTIAL', l: 'Presencial' }, { v: 'REMOTE', l: 'Remoto' }].map(({ v, l }) => (
+                  <button
+                    key={v}
+                    type="button"
+                    onClick={() => {
+                      set('interviewFormat', v)
+                      if (v === 'REMOTE') set('roomId', '')
+                      else { set('meetingPlatform', ''); set('meetingLink', '') }
+                    }}
+                    className={`px-3 py-1 rounded-lg text-xs font-medium border transition-all ${
+                      form.interviewFormat === v
+                        ? 'bg-teal-600 text-white border-teal-600'
+                        : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'
+                    }`}
+                  >
+                    {v === 'PRESENTIAL' ? <FiMapPin size={10} className="inline mr-1" /> : <FiVideo size={10} className="inline mr-1" />}
+                    {l}
+                  </button>
+                ))}
+                {errors.interviewFormat && (
+                  <p className="text-xs text-red-500 w-full">{errors.interviewFormat}</p>
+                )}
+              </>
+            )}
+          </div>
+        )}
+        {readOnly && form.eventType === 'INTERVIEW' && (
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-teal-50 text-teal-700 border border-teal-200">
+              {form.interviewFormat === 'REMOTE' ? <FiVideo size={11} /> : <FiMapPin size={11} />}
+              Entrevista {form.interviewFormat === 'REMOTE' ? 'Remota' : 'Presencial'}
+            </span>
+          </div>
+        )}
         {confirmSeriesEdit && (
           <div className="flex items-start gap-2 p-3 bg-blue-50 border border-blue-100 rounded-xl text-sm text-blue-700">
             <FiRepeat size={15} className="shrink-0 mt-0.5" />
@@ -338,14 +407,27 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
               <Input label="Data *" type="date" value={form.date} onChange={e => set('date', e.target.value)} disabled={readOnly} />
               <Input label="Horário *" type="time" value={form.time} onChange={e => set('time', e.target.value)} error={errors.time} disabled={readOnly} />
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <Select label="Sala *" value={form.roomId} onChange={e => set('roomId', e.target.value)} error={errors.roomId} disabled={readOnly}>
-                <option value="">Selecione</option>
-                {activeRooms.map(r => (
-                  <option key={r.id} value={r.id}>{r.name}</option>
-                ))}
-              </Select>
-            </div>
+            {isRemoteInterview ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <Select label="Plataforma" value={form.meetingPlatform} onChange={e => set('meetingPlatform', e.target.value)} disabled={readOnly}>
+                  <option value="">Selecione</option>
+                  <option value="GOOGLE_MEET">Google Meet</option>
+                  <option value="TEAMS">Microsoft Teams</option>
+                  <option value="ZOOM">Zoom</option>
+                  <option value="OTHER">Outra plataforma</option>
+                </Select>
+                <Input label="Link da Reunião" value={form.meetingLink} onChange={e => set('meetingLink', e.target.value)} placeholder="https://..." disabled={readOnly} />
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <Select label={form.eventType === 'SESSION' ? 'Sala *' : 'Sala'} value={form.roomId} onChange={e => set('roomId', e.target.value)} error={errors.roomId} disabled={readOnly}>
+                  <option value="">Selecione</option>
+                  {activeRooms.map(r => (
+                    <option key={r.id} value={r.id}>{r.name}</option>
+                  ))}
+                </Select>
+              </div>
+            )}
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <Select label="Especialidade *" value={form.specialty} onChange={e => set('specialty', e.target.value)} error={errors.specialty} disabled={readOnly}>
@@ -542,8 +624,8 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
           </div>
         </section>
 
-        {/* Seção NF — admin sempre vê em edição; terapeuta vê apenas se já preenchido */}
-        {isEdit && (isAdmin || initial.nfNumber || initial.nfIssueDate) && (
+        {/* Seção NF — oculta para entrevistas; admin sempre vê em edição; terapeuta vê apenas se já preenchido */}
+        {isEdit && form.eventType !== 'INTERVIEW' && (isAdmin || initial.nfNumber || initial.nfIssueDate) && (
           <section className="space-y-3">
             <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Nota Fiscal / Faturamento</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

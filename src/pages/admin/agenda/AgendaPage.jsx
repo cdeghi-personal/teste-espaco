@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { FiPlus, FiChevronLeft, FiChevronRight, FiSearch, FiCalendar, FiEdit2, FiRepeat, FiSlash } from 'react-icons/fi'
+import { FiPlus, FiChevronLeft, FiChevronRight, FiSearch, FiCalendar, FiEdit2, FiRepeat, FiSlash, FiVideo, FiMapPin, FiExternalLink } from 'react-icons/fi'
 import HelpButton from '../../../components/ui/HelpButton'
 import { addDays, startOfWeek, format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
@@ -95,6 +95,7 @@ export default function AgendaPage() {
   const [search, setSearch] = useState('')
   const [filterRoom, setFilterRoom] = useState('')
   const [filterTherapist, setFilterTherapist] = useState('')
+  const [filterEventType, setFilterEventType] = useState('')
   const [showModal, setShowModal] = useState(false)
   const [editItem, setEditItem] = useState(null)
   const [showSeriesModal, setShowSeriesModal] = useState(false)
@@ -181,6 +182,7 @@ export default function AgendaPage() {
     // Consultas de não-equipe: visíveis para todos (anônimas), ignoram filtro de busca
     if (filterRoom && c.roomId !== filterRoom) return false
     if (filterTherapist && c.therapistId !== filterTherapist && !(c.consultationTherapists || []).some(t => t.therapistId === filterTherapist)) return false
+    if (filterEventType && (c.eventType || 'SESSION') !== filterEventType) return false
     return true
   }
 
@@ -342,6 +344,15 @@ export default function AgendaPage() {
             <span className="sm:hidden">Minha</span>
           </button>
         )}
+        <select
+          value={filterEventType}
+          onChange={e => setFilterEventType(e.target.value)}
+          className="px-3 py-2 text-sm border border-gray-200 rounded-xl bg-white focus:ring-2 focus:ring-brand-blue outline-none"
+        >
+          <option value="">Todos</option>
+          <option value="SESSION">Atendimento</option>
+          <option value="INTERVIEW">Entrevista</option>
+        </select>
       </div>
 
       {/* ── Weekly grid — desktop ── */}
@@ -389,6 +400,8 @@ export default function AgendaPage() {
                   const style = cardStyle(item)
                   const itemConflicts = conflictMap[item.id] || []
                   const conflictTooltip = buildConflictTooltip(itemConflicts, { therapists, rooms, patients, consultations, calendarBlocks })
+                  const isInterview = item.eventType === 'INTERVIEW'
+                  const isRemote = isInterview && item.interviewFormat === 'REMOTE'
                   return (
                     <div
                       key={item.id}
@@ -402,41 +415,52 @@ export default function AgendaPage() {
                           {isPrivate ? 'Consulta Particular' : shortName(patient?.fullName)}
                         </span>
                       </div>
-                      {(room || item.seriesId || (item.consultationTherapists || []).length > 1 || itemConflicts.length > 0) && (
+                      {(room || isInterview || item.seriesId || (item.consultationTherapists || []).length > 1 || itemConflicts.length > 0) && (
                         <div className="flex items-center justify-between gap-1 mt-0.5">
-                          <span className="truncate opacity-75 flex-1" style={{ fontSize: '10px' }}>{room?.name || ''}</span>
-                          {(item.seriesId || (item.consultationTherapists || []).length > 1 || itemConflicts.length > 0) && (
-                            <div className="flex items-center gap-0.5 shrink-0">
-                              {item.seriesId && !item.isSeriesException && (
-                                <span title="Recorrente" className="inline-flex items-center px-1 py-0.5 rounded bg-white/25" style={{ fontSize: '9px' }}>
-                                  <FiRepeat size={7} />
-                                </span>
-                              )}
-                              {item.seriesId && item.isSeriesException && (
-                                <span title="Ocorrência alterada" className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded bg-white/25" style={{ fontSize: '9px' }}>
-                                  <FiRepeat size={7} /><span>!</span>
-                                </span>
-                              )}
-                              {(item.consultationTherapists || []).length > 1 && (
-                                <span
-                                  title={(item.consultationTherapists || []).map(ct => therapists.find(t => t.id === ct.therapistId)?.name || '?').join(', ')}
-                                  className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded bg-white/25"
-                                  style={{ fontSize: '9px' }}
-                                >
-                                  👥 {(item.consultationTherapists || []).length}
-                                </span>
-                              )}
-                              {itemConflicts.length > 0 && (
-                                <span
-                                  title={conflictTooltip}
-                                  className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded text-red-700 bg-red-100"
-                                  style={{ fontSize: '9px' }}
-                                >
-                                  ⚠
-                                </span>
-                              )}
-                            </div>
-                          )}
+                          <span className="truncate opacity-75 flex-1" style={{ fontSize: '10px' }}>
+                            {isRemote ? '' : (room?.name || '')}
+                          </span>
+                          <div className="flex items-center gap-0.5 shrink-0">
+                            {isInterview && (
+                              <span title={isRemote ? 'Entrevista Remota' : 'Entrevista Presencial'} className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded bg-teal-500/80 text-white" style={{ fontSize: '9px' }}>
+                                {isRemote ? <FiVideo size={7} /> : <FiMapPin size={7} />}
+                                <span>Entrev.</span>
+                              </span>
+                            )}
+                            {isRemote && item.meetingLink && (
+                              <a href={item.meetingLink} target="_blank" rel="noopener noreferrer" title="Entrar na reunião" onClick={e => e.stopPropagation()} className="inline-flex items-center px-1 py-0.5 rounded bg-teal-600/80 text-white hover:bg-teal-700/80" style={{ fontSize: '9px' }}>
+                                <FiExternalLink size={7} />
+                              </a>
+                            )}
+                            {item.seriesId && !item.isSeriesException && (
+                              <span title="Recorrente" className="inline-flex items-center px-1 py-0.5 rounded bg-white/25" style={{ fontSize: '9px' }}>
+                                <FiRepeat size={7} />
+                              </span>
+                            )}
+                            {item.seriesId && item.isSeriesException && (
+                              <span title="Ocorrência alterada" className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded bg-white/25" style={{ fontSize: '9px' }}>
+                                <FiRepeat size={7} /><span>!</span>
+                              </span>
+                            )}
+                            {(item.consultationTherapists || []).length > 1 && (
+                              <span
+                                title={(item.consultationTherapists || []).map(ct => therapists.find(t => t.id === ct.therapistId)?.name || '?').join(', ')}
+                                className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded bg-white/25"
+                                style={{ fontSize: '9px' }}
+                              >
+                                👥 {(item.consultationTherapists || []).length}
+                              </span>
+                            )}
+                            {itemConflicts.length > 0 && (
+                              <span
+                                title={conflictTooltip}
+                                className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded text-red-700 bg-red-100"
+                                style={{ fontSize: '9px' }}
+                              >
+                                ⚠
+                              </span>
+                            )}
+                          </div>
                         </div>
                       )}
                       {!isPrivate && (user?.role === 'admin' || user?.id === item.therapistId) && (
@@ -501,6 +525,8 @@ export default function AgendaPage() {
                   const isSun = item.date !== satIso
                   const itemConflicts = conflictMap[item.id] || []
                   const conflictTooltip = buildConflictTooltip(itemConflicts, { therapists, rooms, patients, consultations, calendarBlocks })
+                  const isInterview = item.eventType === 'INTERVIEW'
+                  const isRemote = isInterview && item.interviewFormat === 'REMOTE'
                   return (
                     <div
                       key={item.id}
@@ -514,41 +540,52 @@ export default function AgendaPage() {
                           {isPrivate ? 'Consulta Particular' : shortName(patient?.fullName)}
                         </span>
                       </div>
-                      {(room || item.seriesId || (item.consultationTherapists || []).length > 1 || itemConflicts.length > 0) && (
+                      {(room || isInterview || item.seriesId || (item.consultationTherapists || []).length > 1 || itemConflicts.length > 0) && (
                         <div className="flex items-center justify-between gap-1 mt-0.5">
-                          <span className="truncate opacity-75 flex-1" style={{ fontSize: '10px' }}>{room?.name || ''}</span>
-                          {(item.seriesId || (item.consultationTherapists || []).length > 1 || itemConflicts.length > 0) && (
-                            <div className="flex items-center gap-0.5 shrink-0">
-                              {item.seriesId && !item.isSeriesException && (
-                                <span title="Recorrente" className="inline-flex items-center px-1 py-0.5 rounded bg-white/25" style={{ fontSize: '9px' }}>
-                                  <FiRepeat size={7} />
-                                </span>
-                              )}
-                              {item.seriesId && item.isSeriesException && (
-                                <span title="Ocorrência alterada" className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded bg-white/25" style={{ fontSize: '9px' }}>
-                                  <FiRepeat size={7} /><span>!</span>
-                                </span>
-                              )}
-                              {(item.consultationTherapists || []).length > 1 && (
-                                <span
-                                  title={(item.consultationTherapists || []).map(ct => therapists.find(t => t.id === ct.therapistId)?.name || '?').join(', ')}
-                                  className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded bg-white/25"
-                                  style={{ fontSize: '9px' }}
-                                >
-                                  👥 {(item.consultationTherapists || []).length}
-                                </span>
-                              )}
-                              {itemConflicts.length > 0 && (
-                                <span
-                                  title={conflictTooltip}
-                                  className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded text-red-700 bg-red-100"
-                                  style={{ fontSize: '9px' }}
-                                >
-                                  ⚠
-                                </span>
-                              )}
-                            </div>
-                          )}
+                          <span className="truncate opacity-75 flex-1" style={{ fontSize: '10px' }}>
+                            {isRemote ? '' : (room?.name || '')}
+                          </span>
+                          <div className="flex items-center gap-0.5 shrink-0">
+                            {isInterview && (
+                              <span title={isRemote ? 'Entrevista Remota' : 'Entrevista Presencial'} className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded bg-teal-500/80 text-white" style={{ fontSize: '9px' }}>
+                                {isRemote ? <FiVideo size={7} /> : <FiMapPin size={7} />}
+                                <span>Entrev.</span>
+                              </span>
+                            )}
+                            {isRemote && item.meetingLink && (
+                              <a href={item.meetingLink} target="_blank" rel="noopener noreferrer" title="Entrar na reunião" onClick={e => e.stopPropagation()} className="inline-flex items-center px-1 py-0.5 rounded bg-teal-600/80 text-white hover:bg-teal-700/80" style={{ fontSize: '9px' }}>
+                                <FiExternalLink size={7} />
+                              </a>
+                            )}
+                            {item.seriesId && !item.isSeriesException && (
+                              <span title="Recorrente" className="inline-flex items-center px-1 py-0.5 rounded bg-white/25" style={{ fontSize: '9px' }}>
+                                <FiRepeat size={7} />
+                              </span>
+                            )}
+                            {item.seriesId && item.isSeriesException && (
+                              <span title="Ocorrência alterada" className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded bg-white/25" style={{ fontSize: '9px' }}>
+                                <FiRepeat size={7} /><span>!</span>
+                              </span>
+                            )}
+                            {(item.consultationTherapists || []).length > 1 && (
+                              <span
+                                title={(item.consultationTherapists || []).map(ct => therapists.find(t => t.id === ct.therapistId)?.name || '?').join(', ')}
+                                className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded bg-white/25"
+                                style={{ fontSize: '9px' }}
+                              >
+                                👥 {(item.consultationTherapists || []).length}
+                              </span>
+                            )}
+                            {itemConflicts.length > 0 && (
+                              <span
+                                title={conflictTooltip}
+                                className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded text-red-700 bg-red-100"
+                                style={{ fontSize: '9px' }}
+                              >
+                                ⚠
+                              </span>
+                            )}
+                          </div>
                         </div>
                       )}
                       <div className="opacity-60 mt-0.5" style={{ fontSize: '10px' }}>{isSun ? 'Dom' : 'Sáb'}</div>
@@ -670,6 +707,8 @@ export default function AgendaPage() {
                   const style = cardStyle(item)
                   const itemConflicts = conflictMap[item.id] || []
                   const conflictTooltip = buildConflictTooltip(itemConflicts, { therapists, rooms, patients, consultations, calendarBlocks })
+                  const isInterview = item.eventType === 'INTERVIEW'
+                  const isRemote = isInterview && item.interviewFormat === 'REMOTE'
                   return (
                     <div key={item.id} className="flex items-center gap-3 p-4">
                       <div className="w-1 self-stretch rounded-full shrink-0" style={{ backgroundColor: style.backgroundColor }} />
@@ -679,10 +718,23 @@ export default function AgendaPage() {
                           {isPrivate ? 'Consulta Particular' : patient?.fullName}
                         </div>
                         <div className="text-xs text-gray-500 truncate">
-                          {isPrivate ? (room?.name || '') : `${therapist?.name}${room ? ` • ${room.name}` : ''}`}
+                          {isPrivate
+                            ? (room?.name || '')
+                            : `${therapist?.name}${!isRemote && room ? ` • ${room.name}` : ''}`}
                         </div>
-                        {(item.seriesId || (item.consultationTherapists || []).length > 1 || itemConflicts.length > 0) && (
+                        {(isInterview || item.seriesId || (item.consultationTherapists || []).length > 1 || itemConflicts.length > 0) && (
                           <div className="flex items-center gap-1 mt-1 flex-wrap">
+                            {isInterview && (
+                              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs bg-teal-50 text-teal-700">
+                                {isRemote ? <FiVideo size={9} /> : <FiMapPin size={9} />}
+                                Entrevista
+                              </span>
+                            )}
+                            {isRemote && item.meetingLink && (
+                              <a href={item.meetingLink} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs bg-teal-600 text-white">
+                                <FiExternalLink size={9} /> Entrar
+                              </a>
+                            )}
                             {item.seriesId && !item.isSeriesException && (
                               <span title="Recorrente" className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs bg-indigo-50 text-indigo-500">
                                 <FiRepeat size={9} />
