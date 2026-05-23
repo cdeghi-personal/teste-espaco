@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { FiPlus, FiSearch, FiClipboard, FiChevronDown, FiChevronUp, FiEdit2, FiTrash2, FiEye, FiRepeat } from 'react-icons/fi'
 
 function monthRange(offset) {
@@ -29,9 +29,10 @@ import EmptyState from '../../../components/ui/EmptyState'
 import ConsultationFormModal from './ConsultationFormModal'
 import SeriesFormModal from './SeriesFormModal'
 import { formatDateShort } from '../../../utils/dateUtils'
+import { detectConflicts, buildConflictTooltip } from '../../../utils/conflictUtils'
 
 export default function ConsultationsPage() {
-  const { consultations, patients, therapists, rooms, specialtiesData, consultationStatuses, appointmentTypes, deleteConsultation, deleteConsultationSeries, logAudit } = useData()
+  const { consultations, patients, therapists, rooms, specialtiesData, consultationStatuses, appointmentTypes, calendarBlocks, deleteConsultation, deleteConsultationSeries, logAudit } = useData()
   const { user } = useAuth()
   const [search, setSearch] = useState('')
   const [filterSpecialty, setFilterSpecialty] = useState('')
@@ -84,6 +85,20 @@ export default function ConsultationsPage() {
       return matchSearch && matchSpecialty && matchStatus && matchTherapist && matchDate
     })
     .sort((a, b) => b.date.localeCompare(a.date))
+
+  // Mapa centralizado de conflitos — computed fresh, não depende de dados armazenados no DB
+  const conflictMap = useMemo(() => {
+    const activeCBlocks = (calendarBlocks || []).filter(b => !b.cancelled && b.active !== false)
+    const map = {}
+    for (const c of filtered) {
+      const cfs = detectConflicts(c, consultations, activeCBlocks)
+      if (cfs.length > 0) {
+        map[c.id] = cfs
+        console.log('[CONFLICT_RENDER_DEBUG]', { eventType: 'consultation', eventId: c.id, conflicts: cfs, hasConflict: true })
+      }
+    }
+    return map
+  }, [filtered, consultations, calendarBlocks]) // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleDelete(consultation) {
     if (consultation.seriesId && isAdmin) {
@@ -265,9 +280,9 @@ export default function ConsultationsPage() {
                         👥 {(c.consultationTherapists || []).length}
                       </span>
                     )}
-                    {(c.conflicts || []).length > 0 && (
+                    {(conflictMap[c.id] || []).length > 0 && (
                       <span
-                        title={(c.conflicts || []).map(cf => cf.description || cf.conflictType).join('\n')}
+                        title={buildConflictTooltip(conflictMap[c.id], { therapists, rooms })}
                         className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs font-medium bg-red-50 text-red-600"
                       >
                         ⚠ Conflito

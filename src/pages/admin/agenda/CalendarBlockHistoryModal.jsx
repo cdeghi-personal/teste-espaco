@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { FiEdit2, FiXCircle, FiSearch, FiRepeat } from 'react-icons/fi'
 import Modal from '../../../components/ui/Modal'
 import Button from '../../../components/ui/Button'
@@ -7,6 +7,7 @@ import { useAuth } from '../../../context/AuthContext'
 import Spinner from '../../../components/ui/Spinner'
 import { useToast } from '../../../components/ui/Toast'
 import CalendarBlockFormModal from './CalendarBlockFormModal'
+import { getCalendarBlockConflicts, buildConflictTooltip } from '../../../utils/conflictUtils'
 
 function monthRange(offset) {
   const d = new Date()
@@ -28,7 +29,7 @@ function monthBtnLabel(offset) {
 }
 
 export default function CalendarBlockHistoryModal({ onClose, therapistId }) {
-  const { therapists, getCalendarBlockHistory, cancelCalendarBlock } = useData()
+  const { therapists, consultations, calendarBlocks, getCalendarBlockHistory, cancelCalendarBlock } = useData()
   const { user } = useAuth()
   const toast = useToast()
   const isAdmin = user?.role === 'admin'
@@ -94,6 +95,26 @@ export default function CalendarBlockHistoryModal({ onClose, therapistId }) {
     if (filterDateTo && b.date > filterDateTo) return false
     return true
   })
+
+  // Conflitos para os bloqueios filtrados (computed fresh)
+  const blockConflictMap = useMemo(() => {
+    const activeCBlocks = (calendarBlocks || []).filter(b => !b.cancelled && b.active !== false)
+    // Inclui também os bloqueios do histórico não cancelados (para conflito bloqueio×bloqueio)
+    const activeHistoryBlocks = blocks.filter(b => !b.cancelled)
+    const allBlocksForCheck = [
+      ...activeCBlocks,
+      ...activeHistoryBlocks.filter(b => !activeCBlocks.some(a => a.id === b.id)),
+    ]
+    const map = {}
+    for (const b of filtered) {
+      const cfs = getCalendarBlockConflicts(b, consultations, allBlocksForCheck)
+      if (cfs.length > 0) {
+        map[b.id] = cfs
+        console.log('[CONFLICT_RENDER_DEBUG]', { eventType: 'block', eventId: b.id, conflicts: cfs, hasConflict: true })
+      }
+    }
+    return map
+  }, [filtered, consultations, calendarBlocks, blocks]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleCancel() {
     if (!cancelConfirm) return
@@ -278,11 +299,21 @@ export default function CalendarBlockHistoryModal({ onClose, therapistId }) {
                       {b.description || '—'}
                     </td>
                     <td className="py-2 pr-3">
-                      {b.cancelled ? (
-                        <span className="px-1.5 py-0.5 rounded text-xs bg-gray-100 text-gray-500">Cancelado</span>
-                      ) : (
-                        <span className="px-1.5 py-0.5 rounded text-xs bg-green-50 text-green-700">Ativo</span>
-                      )}
+                      <div className="flex items-center gap-1 flex-wrap">
+                        {b.cancelled ? (
+                          <span className="px-1.5 py-0.5 rounded text-xs bg-gray-100 text-gray-500">Cancelado</span>
+                        ) : (
+                          <span className="px-1.5 py-0.5 rounded text-xs bg-green-50 text-green-700">Ativo</span>
+                        )}
+                        {(blockConflictMap[b.id] || []).length > 0 && (
+                          <span
+                            title={buildConflictTooltip(blockConflictMap[b.id], { therapists })}
+                            className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-xs bg-red-50 text-red-600"
+                          >
+                            ⚠ Conflito
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="py-2">
                       {!b.cancelled && canEdit && (

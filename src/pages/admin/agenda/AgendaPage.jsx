@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { FiPlus, FiChevronLeft, FiChevronRight, FiSearch, FiCalendar, FiEdit2, FiRepeat, FiSlash } from 'react-icons/fi'
 import HelpButton from '../../../components/ui/HelpButton'
 import { addDays, startOfWeek, format } from 'date-fns'
@@ -11,6 +11,7 @@ import SeriesFormModal from '../consultations/SeriesFormModal'
 import CalendarBlockFormModal from './CalendarBlockFormModal'
 import CalendarBlockHistoryModal from './CalendarBlockHistoryModal'
 import { formatMonthYear } from '../../../utils/dateUtils'
+import { detectConflicts, getCalendarBlockConflicts, buildConflictTooltip } from '../../../utils/conflictUtils'
 
 function textColorForBg(hex) {
   if (!hex) return 'white'
@@ -37,26 +38,7 @@ function formatDay(date) {
   return format(date, "EEE dd/MM", { locale: ptBR })
 }
 
-function timeToMin(t) {
-  if (!t) return null
-  const [h, m] = t.split(':').map(Number)
-  return h * 60 + m
-}
-
-function blockHasConflict(block, consultations) {
-  const bStart = timeToMin(block.startTime)
-  const bEnd   = timeToMin(block.endTime)
-  if (bStart === null || bEnd === null) return false
-  return consultations.some(c => {
-    if (c.date !== block.date || !c.time) return false
-    const ids = [c.therapistId, ...(c.consultationTherapists || []).map(ct => ct.therapistId)].filter(Boolean)
-    if (!ids.includes(block.therapistId)) return false
-    const cStart = timeToMin(c.time)
-    return cStart < bEnd && (cStart + 50) > bStart
-  })
-}
-
-function BlockCard({ block, therapist, onEdit, isAdmin, userId, hasConflict }) {
+function BlockCard({ block, therapist, onEdit, isAdmin, userId, conflictTooltip }) {
   const canEdit = isAdmin || userId === block.therapistId
   const isRigid = block.blockType === 'RIGID'
   const cardCls = isRigid
@@ -91,8 +73,8 @@ function BlockCard({ block, therapist, onEdit, isAdmin, userId, hasConflict }) {
         <span className={`px-1 rounded shrink-0 ${chipCls}`} style={{ fontSize: '9px' }}>
           {isRigid ? 'Rígido' : 'Flex'}
         </span>
-        {hasConflict && (
-          <span title="Atendimento conflitante" className="shrink-0 px-0.5 rounded text-red-600 bg-red-100" style={{ fontSize: '9px' }}>⚠</span>
+        {conflictTooltip && (
+          <span title={conflictTooltip} className="shrink-0 px-0.5 rounded text-red-600 bg-red-100" style={{ fontSize: '9px' }}>⚠</span>
         )}
       </div>
       {canEdit && (
@@ -138,6 +120,35 @@ export default function AgendaPage() {
   const sunday = addDays(weekStart, 6)
 
   const isAdminOrTeam = user?.role === 'admin' || user?.belongsToTeam
+
+  // Mapa centralizado de conflitos — recalculado quando dados ou semana mudam
+  const conflictMap = useMemo(() => {
+    const ws = startOfWeek(weekRef, { weekStartsOn: 1 })
+    const weekIsos = Array.from({ length: 7 }, (_, i) => format(addDays(ws, i), 'yyyy-MM-dd'))
+    const map = {}
+    const activeCBlocks = (calendarBlocks || []).filter(b => !b.cancelled && b.active !== false)
+
+    // Conflitos de atendimentos na semana visível
+    const weekConss = consultations.filter(c => weekIsos.includes(c.date))
+    for (const c of weekConss) {
+      const cfs = detectConflicts(c, consultations, activeCBlocks)
+      if (cfs.length > 0) {
+        map[c.id] = cfs
+        console.log('[CONFLICT_RENDER_DEBUG]', { eventType: 'consultation', eventId: c.id, conflicts: cfs, hasConflict: true })
+      }
+    }
+
+    // Conflitos de bloqueios na semana visível
+    const weekBlocks = activeCBlocks.filter(b => weekIsos.includes(b.date))
+    for (const b of weekBlocks) {
+      const cfs = getCalendarBlockConflicts(b, consultations, activeCBlocks)
+      if (cfs.length > 0) {
+        map[b.id] = cfs
+        console.log('[CONFLICT_RENDER_DEBUG]', { eventType: 'block', eventId: b.id, conflicts: cfs, hasConflict: true })
+      }
+    }
+    return map
+  }, [consultations, calendarBlocks, weekRef]) // eslint-disable-line react-hooks/exhaustive-deps
 
   function prevWeek() { const d = new Date(weekRef); d.setDate(d.getDate() - 7); setWeekRef(d) }
   function nextWeek() { const d = new Date(weekRef); d.setDate(d.getDate() + 7); setWeekRef(d) }
@@ -376,6 +387,8 @@ export default function AgendaPage() {
                   const patient = isPrivate ? null : getPatient(item.patientId)
                   const room = getRoom(item.roomId)
                   const style = cardStyle(item)
+                  const itemConflicts = conflictMap[item.id] || []
+                  const conflictTooltip = buildConflictTooltip(itemConflicts, { therapists, rooms })
                   return (
                     <div
                       key={item.id}
@@ -389,10 +402,10 @@ export default function AgendaPage() {
                           {isPrivate ? 'Consulta Particular' : shortName(patient?.fullName)}
                         </span>
                       </div>
-                      {(room || item.seriesId || (item.consultationTherapists || []).length > 1 || (item.conflicts || []).length > 0) && (
+                      {(room || item.seriesId || (item.consultationTherapists || []).length > 1 || itemConflicts.length > 0) && (
                         <div className="flex items-center justify-between gap-1 mt-0.5">
                           <span className="truncate opacity-75 flex-1" style={{ fontSize: '10px' }}>{room?.name || ''}</span>
-                          {(item.seriesId || (item.consultationTherapists || []).length > 1 || (item.conflicts || []).length > 0) && (
+                          {(item.seriesId || (item.consultationTherapists || []).length > 1 || itemConflicts.length > 0) && (
                             <div className="flex items-center gap-0.5 shrink-0">
                               {item.seriesId && !item.isSeriesException && (
                                 <span title="Recorrente" className="inline-flex items-center px-1 py-0.5 rounded bg-white/25" style={{ fontSize: '9px' }}>
@@ -413,9 +426,9 @@ export default function AgendaPage() {
                                   👥 {(item.consultationTherapists || []).length}
                                 </span>
                               )}
-                              {(item.conflicts || []).length > 0 && (
+                              {itemConflicts.length > 0 && (
                                 <span
-                                  title={(item.conflicts || []).map(c => c.description || c.conflictType).join('\n')}
+                                  title={conflictTooltip}
                                   className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded text-red-700 bg-red-100"
                                   style={{ fontSize: '9px' }}
                                 >
@@ -451,7 +464,7 @@ export default function AgendaPage() {
                 })}
                 {/* Block cards */}
                 {dayBlocks.map(block => {
-                  const hasConflict = blockHasConflict(block, consultations)
+                  const conflictTooltip = buildConflictTooltip(conflictMap[block.id] || [], { therapists, rooms })
                   return (
                     <BlockCard
                       key={block.id}
@@ -460,7 +473,7 @@ export default function AgendaPage() {
                       onEdit={() => { setEditBlock(block); setShowBlockModal(true) }}
                       isAdmin={user?.role === 'admin'}
                       userId={user?.id}
-                      hasConflict={hasConflict}
+                      conflictTooltip={conflictTooltip}
                     />
                   )
                 })}
@@ -486,6 +499,8 @@ export default function AgendaPage() {
                   const room = getRoom(item.roomId)
                   const style = cardStyle(item)
                   const isSun = item.date !== satIso
+                  const itemConflicts = conflictMap[item.id] || []
+                  const conflictTooltip = buildConflictTooltip(itemConflicts, { therapists, rooms })
                   return (
                     <div
                       key={item.id}
@@ -499,10 +514,10 @@ export default function AgendaPage() {
                           {isPrivate ? 'Consulta Particular' : shortName(patient?.fullName)}
                         </span>
                       </div>
-                      {(room || item.seriesId || (item.consultationTherapists || []).length > 1 || (item.conflicts || []).length > 0) && (
+                      {(room || item.seriesId || (item.consultationTherapists || []).length > 1 || itemConflicts.length > 0) && (
                         <div className="flex items-center justify-between gap-1 mt-0.5">
                           <span className="truncate opacity-75 flex-1" style={{ fontSize: '10px' }}>{room?.name || ''}</span>
-                          {(item.seriesId || (item.consultationTherapists || []).length > 1 || (item.conflicts || []).length > 0) && (
+                          {(item.seriesId || (item.consultationTherapists || []).length > 1 || itemConflicts.length > 0) && (
                             <div className="flex items-center gap-0.5 shrink-0">
                               {item.seriesId && !item.isSeriesException && (
                                 <span title="Recorrente" className="inline-flex items-center px-1 py-0.5 rounded bg-white/25" style={{ fontSize: '9px' }}>
@@ -523,9 +538,9 @@ export default function AgendaPage() {
                                   👥 {(item.consultationTherapists || []).length}
                                 </span>
                               )}
-                              {(item.conflicts || []).length > 0 && (
+                              {itemConflicts.length > 0 && (
                                 <span
-                                  title={(item.conflicts || []).map(c => c.description || c.conflictType).join('\n')}
+                                  title={conflictTooltip}
                                   className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded text-red-700 bg-red-100"
                                   style={{ fontSize: '9px' }}
                                 >
@@ -562,7 +577,7 @@ export default function AgendaPage() {
                 })}
                 {/* Weekend block cards */}
                 {weekendBlocks.map(block => {
-                  const hasConflict = blockHasConflict(block, consultations)
+                  const conflictTooltip = buildConflictTooltip(conflictMap[block.id] || [], { therapists, rooms })
                   return (
                     <BlockCard
                       key={block.id}
@@ -571,7 +586,7 @@ export default function AgendaPage() {
                       onEdit={() => { setEditBlock(block); setShowBlockModal(true) }}
                       isAdmin={user?.role === 'admin'}
                       userId={user?.id}
-                      hasConflict={hasConflict}
+                      conflictTooltip={conflictTooltip}
                     />
                   )
                 })}
@@ -653,6 +668,8 @@ export default function AgendaPage() {
                   const therapist = getTherapist(item.therapistId)
                   const room = getRoom(item.roomId)
                   const style = cardStyle(item)
+                  const itemConflicts = conflictMap[item.id] || []
+                  const conflictTooltip = buildConflictTooltip(itemConflicts, { therapists, rooms })
                   return (
                     <div key={item.id} className="flex items-center gap-3 p-4">
                       <div className="w-1 self-stretch rounded-full shrink-0" style={{ backgroundColor: style.backgroundColor }} />
@@ -664,7 +681,7 @@ export default function AgendaPage() {
                         <div className="text-xs text-gray-500 truncate">
                           {isPrivate ? (room?.name || '') : `${therapist?.name}${room ? ` • ${room.name}` : ''}`}
                         </div>
-                        {(item.seriesId || (item.consultationTherapists || []).length > 1 || (item.conflicts || []).length > 0) && (
+                        {(item.seriesId || (item.consultationTherapists || []).length > 1 || itemConflicts.length > 0) && (
                           <div className="flex items-center gap-1 mt-1 flex-wrap">
                             {item.seriesId && !item.isSeriesException && (
                               <span title="Recorrente" className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs bg-indigo-50 text-indigo-500">
@@ -684,12 +701,12 @@ export default function AgendaPage() {
                                 👥 {(item.consultationTherapists || []).length}
                               </span>
                             )}
-                            {(item.conflicts || []).length > 0 && (
+                            {itemConflicts.length > 0 && (
                               <span
-                                title={(item.conflicts || []).map(c => c.description || c.conflictType).join('\n')}
+                                title={conflictTooltip}
                                 className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs bg-red-50 text-red-600"
                               >
-                                ⚠ {(item.conflicts || []).length}
+                                ⚠ {itemConflicts.length}
                               </span>
                             )}
                           </div>
@@ -717,6 +734,8 @@ export default function AgendaPage() {
                   const blockTherapist = getTherapist(block.therapistId)
                   const canEditBlock = user?.role === 'admin' || user?.id === block.therapistId
                   const isRigid = block.blockType === 'RIGID'
+                  const blockConflicts = conflictMap[block.id] || []
+                  const blockConflictTooltip = buildConflictTooltip(blockConflicts, { therapists, rooms })
                   return (
                     <div key={block.id} className="flex items-center gap-3 p-4 bg-gray-50">
                       <div className={`w-1 self-stretch rounded-full shrink-0 ${isRigid ? 'bg-gray-500' : 'bg-gray-300'}`} />
@@ -736,8 +755,8 @@ export default function AgendaPage() {
                           }`}>
                             {isRigid ? 'Rígido' : 'Flex'}
                           </span>
-                          {blockHasConflict(block, consultations) && (
-                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs bg-red-50 text-red-600">⚠ Conflito</span>
+                          {blockConflicts.length > 0 && (
+                            <span title={blockConflictTooltip} className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs bg-red-50 text-red-600">⚠ Conflito</span>
                           )}
                         </div>
                       </div>
