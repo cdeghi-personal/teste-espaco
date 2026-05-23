@@ -173,9 +173,24 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
   }
 
   function proceedSave(conflicts) {
-    if (hasSeries && (isAdmin || user?.id === initial.therapistId)) {
-      setPendingConflicts(conflicts)
-      setConfirmSeriesEdit(true)
+    const canShowSeriesDialog = hasSeries && (isAdmin || user?.id === initial.therapistId)
+    if (canShowSeriesDialog) {
+      // Only ask scope when a propagatable (structural) field actually changed.
+      // Note fields (mainObjective, sessionReport, nextObjective) are always per-session
+      // and are never sent to updateConsultationSeries, so no dialog is needed for them.
+      const structuralFields = ['time', 'roomId', 'appointmentTypeId', 'therapistId', 'specialty']
+      const hasStructuralChange = structuralFields.some(
+        f => String(form[f] ?? '') !== String(initial[f] ?? '')
+      )
+      if (hasStructuralChange) {
+        setPendingConflicts(conflicts)
+        setConfirmSeriesEdit(true)
+        return
+      }
+      // Notes-only change: save directly without marking as exception
+      if (isEdit) updateConsultation(initial.id, { ...form, conflicts })
+      else addConsultation({ ...form, conflicts })
+      onClose()
       return
     }
     const saveData = hasSeries ? { ...form, isSeriesException: true } : form
