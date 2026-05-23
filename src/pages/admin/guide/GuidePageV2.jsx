@@ -273,7 +273,7 @@ export default function GuidePageV2() {
           <h1>Tudo que você precisa<br />para <span>cuidar melhor</span></h1>
           <p>Do agendamento ao relatório de convênio — uma plataforma completa criada especialmente para a equipe do Espaço Casa Amarela.</p>
           <div className="hero-stats">
-            {[['11', 'módulos\nintegrados'], ['IA', 'sugestão de texto\npara convênio'], ['PDF', 'relatórios prontos\npara download']].map(([num, lbl]) => (
+            {[['20', 'módulos\nintegrados'], ['IA', 'sugestão de texto\npara convênio'], ['PDF', 'relatórios prontos\npara download']].map(([num, lbl]) => (
               <div key={num} className="stat-chip">
                 <div className="num">{num}</div>
                 <div className="lbl" style={{ whiteSpace: 'pre-line' }}>{lbl}</div>
@@ -503,6 +503,7 @@ export default function GuidePageV2() {
           {/* CRM */}
           <p className="sec-title">📬 CRM de Contatos</p>
           <p className="sec-sub">Gerencie todos os leads que chegam pelo formulário do site público.</p>
+          <SectionImage src="/Tela_Contatos.png" alt="Tela de CRM de Contatos" />
           <div className="grid">
             <Card delay={0.05} icon="📥" bg="#eff6ff" title="Captação automática" desc="Todo contato enviado pelo site público aparece automaticamente. Um banner vermelho no dashboard avisa quando há novos contatos aguardando." tags={[['Integrado ao site', 'blue']]} />
             <Card delay={0.10} icon="🔄" bg="#f0fdf4" title="Workflow de status" desc="Acompanhe cada lead: Novo → Em Contato → Agendado → Convertido ou Sem Interesse. Notas internas e responsável por atendimento." tags={[['Pipeline', 'green']]} />
@@ -513,6 +514,7 @@ export default function GuidePageV2() {
           {/* Pagamentos */}
           <p className="sec-title">💳 Controle de Pagamentos</p>
           <p className="sec-sub">Histórico centralizado de todas as faturas geradas a partir dos Demonstrativos de Pagamento.</p>
+          <SectionImage src="/Tela_Pagamentos.png" alt="Tela de Controle de Pagamentos" />
           <div className="grid">
             <Card delay={0.05} icon="📄" bg="#eff6ff" title="Faturas registradas" desc="Cada Demonstrativo Definitivo gera uma fatura (NF) automaticamente. Acompanhe número da NF, paciente, período, total e status em uma lista paginada." tags={[['Histórico completo', 'blue']]} />
             <Card delay={0.10} icon="🔄" bg="#f0fdf4" title="Ciclo de vida da fatura" desc="Emitida → Paga (ao confirmar recebimento) ou Cancelada (restaura o status anterior dos atendimentos e limpa os campos de NF). Cada transição exige confirmação explícita." tags={[['Rastreável', 'green']]} />
