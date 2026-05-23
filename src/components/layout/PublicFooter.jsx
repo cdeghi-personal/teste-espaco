@@ -61,7 +61,7 @@ export default function PublicFooter() {
             <ul className="space-y-3">
               <li className="flex items-start gap-2 text-sm text-blue-200">
                 <FiMapPin size={15} className="mt-0.5 shrink-0 text-brand-yellow" />
-                Rua das Crianças, 123<br />São Paulo - SP
+                Rua Almirante Protógenes, 143<br />Jardim, Santo André - SP
               </li>
               <li className="flex items-center gap-2 text-sm text-blue-200">
                 <FiPhone size={15} className="shrink-0 text-brand-yellow" />
@@ -81,8 +81,9 @@ export default function PublicFooter() {
           </div>
         </div>
 
-        <div className="border-t border-white/10 mt-10 pt-6 text-center text-xs text-blue-300">
-          © {new Date().getFullYear()} Espaço Casa Amarela — Todos os direitos reservados.
+        <div className="border-t border-white/10 mt-10 pt-6 flex items-center justify-between text-xs text-blue-300 flex-wrap gap-2">
+          <span>© {new Date().getFullYear()} Espaço Casa Amarela — Todos os direitos reservados.</span>
+          <span>Powered by ©DGT</span>
         </div>
       </div>
     </footer>

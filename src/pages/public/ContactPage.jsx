@@ -222,9 +222,9 @@ export default function ContactPage() {
               <h2 className="text-2xl font-bold text-gray-900">Informações de Contato</h2>
 
               {[
-                { icon: FiMapPin, title: 'Endereço', content: 'Rua das Crianças, 123\nSão Paulo - SP, CEP 01234-567' },
-                { icon: FiPhone, title: 'Telefone / WhatsApp', content: '(11) 9 9999-9999' },
-                { icon: FiMail, title: 'E-mail', content: 'contato@casaamarela.com.br' },
+                { icon: FiMapPin, title: 'Endereço', content: 'Rua Almirante Protógenes, 143\nJardim, Santo André - SP\nCEP 09090-760' },
+                { icon: FiPhone, title: 'Telefone / WhatsApp', content: '(11) 9 7579-9590' },
+                { icon: FiMail, title: 'E-mail', content: 'contatocasa.amarela2024@gmail.com' },
                 { icon: FiClock, title: 'Horário de Atendimento', content: 'Segunda a Sexta: 8h às 18h\nSábado: 8h às 12h' },
               ].map(({ icon: Icon, title, content }) => (
                 <div key={title} className="flex gap-4">
@@ -240,7 +240,7 @@ export default function ContactPage() {
 
               <div className="mt-6">
                 <a
-                  href="https://wa.me/5511999999999"
+                  href="https://wa.me/5511975799590"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center justify-center gap-3 bg-green-500 text-white font-bold px-6 py-3.5 rounded-xl hover:bg-green-600 transition-all"

@@ -198,6 +198,7 @@ export default function AdminSidebar({ open, onClose }) {
           <FiLogOut size={16} />
           Sair
         </button>
+        <p className="text-center text-xs text-gray-400 mt-2">Powered by ©DGT</p>
       </div>
     </aside>
   )

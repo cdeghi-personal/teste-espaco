@@ -180,6 +180,26 @@ function InvoiceCard({ invoice, consultationStatuses, onView, onCancel, onPaid }
   )
 }
 
+// ─── helpers de mês ───────────────────────────────────────────────────────────
+
+function monthRange(offset) {
+  const d = new Date()
+  const y = d.getFullYear()
+  const m = d.getMonth() + offset
+  const first = new Date(y, m, 1)
+  const last = new Date(y, m + 1, 0)
+  const pad = n => String(n).padStart(2, '0')
+  const fmt = x => `${x.getFullYear()}-${pad(x.getMonth() + 1)}-${pad(x.getDate())}`
+  return { from: fmt(first), to: fmt(last) }
+}
+
+function monthBtnLabel(offset) {
+  if (offset === 0) return 'Mês Atual'
+  const d = new Date()
+  const t = new Date(d.getFullYear(), d.getMonth() + offset, 1)
+  return t.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '') + '/' + String(t.getFullYear()).slice(2)
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function PaymentsPage() {
@@ -190,8 +210,8 @@ export default function PaymentsPage() {
   const [loading, setLoading]           = useState(true)
   const [search, setSearch]             = useState('')
   const [filterStatus, setFilterStatus] = useState('')
-  const [dateFrom, setDateFrom]         = useState('')
-  const [dateTo, setDateTo]             = useState('')
+  const [dateFrom, setDateFrom]         = useState(() => monthRange(0).from)
+  const [dateTo, setDateTo]             = useState(() => monthRange(0).to)
 
   const [viewInvoice, setViewInvoice]   = useState(null)
   const [confirmAction, setConfirmAction] = useState(null) // { type: 'cancel'|'paid', invoice }
@@ -257,7 +277,7 @@ export default function PaymentsPage() {
   }
 
   return (
-    <div className="p-3 md:p-6 space-y-4 max-w-4xl mx-auto">
+    <div className="p-3 md:p-6 space-y-4 max-w-5xl mx-auto">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -278,41 +298,60 @@ export default function PaymentsPage() {
       </div>
 
       {/* Filtros */}
-      <div className="flex flex-col sm:flex-row gap-2">
-        <div className="relative flex-1">
-          <FiSearch size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Buscar por NF ou paciente..."
-            className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-brand-blue outline-none bg-white"
-          />
+      <div className="space-y-2">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {[-2, -1, 0].map(offset => {
+            const { from, to } = monthRange(offset)
+            const isActive = dateFrom === from && dateTo === to
+            return (
+              <button
+                key={offset}
+                onClick={() => { setDateFrom(from); setDateTo(to) }}
+                className={`px-2.5 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all ${
+                  isActive ? 'bg-brand-blue text-white' : 'bg-white border border-gray-200 text-gray-600 hover:border-gray-300'
+                }`}
+              >
+                {monthBtnLabel(offset)}
+              </button>
+            )
+          })}
         </div>
-        <select
-          value={filterStatus}
-          onChange={e => setFilterStatus(e.target.value)}
-          className="px-3 py-2 text-sm border border-gray-200 rounded-xl bg-white focus:ring-2 focus:ring-brand-blue outline-none"
-        >
-          <option value="">Todos os Status</option>
-          <option value="ISSUED">Emitida</option>
-          <option value="PAID">Paga</option>
-          <option value="CANCELLED">Cancelada</option>
-        </select>
-        <div className="flex gap-2">
-          <input
-            type="date"
-            value={dateFrom}
-            onChange={e => setDateFrom(e.target.value)}
+        <div className="flex flex-col sm:flex-row gap-2">
+          <div className="relative flex-1">
+            <FiSearch size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Buscar por NF ou paciente..."
+              className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-brand-blue outline-none bg-white"
+            />
+          </div>
+          <select
+            value={filterStatus}
+            onChange={e => setFilterStatus(e.target.value)}
             className="px-3 py-2 text-sm border border-gray-200 rounded-xl bg-white focus:ring-2 focus:ring-brand-blue outline-none"
-            title="Emissão a partir de"
-          />
-          <input
-            type="date"
-            value={dateTo}
-            onChange={e => setDateTo(e.target.value)}
-            className="px-3 py-2 text-sm border border-gray-200 rounded-xl bg-white focus:ring-2 focus:ring-brand-blue outline-none"
-            title="Emissão até"
-          />
+          >
+            <option value="">Todos os Status</option>
+            <option value="ISSUED">Emitida</option>
+            <option value="PAID">Paga</option>
+            <option value="CANCELLED">Cancelada</option>
+          </select>
+          <div className="flex gap-2">
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={e => setDateFrom(e.target.value)}
+              className="px-3 py-2 text-sm border border-gray-200 rounded-xl bg-white focus:ring-2 focus:ring-brand-blue outline-none"
+              title="Emissão a partir de"
+            />
+            <input
+              type="date"
+              value={dateTo}
+              onChange={e => setDateTo(e.target.value)}
+              className="px-3 py-2 text-sm border border-gray-200 rounded-xl bg-white focus:ring-2 focus:ring-brand-blue outline-none"
+              title="Emissão até"
+            />
+          </div>
         </div>
       </div>
 

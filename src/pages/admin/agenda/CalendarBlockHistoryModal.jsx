@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { FiEdit2, FiXCircle } from 'react-icons/fi'
+import { FiEdit2, FiXCircle, FiSearch } from 'react-icons/fi'
 import Modal from '../../../components/ui/Modal'
 import Button from '../../../components/ui/Button'
 import { useData } from '../../../context/DataContext'
@@ -7,6 +7,25 @@ import { useAuth } from '../../../context/AuthContext'
 import Spinner from '../../../components/ui/Spinner'
 import { useToast } from '../../../components/ui/Toast'
 import CalendarBlockFormModal from './CalendarBlockFormModal'
+
+function monthRange(offset) {
+  const d = new Date()
+  const y = d.getFullYear()
+  const m = d.getMonth() + offset
+  const first = new Date(y, m, 1)
+  const last = new Date(y, m + 1, 0)
+  const pad = n => String(n).padStart(2, '0')
+  const fmt = x => `${x.getFullYear()}-${pad(x.getMonth() + 1)}-${pad(x.getDate())}`
+  return { from: fmt(first), to: fmt(last) }
+}
+
+function monthBtnLabel(offset) {
+  if (offset === 0) return 'Mês Atual'
+  if (offset === 1) return 'Mês+1'
+  const d = new Date()
+  const t = new Date(d.getFullYear(), d.getMonth() + offset, 1)
+  return t.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '') + '/' + String(t.getFullYear()).slice(2)
+}
 
 export default function CalendarBlockHistoryModal({ onClose, therapistId }) {
   const { therapists, getCalendarBlockHistory, cancelCalendarBlock } = useData()
@@ -19,6 +38,13 @@ export default function CalendarBlockHistoryModal({ onClose, therapistId }) {
   const [editBlock, setEditBlock] = useState(null)
   const [cancelConfirm, setCancelConfirm] = useState(null)
   const [cancelLoading, setCancelLoading] = useState(false)
+
+  const [filterSearch, setFilterSearch]       = useState('')
+  const [filterStatus, setFilterStatus]       = useState('')
+  const [filterType, setFilterType]           = useState('')
+  const [filterTherapist, setFilterTherapist] = useState('')
+  const [filterDateFrom, setFilterDateFrom]   = useState(() => monthRange(0).from)
+  const [filterDateTo, setFilterDateTo]       = useState(() => monthRange(0).to)
 
   function reload() {
     setLoading(true)
@@ -53,6 +79,21 @@ export default function CalendarBlockHistoryModal({ onClose, therapistId }) {
     if (!t) return '—'
     return t.slice(0, 5)
   }
+
+  const filtered = blocks.filter(b => {
+    if (filterSearch) {
+      const s = filterSearch.toLowerCase()
+      const tName = getTherapistName(b.therapistId).toLowerCase()
+      if (!tName.includes(s) && !(b.description || '').toLowerCase().includes(s)) return false
+    }
+    if (filterStatus === 'active' && b.cancelled) return false
+    if (filterStatus === 'cancelled' && !b.cancelled) return false
+    if (filterType && b.blockType !== filterType) return false
+    if (filterTherapist && b.therapistId !== filterTherapist) return false
+    if (filterDateFrom && b.date < filterDateFrom) return false
+    if (filterDateTo && b.date > filterDateTo) return false
+    return true
+  })
 
   async function handleCancel() {
     if (!cancelConfirm) return
@@ -106,6 +147,8 @@ export default function CalendarBlockHistoryModal({ onClose, therapistId }) {
     )
   }
 
+  const activeTherapists = therapists.filter(t => t.active !== false)
+
   return (
     <Modal
       title="Histórico de Bloqueios de Agenda"
@@ -113,11 +156,85 @@ export default function CalendarBlockHistoryModal({ onClose, therapistId }) {
       size="lg"
       footer={<Button variant="ghost" onClick={onClose}>Fechar</Button>}
     >
+      {/* Filtros */}
+      <div className="space-y-2 mb-4">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {[-2, -1, 0, 1].map(offset => {
+            const { from, to } = monthRange(offset)
+            const isActive = filterDateFrom === from && filterDateTo === to
+            return (
+              <button
+                key={offset}
+                onClick={() => { setFilterDateFrom(from); setFilterDateTo(to) }}
+                className={`px-2.5 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all ${
+                  isActive ? 'bg-brand-blue text-white' : 'bg-white border border-gray-200 text-gray-600 hover:border-gray-300'
+                }`}
+              >
+                {monthBtnLabel(offset)}
+              </button>
+            )
+          })}
+          <div className="flex gap-1.5 ml-auto">
+            <input
+              type="date"
+              value={filterDateFrom}
+              onChange={e => setFilterDateFrom(e.target.value)}
+              className="px-2 py-1.5 text-xs border border-gray-200 rounded-lg bg-white focus:ring-2 focus:ring-brand-blue outline-none"
+            />
+            <input
+              type="date"
+              value={filterDateTo}
+              onChange={e => setFilterDateTo(e.target.value)}
+              className="px-2 py-1.5 text-xs border border-gray-200 rounded-lg bg-white focus:ring-2 focus:ring-brand-blue outline-none"
+            />
+          </div>
+        </div>
+        <div className="flex flex-col sm:flex-row gap-2">
+          <div className="relative flex-1">
+            <FiSearch size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              value={filterSearch}
+              onChange={e => setFilterSearch(e.target.value)}
+              placeholder="Buscar descrição ou terapeuta..."
+              className="w-full pl-8 pr-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue outline-none bg-white"
+            />
+          </div>
+          <select
+            value={filterStatus}
+            onChange={e => setFilterStatus(e.target.value)}
+            className="px-2.5 py-1.5 text-sm border border-gray-200 rounded-lg bg-white focus:ring-2 focus:ring-brand-blue outline-none"
+          >
+            <option value="">Status: Todos</option>
+            <option value="active">Ativo</option>
+            <option value="cancelled">Cancelado</option>
+          </select>
+          <select
+            value={filterType}
+            onChange={e => setFilterType(e.target.value)}
+            className="px-2.5 py-1.5 text-sm border border-gray-200 rounded-lg bg-white focus:ring-2 focus:ring-brand-blue outline-none"
+          >
+            <option value="">Tipo: Todos</option>
+            <option value="RIGID">Rígido</option>
+            <option value="FLEX">Flex</option>
+          </select>
+          {isAdmin && (
+            <select
+              value={filterTherapist}
+              onChange={e => setFilterTherapist(e.target.value)}
+              className="px-2.5 py-1.5 text-sm border border-gray-200 rounded-lg bg-white focus:ring-2 focus:ring-brand-blue outline-none"
+            >
+              <option value="">Todos os Terapeutas</option>
+              {activeTherapists.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+            </select>
+          )}
+        </div>
+      </div>
+
       {loading ? (
         <div className="flex justify-center py-10">
           <Spinner />
         </div>
-      ) : blocks.length === 0 ? (
+      ) : filtered.length === 0 ? (
         <p className="text-sm text-gray-500 py-6 text-center">Nenhum bloqueio encontrado.</p>
       ) : (
         <div className="overflow-x-auto">
@@ -134,7 +251,7 @@ export default function CalendarBlockHistoryModal({ onClose, therapistId }) {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {blocks.map(b => {
+              {filtered.map(b => {
                 const canEdit = isAdmin || user?.id === b.therapistId
                 return (
                   <tr key={b.id} className={b.cancelled ? 'opacity-50' : ''}>

@@ -37,7 +37,7 @@ function formatDay(date) {
   return format(date, "EEE dd/MM", { locale: ptBR })
 }
 
-function BlockCard({ block, therapist, onEdit, isAdmin, userId }) {
+function BlockCard({ block, therapist, onEdit, isAdmin, userId, hasConflict }) {
   const canEdit = isAdmin || userId === block.therapistId
   const isRigid = block.blockType === 'RIGID'
   const cardCls = isRigid
@@ -72,6 +72,9 @@ function BlockCard({ block, therapist, onEdit, isAdmin, userId }) {
         <span className={`px-1 rounded shrink-0 ${chipCls}`} style={{ fontSize: '9px' }}>
           {isRigid ? 'Rígido' : 'Flex'}
         </span>
+        {hasConflict && (
+          <span title="Atendimento conflitante" className="shrink-0 px-0.5 rounded text-red-600 bg-red-100" style={{ fontSize: '9px' }}>⚠</span>
+        )}
       </div>
       {canEdit && (
         <div className="absolute top-1 right-1 hidden group-hover:flex gap-0.5">
@@ -428,16 +431,20 @@ export default function AgendaPage() {
                   )
                 })}
                 {/* Block cards */}
-                {dayBlocks.map(block => (
-                  <BlockCard
-                    key={block.id}
-                    block={block}
-                    therapist={getTherapist(block.therapistId)}
-                    onEdit={() => { setEditBlock(block); setShowBlockModal(true) }}
-                    isAdmin={user?.role === 'admin'}
-                    userId={user?.id}
-                  />
-                ))}
+                {dayBlocks.map(block => {
+                  const hasConflict = consultations.some(c => (c.conflicts || []).some(cf => !cf.resolved && cf.calendarBlockId === block.id))
+                  return (
+                    <BlockCard
+                      key={block.id}
+                      block={block}
+                      therapist={getTherapist(block.therapistId)}
+                      onEdit={() => { setEditBlock(block); setShowBlockModal(true) }}
+                      isAdmin={user?.role === 'admin'}
+                      userId={user?.id}
+                      hasConflict={hasConflict}
+                    />
+                  )
+                })}
                   </>
                 )}
               </div>
@@ -535,16 +542,20 @@ export default function AgendaPage() {
                   )
                 })}
                 {/* Weekend block cards */}
-                {weekendBlocks.map(block => (
-                  <BlockCard
-                    key={block.id}
-                    block={block}
-                    therapist={getTherapist(block.therapistId)}
-                    onEdit={() => { setEditBlock(block); setShowBlockModal(true) }}
-                    isAdmin={user?.role === 'admin'}
-                    userId={user?.id}
-                  />
-                ))}
+                {weekendBlocks.map(block => {
+                  const hasConflict = consultations.some(c => (c.conflicts || []).some(cf => !cf.resolved && cf.calendarBlockId === block.id))
+                  return (
+                    <BlockCard
+                      key={block.id}
+                      block={block}
+                      therapist={getTherapist(block.therapistId)}
+                      onEdit={() => { setEditBlock(block); setShowBlockModal(true) }}
+                      isAdmin={user?.role === 'admin'}
+                      userId={user?.id}
+                      hasConflict={hasConflict}
+                    />
+                  )
+                })}
                   </>
                 )}
               </div>
@@ -700,11 +711,16 @@ export default function AgendaPage() {
                           )}
                           <span>{blockTherapist?.name || '—'}{block.description ? ` • ${block.description}` : ''}</span>
                         </div>
-                        <span className={`mt-1 inline-block px-1.5 py-0.5 rounded text-xs font-medium ${
-                          isRigid ? 'bg-gray-200 text-gray-700' : 'bg-gray-100 text-gray-500'
-                        }`}>
-                          {isRigid ? 'Rígido' : 'Flex'}
-                        </span>
+                        <div className="flex items-center gap-1 mt-1 flex-wrap">
+                          <span className={`inline-block px-1.5 py-0.5 rounded text-xs font-medium ${
+                            isRigid ? 'bg-gray-200 text-gray-700' : 'bg-gray-100 text-gray-500'
+                          }`}>
+                            {isRigid ? 'Rígido' : 'Flex'}
+                          </span>
+                          {consultations.some(c => (c.conflicts || []).some(cf => !cf.resolved && cf.calendarBlockId === block.id)) && (
+                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs bg-red-50 text-red-600">⚠ Conflito</span>
+                          )}
+                        </div>
                       </div>
                       {canEditBlock && (
                         <div className="flex gap-1 shrink-0">

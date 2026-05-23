@@ -1,5 +1,24 @@
 import { useState } from 'react'
 import { FiPlus, FiSearch, FiClipboard, FiChevronDown, FiChevronUp, FiEdit2, FiTrash2, FiEye, FiRepeat } from 'react-icons/fi'
+
+function monthRange(offset) {
+  const d = new Date()
+  const y = d.getFullYear()
+  const m = d.getMonth() + offset
+  const first = new Date(y, m, 1)
+  const last = new Date(y, m + 1, 0)
+  const pad = n => String(n).padStart(2, '0')
+  const fmt = x => `${x.getFullYear()}-${pad(x.getMonth() + 1)}-${pad(x.getDate())}`
+  return { from: fmt(first), to: fmt(last) }
+}
+
+function monthBtnLabel(offset) {
+  if (offset === 0) return 'Mês Atual'
+  if (offset === 1) return 'Mês+1'
+  const d = new Date()
+  const t = new Date(d.getFullYear(), d.getMonth() + offset, 1)
+  return t.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '') + '/' + String(t.getFullYear()).slice(2)
+}
 import HelpButton from '../../../components/ui/HelpButton'
 import { useData } from '../../../context/DataContext'
 import { useAuth } from '../../../context/AuthContext'
@@ -16,6 +35,8 @@ export default function ConsultationsPage() {
   const { user } = useAuth()
   const [search, setSearch] = useState('')
   const [filterSpecialty, setFilterSpecialty] = useState('')
+  const [filterDateFrom, setFilterDateFrom] = useState(() => monthRange(0).from)
+  const [filterDateTo, setFilterDateTo]     = useState(() => monthRange(0).to)
   const [showModal, setShowModal] = useState(false)
   const [editConsultation, setEditConsultation] = useState(null)
   const [viewConsultation, setViewConsultation] = useState(null)
@@ -55,7 +76,8 @@ export default function ConsultationsPage() {
       const patient = getPatient(c.patientId)
       const matchSearch = !search || patient?.fullName.toLowerCase().includes(search.toLowerCase())
       const matchSpecialty = !filterSpecialty || c.specialty === filterSpecialty
-      return matchSearch && matchSpecialty
+      const matchDate = (!filterDateFrom || c.date >= filterDateFrom) && (!filterDateTo || c.date <= filterDateTo)
+      return matchSearch && matchSpecialty && matchDate
     })
     .sort((a, b) => b.date.localeCompare(a.date))
 
@@ -104,7 +126,25 @@ export default function ConsultationsPage() {
         </div>
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-2">
+      <div className="space-y-2">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {[-2, -1, 0, 1].map(offset => {
+            const { from, to } = monthRange(offset)
+            const isActive = filterDateFrom === from && filterDateTo === to
+            return (
+              <button
+                key={offset}
+                onClick={() => { setFilterDateFrom(from); setFilterDateTo(to) }}
+                className={`px-2.5 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all ${
+                  isActive ? 'bg-brand-blue text-white' : 'bg-white border border-gray-200 text-gray-600 hover:border-gray-300'
+                }`}
+              >
+                {monthBtnLabel(offset)}
+              </button>
+            )
+          })}
+        </div>
+        <div className="flex flex-col sm:flex-row gap-2">
         <div className="relative flex-1">
           <FiSearch size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
@@ -137,6 +177,7 @@ export default function ConsultationsPage() {
             <span className="sm:hidden">Meus</span>
           </button>
         )}
+        </div>
       </div>
 
       <div className="space-y-3">
