@@ -1,5 +1,4 @@
 import { useState, useMemo } from 'react'
-import { FiVideo, FiMapPin } from 'react-icons/fi'
 import Modal from '../../../components/ui/Modal'
 import Button from '../../../components/ui/Button'
 import Input from '../../../components/ui/Input'
@@ -34,11 +33,6 @@ export default function SeriesFormModal({ onClose }) {
     appointmentTypeId: '',
     roomId: '',
     time: '',
-    eventType: 'SESSION',
-    interviewFormat: '',
-    meetingPlatform: '',
-    meetingLink: '',
-    intervieweeName: '',
     recurrenceType: 'by_count',
     recurrenceDays: [1],
     startDate: isoToday(),
@@ -159,11 +153,11 @@ export default function SeriesFormModal({ onClose }) {
         appointmentTypeId:     form.appointmentTypeId || null,
         roomId:                form.roomId || null,
         time:                  form.time,
-        eventType:             form.eventType || 'SESSION',
-        interviewFormat:       form.interviewFormat || null,
-        meetingPlatform:       form.meetingPlatform || null,
-        meetingLink:           form.meetingLink || null,
-        intervieweeName:       form.intervieweeName || null,
+        eventType:             'SESSION',
+        interviewFormat:       null,
+        meetingPlatform:       null,
+        meetingLink:           null,
+        intervieweeName:       null,
         recurrenceType:        form.recurrenceType,
         recurrenceDays:        form.recurrenceDays,
         startDate:             form.startDate,
@@ -278,82 +272,17 @@ export default function SeriesFormModal({ onClose }) {
             Configuração do Atendimento
           </h3>
           <div className="space-y-3">
-            {/* Tipo do Evento */}
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Tipo:</span>
-              {[{ v: 'SESSION', l: 'Atendimento' }, { v: 'INTERVIEW', l: 'Entrevista' }].map(({ v, l }) => (
-                <button key={v} type="button"
-                  onClick={() => {
-                    set('eventType', v)
-                    if (v === 'SESSION') { set('interviewFormat', ''); set('meetingPlatform', ''); set('meetingLink', '') }
-                  }}
-                  className={`px-3 py-1 rounded-lg text-xs font-medium border transition-all ${
-                    form.eventType === v ? 'bg-teal-600 text-white border-teal-600' : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'
-                  }`}
-                >{l}</button>
-              ))}
-              {form.eventType === 'INTERVIEW' && (
-                <>
-                  <span className="text-gray-300 mx-1">|</span>
-                  <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Formato:</span>
-                  {[{ v: 'PRESENTIAL', l: 'Presencial' }, { v: 'REMOTE', l: 'Remoto' }].map(({ v, l }) => (
-                    <button key={v} type="button"
-                      onClick={() => {
-                        set('interviewFormat', v)
-                        if (v === 'REMOTE') set('roomId', '')
-                        else { set('meetingPlatform', ''); set('meetingLink', '') }
-                      }}
-                      className={`px-3 py-1 rounded-lg text-xs font-medium border transition-all ${
-                        form.interviewFormat === v ? 'bg-teal-600 text-white border-teal-600' : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'
-                      }`}
-                    >
-                      {v === 'PRESENTIAL' ? <FiMapPin size={10} className="inline mr-1" /> : <FiVideo size={10} className="inline mr-1" />}
-                      {l}
-                    </button>
-                  ))}
-                </>
-              )}
-            </div>
-            {form.eventType === 'INTERVIEW' && (
-              <Input
-                label="Nome(s) do(s) entrevistado(s)"
-                value={form.intervieweeName}
-                onChange={e => set('intervieweeName', e.target.value)}
-                placeholder="Ex: Maria (responsável)"
-              />
-            )}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <Input label="Horário *" type="time" value={form.time} onChange={e => set('time', e.target.value)} error={errors.time} />
-              {form.eventType === 'INTERVIEW' && form.interviewFormat === 'REMOTE' ? (
-                <>
-                  <Select label="Plataforma" value={form.meetingPlatform} onChange={e => set('meetingPlatform', e.target.value)}>
-                    <option value="">Selecione</option>
-                    <option value="GOOGLE_MEET">Google Meet</option>
-                    <option value="TEAMS">Microsoft Teams</option>
-                    <option value="ZOOM">Zoom</option>
-                    <option value="OTHER">Outra</option>
-                  </Select>
-                  <Input label="Link da Reunião" value={form.meetingLink} onChange={e => set('meetingLink', e.target.value)} placeholder="https://..." />
-                </>
-              ) : (
-                <>
-                  <Select label="Sala" value={form.roomId} onChange={e => set('roomId', e.target.value)}>
-                    <option value="">Sem sala</option>
-                    {activeRooms.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
-                  </Select>
-                  <Select label="Tipo de Atendimento" value={form.appointmentTypeId} onChange={e => set('appointmentTypeId', e.target.value)}>
-                    <option value="">Selecione</option>
-                    {activeAppointmentTypes.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                  </Select>
-                </>
-              )}
-            </div>
-            {form.eventType === 'INTERVIEW' && form.interviewFormat === 'REMOTE' && (
+              <Select label="Sala" value={form.roomId} onChange={e => set('roomId', e.target.value)}>
+                <option value="">Sem sala</option>
+                {activeRooms.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+              </Select>
               <Select label="Tipo de Atendimento" value={form.appointmentTypeId} onChange={e => set('appointmentTypeId', e.target.value)}>
                 <option value="">Selecione</option>
                 {activeAppointmentTypes.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
               </Select>
-            )}
+            </div>
             <Select label="Status Inicial (opcional)" value={form.consultationStatusId} onChange={e => set('consultationStatusId', e.target.value)}>
               <option value="">Sem status definido</option>
               {activeStatuses.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
