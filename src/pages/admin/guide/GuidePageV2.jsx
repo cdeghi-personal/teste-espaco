@@ -307,6 +307,7 @@ export default function GuidePageV2() {
             <Card delay={0.10} icon="✏️" bg="#f0fdf4" title="Crie e edite na hora" desc="Novo atendimento ou edição com um clique direto na agenda. Campos de paciente, terapeuta, especialidade, horário e sala." tags={[['Rápido', 'green']]} />
             <Card delay={0.15} icon="🎨" bg="#faf5ff" title="Legenda por terapeuta" desc="Cada terapeuta tem uma cor própria. A legenda inferior mostra o nome completo de cada profissional." />
             <Card delay={0.20} icon="🔍" bg="#fff7ed" title={'Filtro "Minha Agenda"'} desc="Terapeutas veem automaticamente apenas seus próprios atendimentos. Administradores têm visão de toda a equipe." tags={[['Personalizado', 'orange']]} />
+            <Card delay={0.25} icon="🎤" bg="#fff7ed" title="Entrevistas" desc="Registre entrevistas com responsáveis ou candidatos — presenciais ou remotas. Chip laranja identifica entrevistas na agenda. Entrevistas remotas exibem plataforma e link de acesso direto pelo card." tags={[['Presencial ou Remota', 'orange']]} />
           </div>
         </div>
 
@@ -345,6 +346,7 @@ export default function GuidePageV2() {
             <Card delay={0.20} icon="🔒" bg="#faf5ff" title="Controle de acesso" desc="Cada terapeuta edita e exclui apenas os próprios atendimentos. O administrador tem acesso completo a todos os registros." tags={[['Seguro', 'violet']]} />
             <Card delay={0.25} icon="🔁" bg="#eff6ff" title="Recorrência em Série" desc='Crie múltiplos atendimentos recorrentes de uma vez com o botão "Série". Escolha dias da semana, número de sessões ou data final. Edite um item ou todos os próximos.' tags={[['Agilidade', 'blue']]} />
             <Card delay={0.30} icon="👥" bg="#f0fdf4" title="Múltiplos Terapeutas" desc="Adicione terapeutas secundários a um atendimento quando a sessão é multidisciplinar. Cada participante aparece no relatório com sua própria especialidade e valor de repasse." tags={[['Multidisciplinar', 'green']]} />
+            <Card delay={0.35} icon="🎤" bg="#fff7ed" title="Entrevistas" desc="Registre entrevistas com responsáveis ou candidatos. Paciente é opcional; o campo entrevistado é obrigatório. Entrevistas remotas têm plataforma + link de acesso e não exigem sala. Não impactam ledger pré-pago nem faturamento." tags={[['Presencial ou Remota', 'orange']]} />
           </div>
         </div>
 

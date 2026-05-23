@@ -128,7 +128,8 @@ export default function ConsultationsPage() {
           <HelpButton title="Como usar Atendimentos">
             <p><strong>Registrar atendimento:</strong> clique em <em>Novo Registro</em> e preencha paciente, terapeuta, especialidade, data, horário, status e tipo.</p>
             <p><strong>Criar série:</strong> clique em <em>Série</em> para criar atendimentos recorrentes (ex.: toda segunda por 10 semanas).</p>
-            <p><strong>Filtros:</strong> use os filtros de especialidade, status, tipo e terapeuta para localizar atendimentos específicos.</p>
+            <p><strong>Entrevistas:</strong> ao criar um registro, selecione o tipo "Entrevista" para entrevistas com responsáveis ou candidatos. O paciente torna-se opcional e o campo "Nome do entrevistado" fica obrigatório. Chip laranja identifica entrevistas na lista. Entrevistas remotas não exigem sala e não conflitam com bloqueios Flex.</p>
+            <p><strong>Filtros:</strong> use os filtros de especialidade, status, tipo (Atendimento / Entrevista) e terapeuta para localizar registros específicos.</p>
             <p><strong>Editar:</strong> clique no lápis (✏) ou olhinho (👁) na linha para editar ou visualizar o atendimento. Terapeutas só podem editar ou excluir seus próprios atendimentos.</p>
             <p><strong>Status "Realizada":</strong> ao selecionar esse status, os campos Objetivo da Sessão, Relato de Evolução e Objetivo da Próxima Sessão tornam-se obrigatórios.</p>
             <p><strong>Status automáticos:</strong> configurados em Administração → Status Atendimento; aparecem nos filtros e no prontuário, mas não no formulário de registro.</p>

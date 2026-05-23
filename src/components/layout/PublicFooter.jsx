@@ -83,7 +83,7 @@ export default function PublicFooter() {
 
         <div className="border-t border-white/10 mt-10 pt-6 flex items-center justify-between text-xs text-blue-300 flex-wrap gap-2">
           <span>© {new Date().getFullYear()} Espaço Casa Amarela — Todos os direitos reservados.</span>
-          <span>Powered by ©DGT</span>
+          <span>Powered by ©DGT Transformação Digital</span>
         </div>
       </div>
     </footer>

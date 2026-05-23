@@ -258,6 +258,7 @@ export default function AgendaPage() {
             <p><strong>Visualização semanal:</strong> a agenda exibe os atendimentos da semana atual. Use as setas para navegar entre semanas. No mobile, as abas mostram os dias separadamente.</p>
             <p><strong>Criar atendimento:</strong> clique em <em>Novo Atendimento</em> e preencha paciente, terapeuta, especialidade, data e horário.</p>
             <p><strong>Criar série:</strong> clique em <em>Série</em> para criar atendimentos recorrentes (ex.: toda segunda por 10 semanas).</p>
+            <p><strong>Entrevistas:</strong> use o tipo "Entrevista" para registrar entrevistas com responsáveis ou candidatos. O chip laranja identifica entrevistas na agenda. Entrevistas presenciais ocupam uma sala; entrevistas remotas exibem plataforma e link de acesso direto pelo card.</p>
             <p><strong>Editar:</strong> clique no lápis (✏) no card do atendimento para abrir o formulário de edição.</p>
             <p><strong>Filtro "Minha Agenda":</strong> terapeutas veem apenas seus próprios atendimentos. Admins veem todos.</p>
             <p><strong>Legenda:</strong> as cores na legenda inferior identificam cada terapeuta.</p>

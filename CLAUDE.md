@@ -42,7 +42,7 @@ src/
     pdfShared.js                 # Utilitários compartilhados por todos os PDFs (addPageHeader, addPageFooter, addAllPageFooters, sectionBlock, labelValue, loadLogo, fmtDatePDF, fmtCurrencyPDF + constantes)
     generateProntuarioPDF.js     # Gera PDF completo do prontuário (admin only)
     generateReportPDF.js         # Gera relatórios PDF: consultas por paciente ou terapeuta
-    conflictUtils.js             # Detecção de conflitos de agenda: detectConflicts, detectSeriesConflicts, CONFLICT_DURATION (50min), CONFLICT_LABELS
+    conflictUtils.js             # Detecção de conflitos: detectConflicts, detectSeriesConflicts, getCalendarBlockConflicts, buildConflictTooltip; CONFLICT_DURATION (50min), CONFLICT_LABELS; tooltips ricos com data DD/MM/YYYY, intervalo de horário, nome do paciente/entrevistado, terapeuta e tipo do evento
   components/
     layout/
       PublicLayout.jsx, PublicHeader.jsx, PublicFooter.jsx
@@ -159,6 +159,8 @@ supabase/
   88_calendar_blocks.sql               # Tabelas calendar_block_series + calendar_blocks; RLS; GRANT; persist_consultation_conflicts com calendar_block_id; triggers de auditoria
   89_block_type_rigid_flex.sql         # Converte dados TOTAL→RIGID / PARTIAL→FLEX; recria CHECK constraints
   90_fix_audit_calendar_blocks.sql     # Fix triggers de auditoria: ignora operações sem JWT (SQL Editor/migrations); completa migração 89
+  91_interviews.sql                    # Adiciona event_type (SESSION/INTERVIEW), interview_format (PRESENTIAL/REMOTE), meeting_platform, meeting_link em consultations e consultation_series
+  92_interviewee_name.sql              # Adiciona interviewee_name TEXT em consultations e consultation_series — obrigatório quando event_type=INTERVIEW
   functions/
     invite-therapist/index.ts    # Edge Function — envia convite por e-mail ao criar terapeuta
     suggest-convenio/index.ts    # Edge Function — gera sugestões de texto para relatório de convênio via OpenAI gpt-4o-mini
@@ -189,7 +191,7 @@ Encontrar em: Supabase Dashboard → Project Settings → API.
 | `guardians` | Responsáveis — soft delete com `active = false`; tem campo `neighborhood` |
 | `patient_guardians` | Relação N:N paciente ↔ responsável |
 | `appointments` | Agendamentos — hard delete; campos `time` (HH:MM), `room_id` |
-| `consultations` | Consultas/evolução — hard delete; tem `appointment_type_id`, `time` (HH:MM), `room_id`, `nf_number`, `nf_issue_date`, `previous_status_before_invoice`, `series_id`, `series_original_date`, `is_series_exception` |
+| `consultations` | Consultas/evolução — hard delete; tem `appointment_type_id`, `time` (HH:MM), `room_id`, `nf_number`, `nf_issue_date`, `previous_status_before_invoice`, `series_id`, `series_original_date`, `is_series_exception`, `event_type` (SESSION/INTERVIEW), `interview_format` (PRESENTIAL/REMOTE), `meeting_platform`, `meeting_link`, `interviewee_name` |
 | `consultation_activities` | Atividades dentro de uma consulta |
 | `specialties` | Tabela de config — toggle `active` |
 | `payment_methods` | Tabela de config — toggle `active` |
@@ -216,7 +218,7 @@ Encontrar em: Supabase Dashboard → Project Settings → API.
 | `patient_specialty_report_settings` | Desafios relacionados do Encaminhamento por paciente + especialidade — unique(patient_id, specialty), referral_challenges |
 | `company_settings` | Configurações da empresa — linha única (id=1, CHECK constraint); razao_social, cnpj, cnes, ai_system_prompt, updated_at |
 | `payment_invoices` | Notas fiscais / faturas — nf_number (globalmente único via índice parcial), patient_id, nf_issue_date, status (ISSUED/PAID/CANCELLED), total_amount, payment_demonstrative_id, consultation_ids (UUID[]), snapshot (JSONB), created_by, cancelled_at, cancelled_by, paid_at, paid_by; admin only |
-| `consultation_series` | Séries recorrentes — patient_id, primary_therapist_id, specialty, appointment_type_id, consultation_status_id, room_id, time, duration, recurrence_type ('by_count'/'by_date'), recurrence_days (integer[] ISO 1=Seg…7=Dom), start_date, end_date, session_count, active, notes, created_by; RLS: admin tudo; terapeuta SELECT das próprias séries |
+| `consultation_series` | Séries recorrentes — patient_id, primary_therapist_id, specialty, appointment_type_id, consultation_status_id, room_id, time, duration, recurrence_type ('by_count'/'by_date'), recurrence_days (integer[] ISO 1=Seg…7=Dom), start_date, end_date, session_count, active, notes, created_by, `event_type` (SESSION/INTERVIEW), `interview_format` (PRESENTIAL/REMOTE), `meeting_platform`, `meeting_link`, `interviewee_name`; RLS: admin tudo; terapeuta SELECT das próprias séries |
 | `consultation_therapists` | Participantes por consulta — consultation_id, therapist_id, specialty, is_primary; UNIQUE (consultation_id, therapist_id); sempre deve existir exatamente 1 is_primary=true; ON DELETE CASCADE de consultations |
 | `calendar_block_series` | Séries de bloqueios recorrentes — therapist_id, block_type ('RIGID'/'FLEX'), description, start_date, end_date, recurrence_type, recurrence_days (integer[]), session_count, start_time, end_time, active, cancelled, created_by |
 | `calendar_blocks` | Bloqueios de agenda por data — therapist_id, series_id (nullable), block_type ('RIGID'/'FLEX'), description, date, start_time, end_time, series_original_date, is_series_exception, active, cancelled, cancelled_at, cancelled_by, created_by; soft-delete via cancelled=true (nunca DELETE físico); RLS: admin tudo; próprio terapeuta SELECT/INSERT/UPDATE; membro da equipe SELECT |
@@ -229,8 +231,8 @@ Todos em `src/lib/supabase.js`. Convertem snake_case do banco para camelCase do 
 - `mapTherapist` — `therapistSpecialties` agora é `[{ specialty, credential, canBeRt }]`
 - `mapGuardian` (inclui `neighborhood`), `mapTherapist`, `mapAppointment` (inclui `startTime`, `endTime` calculado via duration), `mapConsultation` (inclui `time`, `roomId`)
 - `mapSpecialty`, `mapPaymentMethod`, `mapDiagnosis`, `mapPatientStatus`, `mapRoom`
-- `mapConsultation` também inclui `nfNumber`, `nfIssueDate`, `previousStatusBeforeInvoice`, `seriesId`, `seriesOriginalDate`, `isSeriesException`, `consultationTherapists[{id, therapistId, specialty, isPrimary}]`
-- `mapConsultationSeries` — novo mapper para `consultation_series`
+- `mapConsultation` também inclui `nfNumber`, `nfIssueDate`, `previousStatusBeforeInvoice`, `seriesId`, `seriesOriginalDate`, `isSeriesException`, `consultationTherapists[{id, therapistId, specialty, isPrimary}]`, `eventType`, `interviewFormat`, `meetingPlatform`, `meetingLink`, `intervieweeName`
+- `mapConsultationSeries` — mapper para `consultation_series`; inclui `eventType`, `interviewFormat`, `meetingPlatform`, `meetingLink`, `intervieweeName`
 - `mapConsultationStatus` (inclui `automatic`), `mapAppointmentType`, `mapExam`, `mapMedication`, `mapConduct`
 - `mapCalendarBlock` — mapper para `calendar_blocks` (camelCase; inclui `seriesId`, `blockType`, `startTime`, `endTime`, `cancelled`, `cancelledAt`, `cancelledBy`)
 - `mapCalendarBlockSeries` — mapper para `calendar_block_series`
@@ -706,10 +708,22 @@ Não é mais editável. Texto padrão fixo definido em `DESEMPENHO_FIXO` em `gen
   - `isAdminOrTeam = isAdmin || user?.belongsToTeam` — campo `belongs_to_team` no `therapists`
   - Campo Terapeuta (primário): editável apenas por `isAdminOrTeam`; terapeuta fora da equipe vê read-only (só pode salvar para si mesmo)
   - Terapeutas Adicionais: `canManageSecondary = isAdmin || (user?.belongsToTeam && user?.id === form.therapistId)`
-  - Botão "Série": visível para qualquer usuário com `user?.id` (todos os terapeutas)
+  - Botão "Série": visível para `isAdminOrTeam` (admin OU membro da equipe); admin puro (`user.id = null`) também vê o botão
   - Validação: se há secundários, o primário deve ser da equipe (`belongsToTeam`)
   - Diálogo de escopo na edição de série: exibido para admin **ou** para o próprio terapeuta primário (`user?.id === initial.therapistId`)
 - **Seção Nota Fiscal / Faturamento (ConsultationFormModal):** visível apenas em edição quando admin ou quando a consulta já tem NF. Admin pode editar Número da NF e Data de Emissão; terapeuta vê read-only. Exibe status anterior (antes do faturamento) quando `previous_status_before_invoice` está preenchido.
+
+### Entrevistas
+
+- **`event_type`:** `SESSION` (padrão) ou `INTERVIEW`. Selecionável no `ConsultationFormModal` e `SeriesFormModal`.
+- **`interview_format`:** `PRESENTIAL` ou `REMOTE` — exibido apenas quando `event_type === 'INTERVIEW'`.
+- **`meeting_platform` / `meeting_link`:** campos opcionais para entrevistas remotas.
+- **`interviewee_name`:** obrigatório quando `event_type === 'INTERVIEW'`; campo de texto livre para nome(s) do(s) entrevistado(s).
+- **Paciente:** opcional para entrevistas (label muda para "Paciente (opcional)"; sem validação de campo vazio quando `event_type === 'INTERVIEW'`).
+- **Impacto financeiro:** zero — entrevistas não afetam ledger pré-pago, faturamento nem demonstrativos.
+- **Chips visuais (laranja):** chip "Entrevista" (`bg-orange-50 text-orange-700`); chip adicional "Remota" para `interview_format === 'REMOTE'`. Exibidos nos cards de `ConsultationsPage` e `AgendaPage`.
+- **Título do card:** usa `intervieweeName` quando preenchido; cai para `patient.fullName` se não houver.
+- **Conflitos:** entrevistas REMOTE são isentas de `ROOM_OVERLAP` e `THERAPIST_UNAVAILABLE_PARTIAL` (FLEX). Entrevistas PRESENTIAL seguem as mesmas regras de sessão.
 
 ## Pagamentos / Notas Fiscais (`/admin/pagamentos`)
 
@@ -726,10 +740,12 @@ Não é mais editável. Texto padrão fixo definido em `DESEMPENHO_FIXO` em `gen
 
 - Usa a tabela `consultations` (appointments não é usada)
 - 6 colunas: Seg/Ter/Qua/Qui/Sex + Sáb-Dom; mobile: abas
-- Card: `HH:MM - PrimeiroNome Ultimo` + sala em 10px
+- Card: `HH:MM - PrimeiroNome Ultimo` (ou `intervieweeName` para entrevistas) + sala em 10px
+- Coluna Sáb-Dom: coluna única; day label (Sáb/Dom) embutido na primeira linha do card junto ao horário — sem linha separada.
 - Legenda inferior exibe nome completo do terapeuta
+- **Botão "Série" (`FiRepeat`):** visível para `isAdminOrTeam` (admin OU membro da equipe); admin puro (`user.id = null`) também vê o botão.
 - **Toggle "Minha Agenda":** visível para qualquer usuário com `user.id` preenchido (`canFilterMine = !!user?.id`); padrão `true` para não-admin (terapeutas veem só os seus por padrão), `false` para admin. Ao ativar, `filterConsultation` exige que o usuário seja primário ou participante secundário (`consultationTherapists`).
-- **Chips visuais nos cards de consulta:** desktop — `bg-white/25` (funciona em qualquer cor de fundo do terapeuta); mobile — `bg-indigo-50`/`bg-amber-50`/`bg-blue-50`. Semântica: indigo = série, amber+`!` = ocorrência alterada, 👥 N = múltiplos terapeutas, vermelho `⚠` = conflito. Chips de série/múltiplos terapeutas exibidos apenas quando `!isPrivate`; chip de conflito sempre visível.
+- **Chips visuais nos cards de consulta:** desktop — `bg-white/25`; mobile — `bg-indigo-50`/`bg-amber-50`/`bg-blue-50`/`bg-orange-50`. Semântica: indigo = série, amber+`!` = ocorrência alterada, 👥 N = múltiplos terapeutas, vermelho `⚠` = conflito, laranja "Entrevista" = `event_type === 'INTERVIEW'`, laranja "Remota" = entrevista remota. Chips de série/múltiplos terapeutas/entrevista exibidos apenas quando `!isPrivate`; chip de conflito sempre visível.
 - **Chips visuais nos BlockCards (bloqueios):** chip `⚠` vermelho pequeno quando `consultations.some(c => c.conflicts.some(cf => !cf.resolved && cf.calendarBlockId === block.id))`. Desktop: inline na linha de chips do BlockCard. Mobile: chip "⚠ Conflito" na linha de badges abaixo do tipo RIGID/FLEX.
 
 ## CRM de Contatos (`/admin/contatos`)
@@ -810,7 +826,7 @@ Não é mais editável. Texto padrão fixo definido em `DESEMPENHO_FIXO` em `gen
 ### `addConsultationSeries` (DataContext)
 
 - Gera datas via `generateSeriesDates` (`src/utils/dateUtils.js`)
-- Cria `consultation_series` → bulk insert `consultations` (com `series_id`) → bulk insert `consultation_therapists` (terapeuta principal, `is_primary = true`) → fetch completo com `CONSULTATION_SELECT` → atualiza estado local
+- Cria `consultation_series` (inclui `event_type`, `interview_format`, `meeting_platform`, `meeting_link`, `interviewee_name`) → bulk insert `consultations` (com `series_id` e mesmos campos de entrevista) → bulk insert `consultation_therapists` (terapeuta principal, `is_primary = true`) → fetch completo com `CONSULTATION_SELECT` → atualiza estado local
 - **Não chama `handlePrepaidConsumption`** — criação de série nunca consome pré-pago
 - Retorna `{ series, consultations, count }` ou `{ error }`
 
@@ -844,8 +860,10 @@ Não é mais editável. Texto padrão fixo definido em `DESEMPENHO_FIXO` em `gen
 
 - `CONFLICT_DURATION` — constante 50 (minutos)
 - `CONFLICT_LABELS` — mapa tipo → label legível em PT-BR
-- `detectConflicts(input, allConsultations, calendarBlocks = [])` — retorna array de conflitos para um único atendimento
-- `detectSeriesConflicts(seriesInput, dates, allConsultations, calendarBlocks = [])` — retorna `[{ date, conflicts[] }]` filtrado para datas com conflito
+- `detectConflicts(input, allConsultations, calendarBlocks = [])` — retorna array de conflitos para um único atendimento; entrevistas REMOTE isentas de `ROOM_OVERLAP` e `THERAPIST_UNAVAILABLE_PARTIAL`
+- `detectSeriesConflicts(seriesInput, dates, allConsultations, calendarBlocks = [])` — retorna `[{ date, conflicts[] }]` filtrado para datas com conflito; passa `eventType` e `interviewFormat` para cada chamada interna de `detectConflicts`
+- `getCalendarBlockConflicts(block, consultations)` — retorna consultas em conflito com um bloqueio específico
+- `buildConflictTooltip(conflicts, { therapists, rooms, patients, consultations, calendarBlocks })` — produz frases ricas em PT-BR com data DD/MM/YYYY, intervalo de horário, tipo do evento (Atendimento / Entrevista Presencial / Entrevista Remota), nome do paciente ou entrevistado, terapeuta; ex.: "⚠ Ana Paula já possui Atendimento de Helena em 22/05/2026 das 08:30 às 09:20."
 
 ### DataContext — novos valores e funções
 
@@ -919,7 +937,7 @@ Não é mais editável. Texto padrão fixo definido em `DESEMPENHO_FIXO` em `gen
 ## Atenção — SELECTs explícitos no DataContext
 
 `CONSULTATION_SELECT` lista colunas explicitamente. Ao adicionar novas colunas ao banco, **sempre incluir no SELECT** correspondente.
-Constantes: `PATIENT_SELECT` (inclui `patient_specialties(specialty, patient_value, therapist_value)`), `GUARDIAN_SELECT`, `CONSULTATION_SELECT` (inclui `consultation_activities(...)`, `consultation_therapists(id, therapist_id, specialty, is_primary)` e `consultation_conflicts(id, conflict_type, related_consultation_id, therapist_id, room_id, calendar_block_id, conflict_date, start_time, end_time, description, resolved)`).
+Constantes: `PATIENT_SELECT` (inclui `patient_specialties(specialty, patient_value, therapist_value)`), `GUARDIAN_SELECT`, `CONSULTATION_SELECT` (inclui `event_type, interview_format, meeting_platform, meeting_link, interviewee_name`, `consultation_activities(...)`, `consultation_therapists(id, therapist_id, specialty, is_primary)` e `consultation_conflicts(id, conflict_type, related_consultation_id, therapist_id, room_id, calendar_block_id, conflict_date, start_time, end_time, description, resolved)`).
 
 ## Especialidades (tabela `specialties` no banco)
 
