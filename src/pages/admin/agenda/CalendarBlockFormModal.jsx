@@ -36,7 +36,7 @@ function hasTimeOverlap(startA, endA, startB, endB) {
   return startA < endB && endA > startB
 }
 
-export default function CalendarBlockFormModal({ onClose, initial = {} }) {
+export default function CalendarBlockFormModal({ onClose, initial = {}, viewOnly = false, onEditRequest = null }) {
   const { therapists, patients, consultations, addCalendarBlock, addCalendarBlockSeries, updateCalendarBlock, updateCalendarBlockSeriesFuture, cancelCalendarBlock, cancelCalendarBlockSeriesFuture } = useData()
   const { user } = useAuth()
   const toast = useToast()
@@ -322,21 +322,26 @@ export default function CalendarBlockFormModal({ onClose, initial = {} }) {
       onClose={onClose}
       size="md"
       footer={
-        <div className="flex items-center justify-between w-full">
-          <div>
-            {isEdit && isAdmin && (
-              <Button variant="danger" onClick={onCancelBlockClick} disabled={loading}>
-                Cancelar Bloqueio
-              </Button>
-            )}
-          </div>
-          <div className="flex gap-2">
-            <Button variant="ghost" onClick={onClose}>Fechar</Button>
-            <Button variant="primary" onClick={onSaveClick} disabled={loading}>
-              {loading ? 'Salvando...' : isEdit ? 'Salvar' : (form.recurrent ? 'Criar Série' : 'Criar Bloqueio')}
-            </Button>
-          </div>
-        </div>
+        viewOnly
+          ? <div className="flex gap-2 justify-end w-full">
+              <Button variant="ghost" onClick={onClose}>Fechar</Button>
+              {onEditRequest && <Button variant="primary" onClick={onEditRequest}>Editar</Button>}
+            </div>
+          : <div className="flex items-center justify-between w-full">
+              <div>
+                {isEdit && isAdmin && (
+                  <Button variant="danger" onClick={onCancelBlockClick} disabled={loading}>
+                    Cancelar Bloqueio
+                  </Button>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <Button variant="ghost" onClick={onClose}>Fechar</Button>
+                <Button variant="primary" onClick={onSaveClick} disabled={loading}>
+                  {loading ? 'Salvando...' : isEdit ? 'Salvar' : (form.recurrent ? 'Criar Série' : 'Criar Bloqueio')}
+                </Button>
+              </div>
+            </div>
       }
     >
       <div className="space-y-4">
@@ -355,7 +360,7 @@ export default function CalendarBlockFormModal({ onClose, initial = {} }) {
                 <option key={t.id} value={t.id}>{t.name}</option>
               ))}
             </select>
-            {errors.therapistId && <p className="text-xs text-red-500 mt-1">{errors.therapistId}</p>}
+            {!viewOnly && errors.therapistId && <p className="text-xs text-red-500 mt-1">{errors.therapistId}</p>}
           </div>
         ) : (
           <div className="p-3 bg-gray-50 rounded-xl text-sm text-gray-700">
@@ -370,23 +375,23 @@ export default function CalendarBlockFormModal({ onClose, initial = {} }) {
           <div className="flex gap-2">
             <button
               type="button"
-              onClick={() => set('blockType', 'RIGID')}
+              onClick={() => !viewOnly && set('blockType', 'RIGID')}
               className={`flex-1 py-2 px-3 rounded-xl text-sm font-medium border transition-all ${
                 form.blockType === 'RIGID'
                   ? 'bg-gray-700 text-white border-gray-700'
                   : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
-              }`}
+              } ${viewOnly ? 'cursor-default' : ''}`}
             >
               Rígido
             </button>
             <button
               type="button"
-              onClick={() => set('blockType', 'FLEX')}
+              onClick={() => !viewOnly && set('blockType', 'FLEX')}
               className={`flex-1 py-2 px-3 rounded-xl text-sm font-medium border transition-all ${
                 form.blockType === 'FLEX'
                   ? 'bg-gray-500 text-white border-gray-500'
                   : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
-              }`}
+              } ${viewOnly ? 'cursor-default' : ''}`}
             >
               Flex
             </button>
@@ -404,7 +409,8 @@ export default function CalendarBlockFormModal({ onClose, initial = {} }) {
             value={form.description}
             onChange={e => set('description', e.target.value)}
             placeholder="Ex: Férias, Curso, Evento..."
-            className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-brand-blue outline-none"
+            disabled={viewOnly}
+            className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-brand-blue outline-none disabled:bg-gray-50 disabled:text-gray-500"
           />
         </div>
 
@@ -417,7 +423,8 @@ export default function CalendarBlockFormModal({ onClose, initial = {} }) {
             type="date"
             value={form.date}
             onChange={e => set('date', e.target.value)}
-            className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-brand-blue outline-none"
+            disabled={viewOnly}
+            className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-brand-blue outline-none disabled:bg-gray-50 disabled:text-gray-500"
           />
           {errors.date && <p className="text-xs text-red-500 mt-1">{errors.date}</p>}
         </div>
@@ -430,7 +437,8 @@ export default function CalendarBlockFormModal({ onClose, initial = {} }) {
               type="time"
               value={form.startTime}
               onChange={e => set('startTime', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-brand-blue outline-none"
+              disabled={viewOnly}
+              className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-brand-blue outline-none disabled:bg-gray-50"
             />
             {errors.startTime && <p className="text-xs text-red-500 mt-1">{errors.startTime}</p>}
           </div>
@@ -440,14 +448,15 @@ export default function CalendarBlockFormModal({ onClose, initial = {} }) {
               type="time"
               value={form.endTime}
               onChange={e => set('endTime', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-brand-blue outline-none"
+              disabled={viewOnly}
+              className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-brand-blue outline-none disabled:bg-gray-50"
             />
             {errors.endTime && <p className="text-xs text-red-500 mt-1">{errors.endTime}</p>}
           </div>
         </div>
 
-        {/* Recorrência — somente na criação */}
-        {!isEdit && (
+        {/* Recorrência — somente na criação e fora do modo visualização */}
+        {!isEdit && !viewOnly && (
           <div className="space-y-3">
             <div className="flex items-center gap-2">
               <input

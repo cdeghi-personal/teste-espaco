@@ -412,7 +412,7 @@ export async function generateConsultasPacientePDF({
       doc.setFontSize(80)
       doc.setFont('helvetica', 'bold')
       doc.setTextColor(80, 80, 80)
-      doc.text('RASCUNHO', pageW / 2, doc.internal.pageSize.height / 2, { angle: 45, align: 'center' })
+      doc.text('', pageW / 2, doc.internal.pageSize.height / 2, { angle: 45, align: 'center' })
       doc.setGState(new doc.GState({ opacity: 1 }))
       doc.setTextColor(...PDF_DARK)
     }

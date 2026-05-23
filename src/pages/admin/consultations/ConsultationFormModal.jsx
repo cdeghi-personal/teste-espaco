@@ -23,7 +23,7 @@ const EMPTY = {
   secondaryTherapists: [],
 }
 
-export default function ConsultationFormModal({ onClose, initial = {}, readOnly = false }) {
+export default function ConsultationFormModal({ onClose, initial = {}, readOnly = false, onEditRequest = null }) {
   const { patients, therapists, specialtiesData, rooms, consultationStatuses, appointmentTypes, appointments, addConsultation, updateConsultation, updateConsultationSeries, getPrepaidData, consultations, calendarBlocks } = useData()
   const { user } = useAuth()
   const isEdit = !!initial.id
@@ -106,9 +106,9 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
     if (!form.specialty) e.specialty = 'Selecione a especialidade'
     if (!form.time) e.time = 'Informe o horário'
     if (form.eventType === 'INTERVIEW' && !form.interviewFormat) e.interviewFormat = 'Selecione o formato'
-    if (form.eventType !== 'INTERVIEW' && !form.roomId) e.roomId = 'Selecione a sala'
+    if (!form.roomId && (form.eventType !== 'INTERVIEW' || form.interviewFormat === 'PRESENTIAL')) e.roomId = 'Selecione a sala'
     if (!form.consultationStatusId) e.consultationStatusId = 'Selecione o status'
-    if (!form.appointmentTypeId) e.appointmentTypeId = 'Selecione o tipo'
+    if (!form.appointmentTypeId && form.eventType !== 'INTERVIEW') e.appointmentTypeId = 'Selecione o tipo'
     const selectedStatus = consultationStatuses.find(s => s.id === form.consultationStatusId)
     if (selectedStatus?.name?.toLowerCase().includes('realizada')) {
       if (!form.mainObjective.trim()) e.mainObjective = 'Informe o objetivo da sessão'
@@ -245,7 +245,10 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
       size="xl"
       footer={
         readOnly
-          ? <Button variant="ghost" onClick={onClose}>Fechar</Button>
+          ? <>
+              <Button variant="ghost" onClick={onClose}>Fechar</Button>
+              {onEditRequest && <Button variant="primary" onClick={onEditRequest}>Editar</Button>}
+            </>
           : conflictsToConfirm !== null
           ? <>
               <Button variant="ghost" onClick={() => setConflictsToConfirm(null)}>Cancelar</Button>
@@ -284,6 +287,8 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
                     set('interviewFormat', '')
                     set('meetingPlatform', '')
                     set('meetingLink', '')
+                  } else {
+                    set('appointmentTypeId', '')
                   }
                 }}
                 className={`px-3 py-1 rounded-lg text-xs font-medium border transition-all ${
@@ -438,7 +443,13 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <Select label={form.eventType === 'SESSION' ? 'Sala *' : 'Sala'} value={form.roomId} onChange={e => set('roomId', e.target.value)} error={errors.roomId} disabled={readOnly}>
+                <Select
+                  label={form.eventType !== 'INTERVIEW' || form.interviewFormat === 'PRESENTIAL' ? 'Sala *' : 'Sala'}
+                  value={form.roomId}
+                  onChange={e => set('roomId', e.target.value)}
+                  error={errors.roomId}
+                  disabled={readOnly}
+                >
                   <option value="">Selecione</option>
                   {activeRooms.map(r => (
                     <option key={r.id} value={r.id}>{r.name}</option>
@@ -447,7 +458,7 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
               </div>
             )}
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className={`grid grid-cols-1 gap-3 ${form.eventType === 'INTERVIEW' ? 'sm:grid-cols-2' : 'sm:grid-cols-3'}`}>
               <Select label="Especialidade *" value={form.specialty} onChange={e => set('specialty', e.target.value)} error={errors.specialty} disabled={readOnly}>
                 <option value="">Selecione</option>
                 {activeSpecialties.map(s => (
@@ -460,12 +471,14 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
                   <option key={s.id} value={s.id}>{s.name}</option>
                 ))}
               </Select>
-              <Select label="Tipo de Atendimento *" value={form.appointmentTypeId} onChange={e => set('appointmentTypeId', e.target.value)} error={errors.appointmentTypeId} disabled={readOnly}>
-                <option value="">Selecione</option>
-                {activeAppointmentTypes.map(t => (
-                  <option key={t.id} value={t.id}>{t.name}</option>
-                ))}
-              </Select>
+              {form.eventType !== 'INTERVIEW' && (
+                <Select label="Tipo de Atendimento *" value={form.appointmentTypeId} onChange={e => set('appointmentTypeId', e.target.value)} error={errors.appointmentTypeId} disabled={readOnly}>
+                  <option value="">Selecione</option>
+                  {activeAppointmentTypes.map(t => (
+                    <option key={t.id} value={t.id}>{t.name}</option>
+                  ))}
+                </Select>
+              )}
             </div>
 
             {!readOnly && patientAppointments.length > 0 && (

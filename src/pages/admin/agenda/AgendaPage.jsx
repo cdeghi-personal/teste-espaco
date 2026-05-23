@@ -38,7 +38,7 @@ function formatDay(date) {
   return format(date, "EEE dd/MM", { locale: ptBR })
 }
 
-function BlockCard({ block, therapist, onEdit, isAdmin, userId, conflictTooltip }) {
+function BlockCard({ block, therapist, onEdit, onView, isAdmin, userId, conflictTooltip }) {
   const canEdit = isAdmin || userId === block.therapistId
   const isRigid = block.blockType === 'RIGID'
   const cardCls = isRigid
@@ -48,7 +48,7 @@ function BlockCard({ block, therapist, onEdit, isAdmin, userId, conflictTooltip 
     ? 'bg-gray-700 text-white'
     : 'bg-gray-400 text-white'
   return (
-    <div className={`rounded-lg px-2 py-1.5 text-xs border group relative ${cardCls}`}>
+    <div className={`rounded-lg px-2 py-1.5 text-xs border group relative cursor-pointer ${cardCls}`} onDoubleClick={onView}>
       <div className="flex items-baseline gap-1 min-w-0">
         <span className="font-bold shrink-0">{block.startTime?.slice(0, 5)}</span>
         <span className="opacity-60">–</span>
@@ -98,6 +98,8 @@ export default function AgendaPage() {
   const [filterEventType, setFilterEventType] = useState('')
   const [showModal, setShowModal] = useState(false)
   const [editItem, setEditItem] = useState(null)
+  const [viewItem, setViewItem] = useState(null)   // consulta em modo visualização
+  const [viewBlock, setViewBlock] = useState(null) // bloqueio em modo visualização
   const [showSeriesModal, setShowSeriesModal] = useState(false)
   const [showBlockModal, setShowBlockModal] = useState(false)
   const [editBlock, setEditBlock] = useState(null)
@@ -404,11 +406,13 @@ export default function AgendaPage() {
                   const isInterview = item.eventType === 'INTERVIEW'
                   const isRemote = isInterview && item.interviewFormat === 'REMOTE'
                   const cardName = isPrivate ? 'Consulta Particular' : (isInterview && item.intervieweeName ? item.intervieweeName : shortName(patient?.fullName))
+                  const canEdit = !isPrivate && (user?.role === 'admin' || user?.id === item.therapistId) || isPrivate && user?.role === 'admin'
                   return (
                     <div
                       key={item.id}
                       className="rounded-lg px-2 py-1.5 text-xs cursor-pointer group relative transition-opacity hover:opacity-90"
                       style={style}
+                      onDoubleClick={() => setViewItem(item)}
                     >
                       <div className="flex items-baseline gap-1 min-w-0">
                         <span className="font-bold shrink-0">{fmtTime(item.time)}</span>
@@ -498,6 +502,7 @@ export default function AgendaPage() {
                       block={block}
                       therapist={getTherapist(block.therapistId)}
                       onEdit={() => { setEditBlock(block); setShowBlockModal(true) }}
+                      onView={() => setViewBlock(block)}
                       isAdmin={user?.role === 'admin'}
                       userId={user?.id}
                       conflictTooltip={conflictTooltip}
@@ -537,6 +542,7 @@ export default function AgendaPage() {
                       key={item.id}
                       className="rounded-lg px-2 py-1.5 text-xs cursor-pointer group relative transition-opacity hover:opacity-90"
                       style={style}
+                      onDoubleClick={() => setViewItem(item)}
                     >
                       <div className="flex items-baseline gap-1 min-w-0">
                         <span className="font-bold shrink-0">{fmtTime(item.time)} · {dayLabel}</span>
@@ -626,6 +632,7 @@ export default function AgendaPage() {
                       block={block}
                       therapist={getTherapist(block.therapistId)}
                       onEdit={() => { setEditBlock(block); setShowBlockModal(true) }}
+                      onView={() => setViewBlock(block)}
                       isAdmin={user?.role === 'admin'}
                       userId={user?.id}
                       conflictTooltip={conflictTooltip}
@@ -716,7 +723,7 @@ export default function AgendaPage() {
                   const isRemote = isInterview && item.interviewFormat === 'REMOTE'
                   const mobileName = isPrivate ? 'Consulta Particular' : (isInterview && item.intervieweeName ? item.intervieweeName : patient?.fullName)
                   return (
-                    <div key={item.id} className="flex items-center gap-3 p-4">
+                    <div key={item.id} className="flex items-center gap-3 p-4 cursor-pointer" onClick={() => setViewItem(item)}>
                       <div className="w-1 self-stretch rounded-full shrink-0" style={{ backgroundColor: style.backgroundColor }} />
                       <div className="flex-1 min-w-0">
                         <div className="font-semibold text-sm text-gray-900">{fmtTime(item.time)}</div>
@@ -798,7 +805,7 @@ export default function AgendaPage() {
                   const blockConflicts = conflictMap[block.id] || []
                   const blockConflictTooltip = buildConflictTooltip(blockConflicts, { therapists, rooms, patients, consultations, calendarBlocks })
                   return (
-                    <div key={block.id} className="flex items-center gap-3 p-4 bg-gray-50">
+                    <div key={block.id} className="flex items-center gap-3 p-4 bg-gray-50 cursor-pointer" onClick={() => setViewBlock(block)}>
                       <div className={`w-1 self-stretch rounded-full shrink-0 ${isRigid ? 'bg-gray-500' : 'bg-gray-300'}`} />
                       <div className="flex-1 min-w-0">
                         <div className="font-semibold text-sm text-gray-800">
@@ -871,6 +878,34 @@ export default function AgendaPage() {
         <ConsultationFormModal
           onClose={() => setShowModal(false)}
           initial={editItem || {}}
+        />
+      )}
+
+      {viewItem && (
+        <ConsultationFormModal
+          onClose={() => setViewItem(null)}
+          initial={viewItem}
+          readOnly
+          onEditRequest={
+            (!isTeamTherapist(viewItem.therapistId)
+              ? user?.role === 'admin'
+              : user?.role === 'admin' || user?.id === viewItem.therapistId)
+              ? () => { setViewItem(null); setEditItem(viewItem); setShowModal(true) }
+              : null
+          }
+        />
+      )}
+
+      {viewBlock && (
+        <CalendarBlockFormModal
+          onClose={() => setViewBlock(null)}
+          initial={viewBlock}
+          viewOnly
+          onEditRequest={
+            (user?.role === 'admin' || user?.id === viewBlock.therapistId)
+              ? () => { setViewBlock(null); setEditBlock(viewBlock); setShowBlockModal(true) }
+              : null
+          }
         />
       )}
 
