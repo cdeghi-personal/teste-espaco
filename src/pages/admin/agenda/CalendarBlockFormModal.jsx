@@ -153,7 +153,7 @@ export default function CalendarBlockFormModal({ onClose, initial = {} }) {
       })
     }
 
-    if (!confirmedOverlap) {
+    if (!confirmedOverlap && form.blockType === 'RIGID') {
       const conflicts = checkConsultationConflicts(datesToCheck)
       if (conflicts.length > 0) {
         setConsultationConflicts(conflicts)
@@ -552,10 +552,10 @@ export default function CalendarBlockFormModal({ onClose, initial = {} }) {
                 </p>
                 <ul className="mt-1.5 space-y-0.5">
                   {consultationConflicts.slice(0, 5).map(c => {
-                    const patientName = patients.find(p => p.id === c.patientId)?.fullName || '—'
+                    const subject = c.intervieweeName || patients.find(p => p.id === c.patientId)?.fullName || '—'
                     return (
                       <li key={`${c.id}-${c.checkDate}`} className="text-xs text-amber-700">
-                        • {patientName} — {c.checkDate?.split('-').reverse().join('/')} às {c.time?.slice(0, 5) || '—'}{c.specialty ? ` (${c.specialty})` : ''}
+                        • {subject} — {c.checkDate?.split('-').reverse().join('/')} às {c.time?.slice(0, 5) || '—'}{c.specialty ? ` (${c.specialty})` : ''}
                       </li>
                     )
                   })}
