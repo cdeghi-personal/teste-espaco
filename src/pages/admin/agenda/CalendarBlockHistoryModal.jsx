@@ -29,7 +29,7 @@ function monthBtnLabel(offset) {
 }
 
 export default function CalendarBlockHistoryModal({ onClose, therapistId }) {
-  const { therapists, consultations, calendarBlocks, getCalendarBlockHistory, cancelCalendarBlock } = useData()
+  const { therapists, patients, consultations, calendarBlocks, getCalendarBlockHistory, cancelCalendarBlock } = useData()
   const { user } = useAuth()
   const toast = useToast()
   const isAdmin = user?.role === 'admin'
@@ -307,7 +307,7 @@ export default function CalendarBlockHistoryModal({ onClose, therapistId }) {
                         )}
                         {(blockConflictMap[b.id] || []).length > 0 && (
                           <span
-                            title={buildConflictTooltip(blockConflictMap[b.id], { therapists })}
+                            title={buildConflictTooltip(blockConflictMap[b.id], { therapists, patients, consultations, calendarBlocks: [...(calendarBlocks || []), ...blocks] })}
                             className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-xs bg-red-50 text-red-600"
                           >
                             ⚠ Conflito

@@ -238,20 +238,92 @@ export function getCalendarBlockConflicts(block, allConsultations, allBlocks = [
 }
 
 /**
- * Constrói texto de tooltip para exibição em chips de conflito.
- * @param {array}  conflicts  - lista retornada por detectConflicts ou getCalendarBlockConflicts
- * @param {object} opts       - { therapists[], rooms[] }
+ * Constrói texto de tooltip rico para chips de conflito.
+ * @param {array}  conflicts
+ * @param {object} opts - { therapists[], rooms[], patients[], consultations[], calendarBlocks[] }
  */
-export function buildConflictTooltip(conflicts, { therapists = [], rooms = [] } = {}) {
+export function buildConflictTooltip(conflicts, {
+  therapists = [], rooms = [], patients = [], consultations = [], calendarBlocks = []
+} = {}) {
   if (!conflicts || conflicts.length === 0) return ''
+
+  const fT = id => therapists.find(t => t.id === id)
+  const fR = id => rooms.find(r => r.id === id)
+  const fP = id => patients.find(p => p.id === id)
+  const fC = id => consultations.find(c => c.id === id)
+  const fB = id => calendarBlocks.find(b => b.id === id)
+
   return conflicts.map(cf => {
-    const label     = CONFLICT_LABELS[cf.conflictType] || cf.conflictType
-    const therapist = therapists.find(t => t.id === cf.therapistId)
-    const room      = rooms.find(r => r.id === cf.roomId)
-    const parts     = [label]
-    if (therapist)     parts.push(`Terapeuta: ${therapist.name}`)
-    if (room)          parts.push(`Sala: ${room.name}`)
-    if (cf.description) parts.push(cf.description)
-    return parts.join(' — ')
+    const therapist = fT(cf.therapistId)
+    const tName = therapist?.name || 'Terapeuta'
+
+    switch (cf.conflictType) {
+
+      case CONFLICT_TYPES.THERAPIST_OVERLAP: {
+        const relC = fC(cf.relatedConsultationId)
+        const relPatient = relC ? fP(relC.patientId) : null
+        const relTherapist = relC ? fT(relC.therapistId) : null
+        const parts = [`⚠ Conflito de terapeuta — ${tName}`]
+        if (relPatient)   parts.push(`Paciente conflitante: ${relPatient.fullName}`)
+        if (relC?.time)   parts.push(`Horário: ${relC.time.slice(0, 5)}`)
+        if (relTherapist && relTherapist.id !== cf.therapistId)
+          parts.push(`(terapeuta do outro atendimento: ${relTherapist.name})`)
+        return parts.join(' | ')
+      }
+
+      case CONFLICT_TYPES.ROOM_OVERLAP: {
+        const relC = fC(cf.relatedConsultationId)
+        const relPatient = relC ? fP(relC.patientId) : null
+        const relTherapist = relC ? fT(relC.therapistId) : null
+        const room = fR(cf.roomId)
+        const parts = [`⚠ Conflito de sala${room ? ` — ${room.name}` : ''}`]
+        if (relPatient)   parts.push(`Paciente conflitante: ${relPatient.fullName}`)
+        if (relTherapist) parts.push(`Terapeuta: ${relTherapist.name}`)
+        if (relC?.time)   parts.push(`Horário: ${relC.time.slice(0, 5)}`)
+        return parts.join(' | ')
+      }
+
+      case CONFLICT_TYPES.THERAPIST_UNAVAILABLE_TOTAL:
+      case CONFLICT_TYPES.THERAPIST_UNAVAILABLE_PARTIAL: {
+        const isRigid = cf.conflictType === CONFLICT_TYPES.THERAPIST_UNAVAILABLE_TOTAL
+        const label = isRigid ? '⚠ Bloqueio rígido' : '⚠ Bloqueio flex'
+        const parts = [`${label} — ${tName}`]
+
+        if (cf.calendarBlockId) {
+          // perspectiva do atendimento: exibe detalhes do bloqueio
+          const blk = fB(cf.calendarBlockId)
+          if (blk) {
+            const timeStr = `${blk.startTime?.slice(0, 5)}–${blk.endTime?.slice(0, 5)}`
+            parts.push(`Bloqueio: ${timeStr}${blk.description ? ` (${blk.description})` : ''}`)
+          }
+        } else if (cf.relatedConsultationId) {
+          // perspectiva do bloqueio: exibe paciente e horário do atendimento
+          const relC = fC(cf.relatedConsultationId)
+          const relPatient = relC ? fP(relC.patientId) : null
+          if (relPatient) parts.push(`Paciente conflitante: ${relPatient.fullName}`)
+          if (relC?.time) parts.push(`Horário atendimento: ${relC.time.slice(0, 5)}`)
+        }
+        return parts.join(' | ')
+      }
+
+      case CONFLICT_TYPES.BLOCK_OVERLAP: {
+        const other = fB(cf.relatedBlockId)
+        const parts = [`⚠ Bloqueios sobrepostos — ${tName}`]
+        if (other) {
+          const timeStr = `${other.startTime?.slice(0, 5)}–${other.endTime?.slice(0, 5)}`
+          parts.push(`Outro bloqueio: ${timeStr}${other.description ? ` (${other.description})` : ''}`)
+        }
+        return parts.join(' | ')
+      }
+
+      default: {
+        const room = fR(cf.roomId)
+        const parts = [CONFLICT_LABELS[cf.conflictType] || cf.conflictType]
+        if (therapist)    parts.push(`Terapeuta: ${therapist.name}`)
+        if (room)         parts.push(`Sala: ${room.name}`)
+        if (cf.description) parts.push(cf.description)
+        return parts.join(' | ')
+      }
+    }
   }).join('\n')
 }

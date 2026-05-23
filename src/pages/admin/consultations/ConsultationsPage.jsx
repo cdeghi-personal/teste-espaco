@@ -282,7 +282,7 @@ export default function ConsultationsPage() {
                     )}
                     {(conflictMap[c.id] || []).length > 0 && (
                       <span
-                        title={buildConflictTooltip(conflictMap[c.id], { therapists, rooms })}
+                        title={buildConflictTooltip(conflictMap[c.id], { therapists, rooms, patients, consultations, calendarBlocks })}
                         className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs font-medium bg-red-50 text-red-600"
                       >
                         ⚠ Conflito

@@ -388,7 +388,7 @@ export default function AgendaPage() {
                   const room = getRoom(item.roomId)
                   const style = cardStyle(item)
                   const itemConflicts = conflictMap[item.id] || []
-                  const conflictTooltip = buildConflictTooltip(itemConflicts, { therapists, rooms })
+                  const conflictTooltip = buildConflictTooltip(itemConflicts, { therapists, rooms, patients, consultations, calendarBlocks })
                   return (
                     <div
                       key={item.id}
@@ -464,7 +464,7 @@ export default function AgendaPage() {
                 })}
                 {/* Block cards */}
                 {dayBlocks.map(block => {
-                  const conflictTooltip = buildConflictTooltip(conflictMap[block.id] || [], { therapists, rooms })
+                  const conflictTooltip = buildConflictTooltip(conflictMap[block.id] || [], { therapists, rooms, patients, consultations, calendarBlocks })
                   return (
                     <BlockCard
                       key={block.id}
@@ -500,7 +500,7 @@ export default function AgendaPage() {
                   const style = cardStyle(item)
                   const isSun = item.date !== satIso
                   const itemConflicts = conflictMap[item.id] || []
-                  const conflictTooltip = buildConflictTooltip(itemConflicts, { therapists, rooms })
+                  const conflictTooltip = buildConflictTooltip(itemConflicts, { therapists, rooms, patients, consultations, calendarBlocks })
                   return (
                     <div
                       key={item.id}
@@ -577,7 +577,7 @@ export default function AgendaPage() {
                 })}
                 {/* Weekend block cards */}
                 {weekendBlocks.map(block => {
-                  const conflictTooltip = buildConflictTooltip(conflictMap[block.id] || [], { therapists, rooms })
+                  const conflictTooltip = buildConflictTooltip(conflictMap[block.id] || [], { therapists, rooms, patients, consultations, calendarBlocks })
                   return (
                     <BlockCard
                       key={block.id}
@@ -669,7 +669,7 @@ export default function AgendaPage() {
                   const room = getRoom(item.roomId)
                   const style = cardStyle(item)
                   const itemConflicts = conflictMap[item.id] || []
-                  const conflictTooltip = buildConflictTooltip(itemConflicts, { therapists, rooms })
+                  const conflictTooltip = buildConflictTooltip(itemConflicts, { therapists, rooms, patients, consultations, calendarBlocks })
                   return (
                     <div key={item.id} className="flex items-center gap-3 p-4">
                       <div className="w-1 self-stretch rounded-full shrink-0" style={{ backgroundColor: style.backgroundColor }} />
@@ -735,7 +735,7 @@ export default function AgendaPage() {
                   const canEditBlock = user?.role === 'admin' || user?.id === block.therapistId
                   const isRigid = block.blockType === 'RIGID'
                   const blockConflicts = conflictMap[block.id] || []
-                  const blockConflictTooltip = buildConflictTooltip(blockConflicts, { therapists, rooms })
+                  const blockConflictTooltip = buildConflictTooltip(blockConflicts, { therapists, rooms, patients, consultations, calendarBlocks })
                   return (
                     <div key={block.id} className="flex items-center gap-3 p-4 bg-gray-50">
                       <div className={`w-1 self-stretch rounded-full shrink-0 ${isRigid ? 'bg-gray-500' : 'bg-gray-300'}`} />
