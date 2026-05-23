@@ -153,11 +153,15 @@ export default function CalendarBlockFormModal({ onClose, initial = {} }) {
       })
     }
 
-    if (!confirmedOverlap && form.blockType === 'RIGID') {
-      const conflicts = checkConsultationConflicts(datesToCheck)
+    if (!confirmedOverlap) {
+      let conflicts = checkConsultationConflicts(datesToCheck)
+      // FLEX isenta apenas entrevistas remotas; RIGID avisa para tudo
+      if (form.blockType === 'FLEX') {
+        conflicts = conflicts.filter(c => !(c.eventType === 'INTERVIEW' && c.interviewFormat === 'REMOTE'))
+      }
       if (conflicts.length > 0) {
         setConsultationConflicts(conflicts)
-        return // show warning, wait for user confirmation
+        return
       }
     }
 
