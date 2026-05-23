@@ -124,56 +124,54 @@ function InvoiceDetailModal({ invoice, onClose }) {
 function InvoiceCard({ invoice, consultationStatuses, onView, onCancel, onPaid }) {
   const patientName = invoice.patients?.full_name || invoice.snapshot?.patientName || '—'
   const snap = invoice.snapshot || {}
-  const canCancel = invoice.status === 'ISSUED'
-  const canPay    = invoice.status === 'ISSUED'
+  const canAction = invoice.status === 'ISSUED'
+  const count = (invoice.consultation_ids || []).length
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-3">
-      {/* Header */}
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-semibold text-gray-900 text-sm">{patientName}</span>
-            <StatusBadge status={invoice.status} />
-          </div>
-          <p className="text-xs text-gray-500 mt-0.5">{snap.period || '—'}</p>
-        </div>
-        <div className="text-right shrink-0">
-          <p className="font-bold text-gray-900 text-sm">{fmtCurrency(invoice.total_amount)}</p>
-          <p className="text-xs text-gray-400">{fmtDate(invoice.created_at)}</p>
-        </div>
-      </div>
-
-      {/* NF info */}
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500">
-        {invoice.nf_number && <span>NF <strong className="text-gray-700">{invoice.nf_number}</strong></span>}
-        {invoice.nf_issue_date && <span>Emissão <strong className="text-gray-700">{fmtDate(invoice.nf_issue_date)}</strong></span>}
-        <span>{(invoice.consultation_ids || []).length} atendimento(s)</span>
-      </div>
-
-      {/* Ações */}
-      <div className="flex items-center gap-2 pt-1 border-t border-gray-50">
-        <button
-          onClick={() => onView(invoice)}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 hover:text-brand-blue hover:bg-blue-50 rounded-lg transition-colors"
-        >
-          <FiEye size={13} /> Ver detalhes
-        </button>
-        {canPay && (
-          <button
-            onClick={() => onPaid(invoice)}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-green-700 hover:bg-green-50 rounded-lg transition-colors"
-          >
-            <FiCheckCircle size={13} /> Marcar como Paga
-          </button>
+    <div className="bg-white rounded-xl border border-gray-100 shadow-sm px-4 py-3 space-y-2">
+      {/* Linha 1 */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="font-semibold text-gray-900 text-sm truncate max-w-[200px]">{patientName}</span>
+        <StatusBadge status={invoice.status} />
+        {invoice.nf_number && (
+          <span className="text-xs text-gray-500">NF <strong className="text-gray-700">{invoice.nf_number}</strong></span>
         )}
-        {canCancel && (
+        {invoice.nf_issue_date && (
+          <span className="text-xs text-gray-500">Emissão <strong className="text-gray-700">{fmtDate(invoice.nf_issue_date)}</strong></span>
+        )}
+        <div className="ml-auto flex items-center gap-2 shrink-0">
           <button
-            onClick={() => onCancel(invoice)}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+            onClick={() => onView(invoice)}
+            title="Ver detalhes"
+            className="p-1.5 rounded-lg text-gray-400 hover:text-brand-blue hover:bg-blue-50 transition-colors"
           >
-            <FiXCircle size={13} /> Cancelar NF
+            <FiEye size={15} />
           </button>
+          <div className="text-right">
+            <p className="font-bold text-gray-900 text-sm leading-tight">{fmtCurrency(invoice.total_amount)}</p>
+            <p className="text-xs text-gray-400 leading-tight">{fmtDate(invoice.created_at)}</p>
+          </div>
+        </div>
+      </div>
+      {/* Linha 2 */}
+      <div className="flex items-center gap-3 flex-wrap text-xs text-gray-500">
+        {snap.period && <span className="font-medium text-gray-600">{snap.period}</span>}
+        <span>{count} atendimento{count !== 1 ? 's' : ''}</span>
+        {canAction && (
+          <div className="ml-auto flex items-center gap-1.5 shrink-0">
+            <button
+              onClick={() => onPaid(invoice)}
+              className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-green-700 hover:bg-green-50 rounded-lg border border-green-100 transition-colors"
+            >
+              <FiCheckCircle size={12} /> Paga
+            </button>
+            <button
+              onClick={() => onCancel(invoice)}
+              className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-red-600 hover:bg-red-50 rounded-lg border border-red-100 transition-colors"
+            >
+              <FiXCircle size={12} /> Cancelar
+            </button>
+          </div>
         )}
       </div>
     </div>
@@ -277,7 +275,7 @@ export default function PaymentsPage() {
   }
 
   return (
-    <div className="p-3 md:p-6 space-y-4 max-w-5xl mx-auto">
+    <div className="p-3 md:p-6 space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">

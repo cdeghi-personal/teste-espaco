@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { FiEdit2, FiXCircle, FiSearch } from 'react-icons/fi'
+import { FiEdit2, FiXCircle, FiSearch, FiRepeat } from 'react-icons/fi'
 import Modal from '../../../components/ui/Modal'
 import Button from '../../../components/ui/Button'
 import { useData } from '../../../context/DataContext'
@@ -40,7 +40,7 @@ export default function CalendarBlockHistoryModal({ onClose, therapistId }) {
   const [cancelLoading, setCancelLoading] = useState(false)
 
   const [filterSearch, setFilterSearch]       = useState('')
-  const [filterStatus, setFilterStatus]       = useState('')
+  const [filterStatus, setFilterStatus]       = useState('active')
   const [filterType, setFilterType]           = useState('')
   const [filterTherapist, setFilterTherapist] = useState('')
   const [filterDateFrom, setFilterDateFrom]   = useState(() => monthRange(0).from)
@@ -153,7 +153,7 @@ export default function CalendarBlockHistoryModal({ onClose, therapistId }) {
     <Modal
       title="Histórico de Bloqueios de Agenda"
       onClose={onClose}
-      size="lg"
+      size="xl"
       footer={<Button variant="ghost" onClick={onClose}>Fechar</Button>}
     >
       {/* Filtros */}
@@ -258,7 +258,7 @@ export default function CalendarBlockHistoryModal({ onClose, therapistId }) {
                     <td className="py-2 pr-3 text-gray-700 whitespace-nowrap">
                       {fmtDate(b.date)}
                       {b.seriesId && (
-                        <span className="ml-1 px-1 py-0.5 rounded text-xs bg-indigo-50 text-indigo-600">Série</span>
+                        <span title="Bloqueio recorrente" className="ml-1 inline-flex items-center text-indigo-500"><FiRepeat size={11} /></span>
                       )}
                     </td>
                     <td className="py-2 pr-3 text-gray-700 whitespace-nowrap">

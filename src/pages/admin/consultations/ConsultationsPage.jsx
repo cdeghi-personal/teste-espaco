@@ -35,6 +35,8 @@ export default function ConsultationsPage() {
   const { user } = useAuth()
   const [search, setSearch] = useState('')
   const [filterSpecialty, setFilterSpecialty] = useState('')
+  const [filterStatus, setFilterStatus] = useState('')
+  const [filterTherapist, setFilterTherapist] = useState('')
   const [filterDateFrom, setFilterDateFrom] = useState(() => monthRange(0).from)
   const [filterDateTo, setFilterDateTo]     = useState(() => monthRange(0).to)
   const [showModal, setShowModal] = useState(false)
@@ -76,8 +78,10 @@ export default function ConsultationsPage() {
       const patient = getPatient(c.patientId)
       const matchSearch = !search || patient?.fullName.toLowerCase().includes(search.toLowerCase())
       const matchSpecialty = !filterSpecialty || c.specialty === filterSpecialty
+      const matchStatus = !filterStatus || c.consultationStatusId === filterStatus
+      const matchTherapist = !filterTherapist || c.therapistId === filterTherapist || (c.consultationTherapists || []).some(ct => ct.therapistId === filterTherapist)
       const matchDate = (!filterDateFrom || c.date >= filterDateFrom) && (!filterDateTo || c.date <= filterDateTo)
-      return matchSearch && matchSpecialty && matchDate
+      return matchSearch && matchSpecialty && matchStatus && matchTherapist && matchDate
     })
     .sort((a, b) => b.date.localeCompare(a.date))
 
@@ -127,6 +131,7 @@ export default function ConsultationsPage() {
       </div>
 
       <div className="space-y-2">
+        {/* Linha 1: botões de mês + datas */}
         <div className="flex items-center gap-1.5 flex-wrap">
           {[-2, -1, 0, 1].map(offset => {
             const { from, to } = monthRange(offset)
@@ -143,40 +148,72 @@ export default function ConsultationsPage() {
               </button>
             )
           })}
+          <div className="flex gap-1.5 ml-auto">
+            <input
+              type="date"
+              value={filterDateFrom}
+              onChange={e => setFilterDateFrom(e.target.value)}
+              className="px-2 py-1.5 text-xs border border-gray-200 rounded-lg bg-white focus:ring-2 focus:ring-brand-blue outline-none"
+            />
+            <input
+              type="date"
+              value={filterDateTo}
+              onChange={e => setFilterDateTo(e.target.value)}
+              className="px-2 py-1.5 text-xs border border-gray-200 rounded-lg bg-white focus:ring-2 focus:ring-brand-blue outline-none"
+            />
+          </div>
         </div>
-        <div className="flex flex-col sm:flex-row gap-2">
-        <div className="relative flex-1">
-          <FiSearch size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Buscar por paciente..."
-            className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-brand-blue outline-none bg-white"
-          />
-        </div>
-        <select
-          value={filterSpecialty}
-          onChange={e => setFilterSpecialty(e.target.value)}
-          className="px-3 py-2 text-sm border border-gray-200 rounded-xl bg-white focus:ring-2 focus:ring-brand-blue outline-none"
-        >
-          <option value="">Especialidade</option>
-          {activeSpecialties.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
-        </select>
-        {canFilterMine && (
-          <button
-            type="button"
-            onClick={() => setMyConsultations(v => !v)}
-            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-sm font-medium transition-all shrink-0 ${
-              myConsultations
-                ? 'border-brand-blue bg-brand-blue text-white'
-                : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
-            }`}
+        {/* Linha 2: busca + filtros + toggle */}
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <div className="relative flex-1 min-w-[160px]">
+            <FiSearch size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Buscar por paciente..."
+              className="w-full pl-8 pr-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue outline-none bg-white"
+            />
+          </div>
+          <select
+            value={filterStatus}
+            onChange={e => setFilterStatus(e.target.value)}
+            className="px-2.5 py-1.5 text-sm border border-gray-200 rounded-lg bg-white focus:ring-2 focus:ring-brand-blue outline-none"
           >
-            <FiRepeat size={13} />
-            <span className="hidden sm:inline">Meus Atendimentos</span>
-            <span className="sm:hidden">Meus</span>
-          </button>
-        )}
+            <option value="">Status</option>
+            {consultationStatuses.filter(s => s.active !== false).map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
+          {isAdminOrTeam && (
+            <select
+              value={filterTherapist}
+              onChange={e => setFilterTherapist(e.target.value)}
+              className="px-2.5 py-1.5 text-sm border border-gray-200 rounded-lg bg-white focus:ring-2 focus:ring-brand-blue outline-none"
+            >
+              <option value="">Terapeuta</option>
+              {therapists.filter(t => t.active !== false).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+            </select>
+          )}
+          <select
+            value={filterSpecialty}
+            onChange={e => setFilterSpecialty(e.target.value)}
+            className="px-2.5 py-1.5 text-sm border border-gray-200 rounded-lg bg-white focus:ring-2 focus:ring-brand-blue outline-none"
+          >
+            <option value="">Especialidade</option>
+            {activeSpecialties.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
+          </select>
+          {canFilterMine && (
+            <button
+              type="button"
+              onClick={() => setMyConsultations(v => !v)}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-sm font-medium transition-all shrink-0 ${
+                myConsultations
+                  ? 'border-brand-blue bg-brand-blue text-white'
+                  : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+              }`}
+            >
+              <FiRepeat size={13} />
+              <span className="hidden sm:inline">Meus</span>
+            </button>
+          )}
         </div>
       </div>
 

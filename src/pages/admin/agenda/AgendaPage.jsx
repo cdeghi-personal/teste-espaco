@@ -37,6 +37,25 @@ function formatDay(date) {
   return format(date, "EEE dd/MM", { locale: ptBR })
 }
 
+function timeToMin(t) {
+  if (!t) return null
+  const [h, m] = t.split(':').map(Number)
+  return h * 60 + m
+}
+
+function blockHasConflict(block, consultations) {
+  const bStart = timeToMin(block.startTime)
+  const bEnd   = timeToMin(block.endTime)
+  if (bStart === null || bEnd === null) return false
+  return consultations.some(c => {
+    if (c.date !== block.date || !c.time) return false
+    const ids = [c.therapistId, ...(c.consultationTherapists || []).map(ct => ct.therapistId)].filter(Boolean)
+    if (!ids.includes(block.therapistId)) return false
+    const cStart = timeToMin(c.time)
+    return cStart < bEnd && (cStart + 50) > bStart
+  })
+}
+
 function BlockCard({ block, therapist, onEdit, isAdmin, userId, hasConflict }) {
   const canEdit = isAdmin || userId === block.therapistId
   const isRigid = block.blockType === 'RIGID'
@@ -432,7 +451,7 @@ export default function AgendaPage() {
                 })}
                 {/* Block cards */}
                 {dayBlocks.map(block => {
-                  const hasConflict = consultations.some(c => (c.conflicts || []).some(cf => !cf.resolved && cf.calendarBlockId === block.id))
+                  const hasConflict = blockHasConflict(block, consultations)
                   return (
                     <BlockCard
                       key={block.id}
@@ -543,7 +562,7 @@ export default function AgendaPage() {
                 })}
                 {/* Weekend block cards */}
                 {weekendBlocks.map(block => {
-                  const hasConflict = consultations.some(c => (c.conflicts || []).some(cf => !cf.resolved && cf.calendarBlockId === block.id))
+                  const hasConflict = blockHasConflict(block, consultations)
                   return (
                     <BlockCard
                       key={block.id}
@@ -717,7 +736,7 @@ export default function AgendaPage() {
                           }`}>
                             {isRigid ? 'Rígido' : 'Flex'}
                           </span>
-                          {consultations.some(c => (c.conflicts || []).some(cf => !cf.resolved && cf.calendarBlockId === block.id)) && (
+                          {blockHasConflict(block, consultations) && (
                             <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs bg-red-50 text-red-600">⚠ Conflito</span>
                           )}
                         </div>
