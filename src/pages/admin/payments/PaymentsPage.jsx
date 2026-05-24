@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback } from 'react'
-import { FiDollarSign, FiRefreshCw, FiSearch, FiEye, FiXCircle, FiCheckCircle, FiX } from 'react-icons/fi'
+import { FiDollarSign, FiRefreshCw, FiSearch, FiEye, FiXCircle, FiCheckCircle, FiFileText, FiDownload } from 'react-icons/fi'
 import HelpButton from '../../../components/ui/HelpButton'
 import { useData } from '../../../context/DataContext'
 import { useToast } from '../../../components/ui/Toast'
 import Modal from '../../../components/ui/Modal'
 import { format, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
+import { generatePaymentSummaryPDF, generatePaymentDetailPDF } from '../../../utils/generatePaymentReportPDF'
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -202,7 +203,7 @@ function monthBtnLabel(offset) {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function PaymentsPage() {
-  const { getPaymentInvoices, cancelPaymentInvoice, markInvoicePaid, consultationStatuses } = useData()
+  const { getPaymentInvoices, cancelPaymentInvoice, markInvoicePaid, consultationStatuses, companySettings } = useData()
   const toast = useToast()
 
   const [invoices, setInvoices]         = useState([])
@@ -275,6 +276,46 @@ export default function PaymentsPage() {
     }
   }
 
+  const [exporting, setExporting] = useState(false)
+
+  async function handleExportPDF(type) {
+    if (invoices.length === 0) { toast.show('Nenhuma fatura para exportar com os filtros atuais.', 'error'); return }
+    setExporting(true)
+    try {
+      const args = { invoices, dateFrom, dateTo, status: filterStatus, companySettings }
+      if (type === 'summary') await generatePaymentSummaryPDF(args)
+      else await generatePaymentDetailPDF(args)
+    } catch (err) {
+      toast.show('Erro ao gerar PDF: ' + (err?.message || ''), 'error')
+    } finally {
+      setExporting(false)
+    }
+  }
+
+  function handleExportCSV() {
+    if (invoices.length === 0) { toast.show('Nenhuma fatura para exportar com os filtros atuais.', 'error'); return }
+    const headers = ['NF', 'Paciente', 'Período', 'Status', 'Data Emissão', 'Total (R$)', 'Atendimentos', 'Data Geração']
+    const rows = invoices.map(inv => [
+      inv.nf_number || '',
+      inv.patients?.full_name || inv.snapshot?.patientName || '',
+      inv.snapshot?.period || '',
+      STATUS_CONFIG[inv.status]?.label || inv.status,
+      inv.nf_issue_date ? fmtDate(inv.nf_issue_date) : '',
+      Number(inv.total_amount || 0).toFixed(2).replace('.', ','),
+      (inv.consultation_ids || []).length,
+      inv.created_at ? fmtDate(inv.created_at.slice(0, 10)) : '',
+    ])
+    const escape = v => `"${String(v).replace(/"/g, '""')}"`
+    const csv = [headers, ...rows].map(r => r.map(escape).join(';')).join('\n')
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `faturas_${new Date().toISOString().slice(0, 10).replace(/-/g, '')}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   return (
     <div className="p-3 md:p-6 space-y-4">
       {/* Header */}
@@ -297,6 +338,33 @@ export default function PaymentsPage() {
             <p><strong>Cancelar NF:</strong> disponível para faturas com status <em>Emitida</em>. Cancela a fatura e restaura automaticamente o status original de cada atendimento, removendo os dados da NF.</p>
             <p><strong>Filtros:</strong> use os botões de mês (Mês-2 / Mês-1 / Atual) ou defina um período manual. Filtre por status ou busque pelo número da NF ou nome do paciente.</p>
           </HelpButton>
+          <button
+            onClick={() => handleExportPDF('summary')}
+            disabled={exporting || loading}
+            title="PDF Resumo"
+            className="flex items-center gap-1.5 px-2.5 py-2 rounded-xl border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-50 text-xs font-medium"
+          >
+            <FiFileText size={14} />
+            <span className="hidden sm:inline">Resumo</span>
+          </button>
+          <button
+            onClick={() => handleExportPDF('detail')}
+            disabled={exporting || loading}
+            title="PDF Detalhado"
+            className="flex items-center gap-1.5 px-2.5 py-2 rounded-xl border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-50 text-xs font-medium"
+          >
+            <FiFileText size={14} />
+            <span className="hidden sm:inline">Detalhado</span>
+          </button>
+          <button
+            onClick={handleExportCSV}
+            disabled={loading}
+            title="Exportar CSV"
+            className="flex items-center gap-1.5 px-2.5 py-2 rounded-xl border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-50 text-xs font-medium"
+          >
+            <FiDownload size={14} />
+            <span className="hidden sm:inline">CSV</span>
+          </button>
           <button
             onClick={loadInvoices}
             className="p-2 rounded-xl border border-gray-200 bg-white text-gray-500 hover:bg-gray-50 transition-colors"
