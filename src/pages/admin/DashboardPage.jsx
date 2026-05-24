@@ -161,10 +161,14 @@ export default function DashboardPage() {
 
   const isAdmin       = user?.role === 'admin'
   const isSupportAdmin = isAdmin && !user?.id
+  const isDualRole    = isAdmin && !!user?.id  // admin que também é terapeuta
 
   const [editingConsultation, setEditingConsultation] = useState(null)
+  // Dual-role: toggle entre painéis; padrão = terapeuta
+  const [dashView, setDashView] = useState('therapist')
+  const effectiveView = isDualRole ? dashView : isAdmin ? 'admin' : 'therapist'
 
-  // ── status IDs para "realizado" — usa flag consumesPrepaidSession (exclui "agendada") ──
+  // ── status IDs ───────────────────────────────────────────────────────────
   const realizadaIds = useMemo(() =>
     consultationStatuses.filter(s =>
       s.consumesPrepaidSession === true && !norm(s.name).includes('agend')
@@ -185,32 +189,67 @@ export default function DashboardPage() {
     consultationStatuses.filter(s => norm(s.name).includes('agend')).map(s => s.id),
   [consultationStatuses])
 
-  // ── visibility filters ───────────────────────────────────────────────────
-  // belongsToTeam concede permissões operacionais (séries, terapeutas secundários)
-  // mas NÃO expande estatísticas pessoais — terapeuta vê seus próprios dados
+  // ── sessões pessoais (primário ou secundário) — painel terapeuta ──────────
+  const mySessions = useMemo(() => {
+    if (!user?.id) return []
+    return consultations.filter(c =>
+      c.eventType !== 'INTERVIEW' &&
+      (c.therapistId === user?.id ||
+       (c.consultationTherapists || []).some(ct => ct.therapistId === user?.id))
+    )
+  }, [consultations, user])
+
+  // ── sessões da clínica inteira — painel admin ─────────────────────────────
+  const clinicSessions = useMemo(() =>
+    isAdmin ? consultations.filter(c => c.eventType !== 'INTERVIEW') : [],
+  [isAdmin, consultations])
+
+  const clinicThisMonth = useMemo(() =>
+    clinicSessions.filter(c => c.date?.startsWith(thisMonth)),
+  [clinicSessions, thisMonth])
+
+  const clinicLastMonth = useMemo(() =>
+    clinicSessions.filter(c => c.date?.startsWith(lastMonth)),
+  [clinicSessions, lastMonth])
+
+  const clinicRealizedMes      = useMemo(() => clinicThisMonth.filter(c => realizadaIds.includes(c.consultationStatusId)), [clinicThisMonth, realizadaIds])
+  const clinicRealizedAnterior = useMemo(() => clinicLastMonth.filter(c => realizadaIds.includes(c.consultationStatusId)), [clinicLastMonth, realizadaIds])
+
+  const clinicTaxa = clinicThisMonth.length > 0
+    ? Math.round(clinicRealizedMes.length / clinicThisMonth.length * 100) : 0
+  const clinicTaxaAnterior = clinicLastMonth.length > 0
+    ? Math.round(clinicRealizedAnterior.length / clinicLastMonth.length * 100) : 0
+
+  const clinicUpcoming = useMemo(() =>
+    clinicSessions
+      .filter(c => {
+        if (c.date > today) return true
+        if (c.date === today) return !c.time || c.time >= nowTime
+        return false
+      })
+      .sort((a, b) => a.date.localeCompare(b.date) || (a.time || '').localeCompare(b.time || ''))
+      .slice(0, 5),
+  [clinicSessions, today, nowTime])
+
+  // ── pacientes pessoais — painel terapeuta ─────────────────────────────────
+  const myPatients = useMemo(() => {
+    if (!user?.id) return []
+    const activeStatusId = patientStatuses.find(s => norm(s.name).includes('ativ'))?.id
+    const base = patients.filter(p =>
+      !p.deleted &&
+      (p.therapistId === user?.id || (p.involvedTherapistIds || []).includes(user?.id))
+    )
+    return activeStatusId ? base.filter(p => p.statusId === activeStatusId) : base
+  }, [patients, patientStatuses, user])
+
+  // ── todos os pacientes ativos — painel admin ──────────────────────────────
   const activePatients = useMemo(() => {
     const activeStatusId = patientStatuses.find(s => norm(s.name).includes('ativ'))?.id
     const base = patients.filter(p => !p.deleted)
-    const mine = isAdmin
-      ? base
-      : base.filter(p =>
-          p.therapistId === user?.id ||
-          (p.involvedTherapistIds || []).includes(user?.id)
-        )
-    return activeStatusId ? mine.filter(p => p.statusId === activeStatusId) : mine
-  }, [patients, patientStatuses, isAdmin, user])
+    return activeStatusId ? base.filter(p => p.statusId === activeStatusId) : base
+  }, [patients, patientStatuses])
 
-  const mySessions = useMemo(() => {
-    const base = isAdmin
-      ? consultations
-      : consultations.filter(c =>
-          c.therapistId === user?.id ||
-          (c.consultationTherapists || []).some(ct => ct.therapistId === user?.id)
-        )
-    return base.filter(c => c.eventType !== 'INTERVIEW')
-  }, [consultations, isAdmin, user])
-
-  // ── month slices ─────────────────────────────────────────────────────────
+  // ── fatias mensais pessoais ───────────────────────────────────────────────
   const thisMonthSessions = useMemo(() =>
     mySessions.filter(c => c.date?.startsWith(thisMonth)),
   [mySessions, thisMonth])
@@ -219,20 +258,18 @@ export default function DashboardPage() {
     mySessions.filter(c => c.date?.startsWith(lastMonth)),
   [mySessions, lastMonth])
 
-  const realizadasMes     = useMemo(() => thisMonthSessions.filter(c => realizadaIds.includes(c.consultationStatusId)), [thisMonthSessions, realizadaIds])
+  const realizadasMes      = useMemo(() => thisMonthSessions.filter(c => realizadaIds.includes(c.consultationStatusId)), [thisMonthSessions, realizadaIds])
   const realizadasAnterior = useMemo(() => lastMonthSessions.filter(c => realizadaIds.includes(c.consultationStatusId)), [lastMonthSessions, realizadaIds])
-  const faltasMes         = useMemo(() => thisMonthSessions.filter(c => faltaIds.includes(c.consultationStatusId)), [thisMonthSessions, faltaIds])
-  const cancelasMes       = useMemo(() => thisMonthSessions.filter(c => cancelaIds.includes(c.consultationStatusId)), [thisMonthSessions, cancelaIds])
-  const negativosMes      = faltasMes.length + cancelasMes.length
+  const faltasMes          = useMemo(() => thisMonthSessions.filter(c => faltaIds.includes(c.consultationStatusId)), [thisMonthSessions, faltaIds])
+  const cancelasMes        = useMemo(() => thisMonthSessions.filter(c => cancelaIds.includes(c.consultationStatusId)), [thisMonthSessions, cancelaIds])
+  const negativosMes       = faltasMes.length + cancelasMes.length
 
   const taxaRealizacao = thisMonthSessions.length > 0
-    ? Math.round(realizadasMes.length / thisMonthSessions.length * 100)
-    : 0
+    ? Math.round(realizadasMes.length / thisMonthSessions.length * 100) : 0
   const taxaAnterior = lastMonthSessions.length > 0
-    ? Math.round(realizadasAnterior.length / lastMonthSessions.length * 100)
-    : 0
+    ? Math.round(realizadasAnterior.length / lastMonthSessions.length * 100) : 0
 
-  // ── upcoming ─────────────────────────────────────────────────────────────
+  // ── próximos (pessoal) ────────────────────────────────────────────────────
   const next7Sessions = useMemo(() =>
     mySessions.filter(c => c.date > today && c.date <= next7Days),
   [mySessions, today, next7Days])
@@ -240,31 +277,20 @@ export default function DashboardPage() {
   const todaySessions = useMemo(() =>
     consultations
       .filter(c => c.date === today && c.eventType !== 'INTERVIEW' &&
-        (isAdmin || c.therapistId === user?.id ||
+        (c.therapistId === user?.id ||
          (c.consultationTherapists || []).some(ct => ct.therapistId === user?.id))
       )
       .sort((a, b) => (a.time || '').localeCompare(b.time || '')),
-  [consultations, today, isAdmin, user])
+  [consultations, today, user])
 
-  const upcomingAll = useMemo(() =>
-    mySessions
-      .filter(c => {
-        if (c.date > today) return true
-        if (c.date === today) return !c.time || c.time >= nowTime
-        return false
-      })
-      .sort((a, b) => a.date.localeCompare(b.date) || (a.time || '').localeCompare(b.time || ''))
-      .slice(0, 5),
-  [mySessions, today, nowTime])
-
-  // ── new patients this month ───────────────────────────────────────────────
+  // ── novos pacientes no mês ────────────────────────────────────────────────
   const newPatientsThisMonth = useMemo(() =>
     patients.filter(p => !p.deleted && (p.createdAt || '').startsWith(thisMonth)).length,
   [patients, thisMonth])
 
-  // ── evasion risk ─────────────────────────────────────────────────────────
+  // ── risco de evasão (pacientes pessoais) ──────────────────────────────────
   const evasionRisk = useMemo(() => {
-    return activePatients
+    return myPatients
       .filter(p => {
         const last = mySessions
           .filter(c => c.patientId === p.id && c.date <= today)
@@ -273,21 +299,25 @@ export default function DashboardPage() {
         return last.date < ago30
       })
       .slice(0, 5)
-  }, [activePatients, mySessions, today, ago30])
+  }, [myPatients, mySessions, today, ago30])
 
-  // ── conflicts ────────────────────────────────────────────────────────────
+  // ── conflitos ─────────────────────────────────────────────────────────────
   const withConflicts = useMemo(() =>
     mySessions.filter(c => (c.conflicts || []).length > 0 && c.date >= today).length,
   [mySessions, today])
 
-  // ── pending fill: past sessions still with "agendada" status ─────────────
+  // ── pendências: atendimentos passados "agendada" onde o usuário é PRIMÁRIO ─
   const pendingFill = useMemo(() =>
     mySessions
-      .filter(c => c.date < today && agendadaIds.includes(c.consultationStatusId))
+      .filter(c =>
+        c.date < today &&
+        c.therapistId === user?.id &&
+        agendadaIds.includes(c.consultationStatusId)
+      )
       .sort((a, b) => a.date.localeCompare(b.date) || (a.time || '').localeCompare(b.time || '')),
-  [mySessions, today, agendadaIds])
+  [mySessions, today, user, agendadaIds])
 
-  // ── admin: therapist ranking ──────────────────────────────────────────────
+  // ── ranking terapeutas (admin) ────────────────────────────────────────────
   const therapistRanking = useMemo(() => {
     if (!isAdmin) return []
     return therapists
@@ -299,6 +329,7 @@ export default function DashboardPage() {
         )
         const realized = tSessions.filter(c => realizadaIds.includes(c.consultationStatusId))
         const rate = tSessions.length > 0 ? Math.round(realized.length / tSessions.length * 100) : 0
+        // Pendências: apenas onde o terapeuta é o responsável principal
         const pending = consultations.filter(c =>
           c.therapistId === t.id &&
           c.date < today &&
@@ -312,7 +343,7 @@ export default function DashboardPage() {
       .slice(0, 8)
   }, [isAdmin, therapists, consultations, thisMonth, realizadaIds, today, agendadaIds])
 
-  // ── specialty distribution (admin=sessions, therapist=patients) ───────────
+  // ── distribuição por especialidade ────────────────────────────────────────
   const activeSpecialties = specialtiesData.filter(s => s.active !== false)
 
   const specialtyDist = useMemo(() => {
@@ -320,8 +351,8 @@ export default function DashboardPage() {
       return activeSpecialties
         .map(spec => ({
           ...spec,
-          count: thisMonthSessions.filter(c => c.specialty === spec.key).length,
-          realized: thisMonthSessions.filter(c => c.specialty === spec.key && realizadaIds.includes(c.consultationStatusId)).length,
+          count: clinicThisMonth.filter(c => c.specialty === spec.key).length,
+          realized: clinicThisMonth.filter(c => c.specialty === spec.key && realizadaIds.includes(c.consultationStatusId)).length,
         }))
         .filter(s => s.count > 0)
         .sort((a, b) => b.count - a.count)
@@ -329,11 +360,11 @@ export default function DashboardPage() {
     return activeSpecialties
       .map(spec => ({
         ...spec,
-        count: activePatients.filter(p => p.specialties?.some(s => s.key === spec.key)).length,
+        count: myPatients.filter(p => p.specialties?.some(s => s.key === spec.key)).length,
       }))
       .filter(s => s.count > 0)
       .sort((a, b) => b.count - a.count)
-  }, [isAdmin, activeSpecialties, thisMonthSessions, activePatients, realizadaIds])
+  }, [isAdmin, activeSpecialties, clinicThisMonth, myPatients, realizadaIds])
 
   // ── admin: financial data ─────────────────────────────────────────────────
   const [financial, setFinancial] = useState(null)
@@ -424,17 +455,32 @@ export default function DashboardPage() {
     <div className="p-3 md:p-6 space-y-4 md:space-y-6">
 
       {/* ── Greeting ─────────────────────────────────────────────────────── */}
-      <div>
-        <h1 className={`text-xl md:text-2xl font-bold transition-colors duration-300 ${greetingLoading ? 'text-gray-400 italic' : 'text-gray-900'}`}>
-          {greetingLoading
-            ? loadingMsg
-            : greetingMsg || `${greeting}, ${user?.name?.split(' ')[0]}! 👋`}
-        </h1>
-        <p className="text-gray-500 text-xs md:text-sm mt-1">
-          {now.toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-        </p>
-        {!isAdmin && !user?.belongsToTeam && (
-          <p className="text-xs text-brand-blue mt-1 font-medium">Exibindo apenas seus pacientes e consultas</p>
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div className="flex-1 min-w-0">
+          <h1 className={`text-xl md:text-2xl font-bold transition-colors duration-300 ${greetingLoading ? 'text-gray-400 italic' : 'text-gray-900'}`}>
+            {greetingLoading
+              ? loadingMsg
+              : greetingMsg || `${greeting}, ${user?.name?.split(' ')[0]}! 👋`}
+          </h1>
+          <p className="text-gray-500 text-xs md:text-sm mt-1">
+            {now.toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+          </p>
+        </div>
+        {isDualRole && (
+          <div className="flex items-center gap-1 bg-gray-100 rounded-xl p-1 shrink-0">
+            <button
+              onClick={() => setDashView('therapist')}
+              className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${dashView === 'therapist' ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
+            >
+              Meu Painel
+            </button>
+            <button
+              onClick={() => setDashView('admin')}
+              className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${dashView === 'admin' ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
+            >
+              Painel Admin
+            </button>
+          </div>
         )}
       </div>
 
@@ -481,14 +527,14 @@ export default function DashboardPage() {
       )}
 
       {/* ══════════════════════ ADMIN VIEW ══════════════════════════════════ */}
-      {isAdmin && (
+      {effectiveView === 'admin' && (
         <>
           {/* ── Stat cards (admin) ─────────────────────────────────────── */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 md:gap-4">
-            <StatCard icon={FiClipboard}  label="Sessões no mês"       value={thisMonthSessions.length}  color="text-brand-blue"   bg="bg-blue-50"    trend prevValue={lastMonthSessions.length} />
-            <StatCard icon={FiActivity}   label="Taxa de realização"    value={taxaRealizacao}             color="text-green-600"    bg="bg-green-50"   suffix="%" trend prevValue={taxaAnterior} />
-            <StatCard icon={FiUsers}      label="Pacientes ativos"      value={activePatients.length}      color="text-purple-600"   bg="bg-purple-50" />
-            <StatCard icon={FiTrendingUp} label="Novos pacientes"       value={newPatientsThisMonth}       color="text-orange-600"   bg="bg-orange-50"  suffix={newPatientsThisMonth === 1 ? ' este mês' : ' este mês'} />
+            <StatCard icon={FiClipboard}  label="Sessões no mês"       value={clinicThisMonth.length}   color="text-brand-blue"   bg="bg-blue-50"    trend prevValue={clinicLastMonth.length} />
+            <StatCard icon={FiActivity}   label="Taxa de realização"    value={clinicTaxa}               color="text-green-600"    bg="bg-green-50"   suffix="%" trend prevValue={clinicTaxaAnterior} />
+            <StatCard icon={FiUsers}      label="Pacientes ativos"      value={activePatients.length}    color="text-purple-600"   bg="bg-purple-50" />
+            <StatCard icon={FiTrendingUp} label="Novos pacientes"       value={newPatientsThisMonth}     color="text-orange-600"   bg="bg-orange-50"  suffix=" este mês" />
           </div>
 
           {/* ── Visão financeira (admin) ───────────────────────────────── */}
@@ -609,7 +655,7 @@ export default function DashboardPage() {
                   {specialtyDist.map(spec => {
                     const bg = spec.color || '#e5e7eb'
                     const tc = textColorForBg(bg)
-                    const pct = thisMonthSessions.length > 0 ? Math.round(spec.count / thisMonthSessions.length * 100) : 0
+                    const pct = clinicThisMonth.length > 0 ? Math.round(spec.count / clinicThisMonth.length * 100) : 0
                     return (
                       <div key={spec.key} className="rounded-xl px-3 py-2.5 border border-gray-100" style={{ backgroundColor: bg }}>
                         <div className="text-xl font-bold" style={{ color: tc }}>{spec.count}</div>
@@ -633,13 +679,13 @@ export default function DashboardPage() {
               <h2 className="font-semibold text-gray-900 text-sm md:text-base">Próximos Atendimentos</h2>
               <Link to={ROUTES.AGENDA} className="text-xs text-brand-blue hover:underline flex items-center gap-1">Ver agenda <FiArrowRight size={11} /></Link>
             </div>
-            {upcomingAll.length === 0 ? (
+            {clinicUpcoming.length === 0 ? (
               <div className="px-4 py-8 text-center text-gray-400 text-sm">Nenhum atendimento agendado</div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <tbody className="divide-y divide-gray-50">
-                    {upcomingAll.map(c => {
+                    {clinicUpcoming.map(c => {
                       const patient   = getPatient(c.patientId)
                       const therapist = getTherapist(c.therapistId)
                       const room      = getRoom(c.roomId)
@@ -674,62 +720,15 @@ export default function DashboardPage() {
       )}
 
       {/* ══════════════════════ THERAPIST VIEW ══════════════════════════════ */}
-      {!isAdmin && (
+      {effectiveView === 'therapist' && (
         <>
           {/* ── Stat cards (therapist) ─────────────────────────────────── */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 md:gap-4">
             <StatCard icon={FiCheckCircle} label="Realizadas no mês"  value={realizadasMes.length}  color="text-green-600"  bg="bg-green-50"  trend prevValue={realizadasAnterior.length} />
             <StatCard icon={FiClipboard}   label="Faltas + canceladas" value={negativosMes}           color="text-red-500"    bg="bg-red-50" />
             <StatCard icon={FiCalendar}    label="Próximos 7 dias"     value={next7Sessions.length}   color="text-brand-blue" bg="bg-blue-50" />
-            <StatCard icon={FiUsers}       label="Meus pacientes"      value={activePatients.length}  color="text-purple-600" bg="bg-purple-50" />
+            <StatCard icon={FiUsers}       label="Meus pacientes"      value={myPatients.length}      color="text-purple-600" bg="bg-purple-50" />
           </div>
-
-          {/* ── Pendências de preenchimento ────────────────────────────── */}
-          {pendingFill.length > 0 && (
-            <div className="bg-amber-50 border border-amber-200 rounded-2xl overflow-hidden">
-              <div className="px-4 py-3 border-b border-amber-200 flex items-center gap-2 flex-wrap">
-                <FiAlertTriangle size={15} className="text-amber-600 shrink-0" />
-                <span className="font-semibold text-amber-800 text-sm">Pendências de preenchimento</span>
-                <span className="bg-amber-200 text-amber-800 text-xs font-bold px-2 py-0.5 rounded-full">{pendingFill.length}</span>
-                <span className="text-xs text-amber-600 ml-auto hidden sm:block">Atendimentos passados com status "Agendada" — atualize o registro</span>
-              </div>
-              <div className="overflow-x-auto" style={{ maxHeight: '260px', overflowY: 'auto' }}>
-                <table className="w-full text-xs">
-                  <thead className="sticky top-0 bg-amber-50 border-b border-amber-100">
-                    <tr className="text-amber-700 uppercase tracking-wide">
-                      <th className="px-4 py-2 text-left font-semibold">Data</th>
-                      <th className="px-3 py-2 text-left font-semibold">Horário</th>
-                      <th className="px-3 py-2 text-left font-semibold">Paciente</th>
-                      <th className="px-3 py-2 text-left font-semibold hidden sm:table-cell">Especialidade</th>
-                      <th className="px-4 py-2 text-center font-semibold">Editar</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-amber-100">
-                    {pendingFill.map(c => {
-                      const patient = getPatient(c.patientId)
-                      return (
-                        <tr key={c.id} className="hover:bg-amber-100/60 transition-colors">
-                          <td className="px-4 py-2 text-amber-900 font-medium whitespace-nowrap">{formatDateShort(c.date)}</td>
-                          <td className="px-3 py-2 text-amber-700 tabular-nums">{c.time?.slice(0, 5) || '—'}</td>
-                          <td className="px-3 py-2 text-amber-900 font-medium max-w-[140px] truncate">{patient?.fullName || '—'}</td>
-                          <td className="px-3 py-2 hidden sm:table-cell"><Badge specialty={c.specialty} /></td>
-                          <td className="px-4 py-2 text-center">
-                            <button
-                              onClick={() => setEditingConsultation(c)}
-                              className="p-1.5 text-amber-700 hover:text-amber-900 hover:bg-amber-200 rounded-lg transition-colors"
-                              title="Editar atendimento"
-                            >
-                              <FiEdit2 size={13} />
-                            </button>
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
 
           {/* ── Agenda do dia ──────────────────────────────────────────── */}
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
@@ -789,6 +788,53 @@ export default function DashboardPage() {
               </div>
             )}
           </div>
+
+          {/* ── Pendências de preenchimento ────────────────────────────── */}
+          {pendingFill.length > 0 && (
+            <div className="bg-amber-50 border border-amber-200 rounded-2xl overflow-hidden">
+              <div className="px-4 py-3 border-b border-amber-200 flex items-center gap-2 flex-wrap">
+                <FiAlertTriangle size={15} className="text-amber-600 shrink-0" />
+                <span className="font-semibold text-amber-800 text-sm">Pendências de preenchimento</span>
+                <span className="bg-amber-200 text-amber-800 text-xs font-bold px-2 py-0.5 rounded-full">{pendingFill.length}</span>
+                <span className="text-xs text-amber-600 ml-auto hidden sm:block">Atendimentos passados com status "Agendada" — atualize o registro</span>
+              </div>
+              <div className="overflow-x-auto" style={{ maxHeight: '260px', overflowY: 'auto' }}>
+                <table className="w-full text-xs">
+                  <thead className="sticky top-0 bg-amber-50 border-b border-amber-100">
+                    <tr className="text-amber-700 uppercase tracking-wide">
+                      <th className="px-4 py-2 text-left font-semibold">Data</th>
+                      <th className="px-3 py-2 text-left font-semibold">Horário</th>
+                      <th className="px-3 py-2 text-left font-semibold">Paciente</th>
+                      <th className="px-3 py-2 text-left font-semibold hidden sm:table-cell">Especialidade</th>
+                      <th className="px-4 py-2 text-center font-semibold">Editar</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-amber-100">
+                    {pendingFill.map(c => {
+                      const patient = getPatient(c.patientId)
+                      return (
+                        <tr key={c.id} className="hover:bg-amber-100/60 transition-colors">
+                          <td className="px-4 py-2 text-amber-900 font-medium whitespace-nowrap">{formatDateShort(c.date)}</td>
+                          <td className="px-3 py-2 text-amber-700 tabular-nums">{c.time?.slice(0, 5) || '—'}</td>
+                          <td className="px-3 py-2 text-amber-900 font-medium max-w-[140px] truncate">{patient?.fullName || '—'}</td>
+                          <td className="px-3 py-2 hidden sm:table-cell"><Badge specialty={c.specialty} /></td>
+                          <td className="px-4 py-2 text-center">
+                            <button
+                              onClick={() => setEditingConsultation(c)}
+                              className="p-1.5 text-amber-700 hover:text-amber-900 hover:bg-amber-200 rounded-lg transition-colors"
+                              title="Editar atendimento"
+                            >
+                              <FiEdit2 size={13} />
+                            </button>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
 
           {/* ── Alertas clínicos ───────────────────────────────────────── */}
           {(evasionRisk.length > 0 || withConflicts > 0) && (
