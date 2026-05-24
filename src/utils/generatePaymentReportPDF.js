@@ -1,5 +1,5 @@
 import jsPDF from 'jspdf'
-import 'jspdf-autotable'
+import autoTable from 'jspdf-autotable'
 import {
   addPageHeader, addAllPageFooters, loadLogo,
   fmtDatePDF, fmtCurrencyPDF,
@@ -43,7 +43,7 @@ export async function generatePaymentSummaryPDF({ invoices, dateFrom, dateTo, st
   )
 
   let firstPage = true
-  doc.autoTable({
+  autoTable(doc, {
     startY: 32,
     head: [['NF', 'Paciente', 'Período', 'Status', 'Emissão', 'Total']],
     body: invoices.map(inv => [
@@ -166,7 +166,7 @@ export async function generatePaymentDetailPDF({ invoices, dateFrom, dateTo, sta
   ])
 
   let firstPage = true
-  doc.autoTable({
+  autoTable(doc, {
     startY: 32,
     head: [['Data', 'Horário', 'Especialidade', 'Terapeuta', 'Status', 'Valor']],
     body,
