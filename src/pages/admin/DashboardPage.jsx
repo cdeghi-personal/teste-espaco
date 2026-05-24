@@ -2,7 +2,7 @@ import {
   FiUsers, FiCalendar, FiClipboard, FiTrendingUp,
   FiMessageSquare, FiArrowRight, FiBell, FiLifeBuoy,
   FiDollarSign, FiCheckCircle, FiAlertTriangle,
-  FiArrowUp, FiArrowDown, FiMinus, FiActivity,
+  FiArrowUp, FiArrowDown, FiMinus, FiActivity, FiEdit2,
 } from 'react-icons/fi'
 import { useState, useEffect, useMemo } from 'react'
 import { format, subMonths, addDays, subDays } from 'date-fns'
@@ -13,6 +13,7 @@ import Badge from '../../components/ui/Badge'
 import { formatDateShort } from '../../utils/dateUtils'
 import { supabase } from '../../lib/supabase'
 import { ROUTES } from '../../constants/routes'
+import ConsultationFormModal from './consultations/ConsultationFormModal'
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -161,6 +162,8 @@ export default function DashboardPage() {
   const isAdmin       = user?.role === 'admin'
   const isSupportAdmin = isAdmin && !user?.id
 
+  const [editingConsultation, setEditingConsultation] = useState(null)
+
   // ── status IDs para "realizado" — usa flag consumesPrepaidSession (exclui "agendada") ──
   const realizadaIds = useMemo(() =>
     consultationStatuses.filter(s =>
@@ -176,6 +179,10 @@ export default function DashboardPage() {
 
   const cancelaIds = useMemo(() =>
     consultationStatuses.filter(s => norm(s.name).includes('cancel')).map(s => s.id),
+  [consultationStatuses])
+
+  const agendadaIds = useMemo(() =>
+    consultationStatuses.filter(s => norm(s.name).includes('agend')).map(s => s.id),
   [consultationStatuses])
 
   // ── visibility filters ───────────────────────────────────────────────────
@@ -273,6 +280,13 @@ export default function DashboardPage() {
     mySessions.filter(c => (c.conflicts || []).length > 0 && c.date >= today).length,
   [mySessions, today])
 
+  // ── pending fill: past sessions still with "agendada" status ─────────────
+  const pendingFill = useMemo(() =>
+    mySessions
+      .filter(c => c.date < today && agendadaIds.includes(c.consultationStatusId))
+      .sort((a, b) => a.date.localeCompare(b.date) || (a.time || '').localeCompare(b.time || '')),
+  [mySessions, today, agendadaIds])
+
   // ── admin: therapist ranking ──────────────────────────────────────────────
   const therapistRanking = useMemo(() => {
     if (!isAdmin) return []
@@ -285,12 +299,18 @@ export default function DashboardPage() {
         )
         const realized = tSessions.filter(c => realizadaIds.includes(c.consultationStatusId))
         const rate = tSessions.length > 0 ? Math.round(realized.length / tSessions.length * 100) : 0
-        return { therapist: t, total: tSessions.length, realized: realized.length, rate }
+        const pending = consultations.filter(c =>
+          c.therapistId === t.id &&
+          c.date < today &&
+          c.eventType !== 'INTERVIEW' &&
+          agendadaIds.includes(c.consultationStatusId)
+        ).length
+        return { therapist: t, total: tSessions.length, realized: realized.length, rate, pending }
       })
       .filter(x => x.total > 0)
       .sort((a, b) => b.realized - a.realized)
       .slice(0, 8)
-  }, [isAdmin, therapists, consultations, thisMonth, realizadaIds])
+  }, [isAdmin, therapists, consultations, thisMonth, realizadaIds, today, agendadaIds])
 
   // ── specialty distribution (admin=sessions, therapist=patients) ───────────
   const activeSpecialties = specialtiesData.filter(s => s.active !== false)
@@ -538,11 +558,12 @@ export default function DashboardPage() {
                         <th className="px-4 py-2 text-left font-semibold">Terapeuta</th>
                         <th className="px-3 py-2 text-center font-semibold">Total</th>
                         <th className="px-3 py-2 text-center font-semibold">Realizadas</th>
-                        <th className="px-4 py-2 text-center font-semibold">Taxa</th>
+                        <th className="px-3 py-2 text-center font-semibold">Taxa</th>
+                        <th className="px-4 py-2 text-center font-semibold">Pendências</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
-                      {therapistRanking.map(({ therapist: t, total, realized, rate }, i) => (
+                      {therapistRanking.map(({ therapist: t, total, realized, rate, pending }, i) => (
                         <tr key={t.id} className="hover:bg-gray-50/60 transition-colors">
                           <td className="px-4 py-2.5">
                             <div className="flex items-center gap-2">
@@ -555,12 +576,18 @@ export default function DashboardPage() {
                           </td>
                           <td className="px-3 py-2.5 text-center text-gray-600">{total}</td>
                           <td className="px-3 py-2.5 text-center font-semibold text-green-700">{realized}</td>
-                          <td className="px-4 py-2.5 text-center">
+                          <td className="px-3 py-2.5 text-center">
                             <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
                               rate >= 80 ? 'bg-green-100 text-green-700' :
                               rate >= 60 ? 'bg-amber-100 text-amber-700' :
                               'bg-red-100 text-red-600'
                             }`}>{rate}%</span>
+                          </td>
+                          <td className="px-4 py-2.5 text-center">
+                            {pending > 0
+                              ? <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-600">{pending}</span>
+                              : <span className="text-gray-300 text-xs">—</span>
+                            }
                           </td>
                         </tr>
                       ))}
@@ -656,6 +683,53 @@ export default function DashboardPage() {
             <StatCard icon={FiCalendar}    label="Próximos 7 dias"     value={next7Sessions.length}   color="text-brand-blue" bg="bg-blue-50" />
             <StatCard icon={FiUsers}       label="Meus pacientes"      value={activePatients.length}  color="text-purple-600" bg="bg-purple-50" />
           </div>
+
+          {/* ── Pendências de preenchimento ────────────────────────────── */}
+          {pendingFill.length > 0 && (
+            <div className="bg-amber-50 border border-amber-200 rounded-2xl overflow-hidden">
+              <div className="px-4 py-3 border-b border-amber-200 flex items-center gap-2 flex-wrap">
+                <FiAlertTriangle size={15} className="text-amber-600 shrink-0" />
+                <span className="font-semibold text-amber-800 text-sm">Pendências de preenchimento</span>
+                <span className="bg-amber-200 text-amber-800 text-xs font-bold px-2 py-0.5 rounded-full">{pendingFill.length}</span>
+                <span className="text-xs text-amber-600 ml-auto hidden sm:block">Atendimentos passados com status "Agendada" — atualize o registro</span>
+              </div>
+              <div className="overflow-x-auto" style={{ maxHeight: '260px', overflowY: 'auto' }}>
+                <table className="w-full text-xs">
+                  <thead className="sticky top-0 bg-amber-50 border-b border-amber-100">
+                    <tr className="text-amber-700 uppercase tracking-wide">
+                      <th className="px-4 py-2 text-left font-semibold">Data</th>
+                      <th className="px-3 py-2 text-left font-semibold">Horário</th>
+                      <th className="px-3 py-2 text-left font-semibold">Paciente</th>
+                      <th className="px-3 py-2 text-left font-semibold hidden sm:table-cell">Especialidade</th>
+                      <th className="px-4 py-2 text-center font-semibold">Editar</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-amber-100">
+                    {pendingFill.map(c => {
+                      const patient = getPatient(c.patientId)
+                      return (
+                        <tr key={c.id} className="hover:bg-amber-100/60 transition-colors">
+                          <td className="px-4 py-2 text-amber-900 font-medium whitespace-nowrap">{formatDateShort(c.date)}</td>
+                          <td className="px-3 py-2 text-amber-700 tabular-nums">{c.time?.slice(0, 5) || '—'}</td>
+                          <td className="px-3 py-2 text-amber-900 font-medium max-w-[140px] truncate">{patient?.fullName || '—'}</td>
+                          <td className="px-3 py-2 hidden sm:table-cell"><Badge specialty={c.specialty} /></td>
+                          <td className="px-4 py-2 text-center">
+                            <button
+                              onClick={() => setEditingConsultation(c)}
+                              className="p-1.5 text-amber-700 hover:text-amber-900 hover:bg-amber-200 rounded-lg transition-colors"
+                              title="Editar atendimento"
+                            >
+                              <FiEdit2 size={13} />
+                            </button>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
 
           {/* ── Agenda do dia ──────────────────────────────────────────── */}
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
@@ -782,6 +856,14 @@ export default function DashboardPage() {
             </div>
           )}
         </>
+      )}
+
+      {/* ── Edit modal (pendências de preenchimento) ──────────────────── */}
+      {editingConsultation && (
+        <ConsultationFormModal
+          initial={editingConsultation}
+          onClose={() => setEditingConsultation(null)}
+        />
       )}
 
     </div>
