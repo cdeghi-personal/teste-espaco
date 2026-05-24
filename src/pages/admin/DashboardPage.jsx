@@ -161,9 +161,11 @@ export default function DashboardPage() {
   const isAdmin       = user?.role === 'admin'
   const isSupportAdmin = isAdmin && !user?.id
 
-  // ── fuzzy status matching ────────────────────────────────────────────────
+  // ── status IDs para "realizado" — usa flag consumesPrepaidSession (exclui "agendada") ──
   const realizadaIds = useMemo(() =>
-    consultationStatuses.filter(s => norm(s.name).includes('realiz')).map(s => s.id),
+    consultationStatuses.filter(s =>
+      s.consumesPrepaidSession === true && !norm(s.name).includes('agend')
+    ).map(s => s.id),
   [consultationStatuses])
 
   const faltaIds = useMemo(() =>
@@ -294,7 +296,11 @@ export default function DashboardPage() {
   const specialtyDist = useMemo(() => {
     if (isAdmin) {
       return activeSpecialties
-        .map(spec => ({ ...spec, count: thisMonthSessions.filter(c => c.specialty === spec.key).length }))
+        .map(spec => ({
+          ...spec,
+          count: thisMonthSessions.filter(c => c.specialty === spec.key).length,
+          realized: thisMonthSessions.filter(c => c.specialty === spec.key && realizadaIds.includes(c.consultationStatusId)).length,
+        }))
         .filter(s => s.count > 0)
         .sort((a, b) => b.count - a.count)
     }
@@ -305,7 +311,7 @@ export default function DashboardPage() {
       }))
       .filter(s => s.count > 0)
       .sort((a, b) => b.count - a.count)
-  }, [isAdmin, activeSpecialties, thisMonthSessions, activePatients])
+  }, [isAdmin, activeSpecialties, thisMonthSessions, activePatients, realizadaIds])
 
   // ── admin: financial data ─────────────────────────────────────────────────
   const [financial, setFinancial] = useState(null)
@@ -574,13 +580,16 @@ export default function DashboardPage() {
                   {specialtyDist.map(spec => {
                     const bg = spec.color || '#e5e7eb'
                     const tc = textColorForBg(bg)
-                    const total = thisMonthSessions.filter(c => c.specialty === spec.key).length
-                    const pct = thisMonthSessions.length > 0 ? Math.round(total / thisMonthSessions.length * 100) : 0
+                    const pct = thisMonthSessions.length > 0 ? Math.round(spec.count / thisMonthSessions.length * 100) : 0
                     return (
                       <div key={spec.key} className="rounded-xl px-3 py-2.5 border border-gray-100" style={{ backgroundColor: bg }}>
                         <div className="text-xl font-bold" style={{ color: tc }}>{spec.count}</div>
                         <div className="text-xs font-medium leading-tight" style={{ color: tc, opacity: .85 }}>{spec.label}</div>
-                        <div className="text-xs mt-0.5" style={{ color: tc, opacity: .6 }}>{pct}% das sessões</div>
+                        <div className="text-xs mt-1 flex items-center gap-1 flex-wrap">
+                          <span style={{ color: tc, opacity: .75 }}>{spec.realized} realizadas</span>
+                          <span style={{ color: tc, opacity: .4 }}>·</span>
+                          <span style={{ color: tc, opacity: .55 }}>{pct}% do mês</span>
+                        </div>
                       </div>
                     )
                   })}
