@@ -337,6 +337,7 @@ export default function PaymentsPage() {
             <p><strong>Marcar como Pago:</strong> disponível para faturas com status <em>Emitida</em>. Confirme para registrar o recebimento e atualizar o status para <em>Paga</em>.</p>
             <p><strong>Cancelar NF:</strong> disponível para faturas com status <em>Emitida</em>. Cancela a fatura e restaura automaticamente o status original de cada atendimento, removendo os dados da NF.</p>
             <p><strong>Filtros:</strong> use os botões de mês (Mês-2 / Mês-1 / Atual) ou defina um período manual. Filtre por status ou busque pelo número da NF ou nome do paciente.</p>
+            <p><strong>Exportar:</strong> use os botões no cabeçalho para exportar as faturas filtradas. <em>Resumo</em> gera um PDF com uma linha por fatura e total geral. <em>Detalhado</em> gera um PDF com os atendimentos de cada fatura. <em>CSV</em> exporta a listagem em formato compatível com Excel. Faturas canceladas não são incluídas nos PDFs.</p>
           </HelpButton>
           <button
             onClick={() => handleExportPDF('summary')}

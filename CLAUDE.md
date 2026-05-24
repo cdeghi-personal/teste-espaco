@@ -485,6 +485,9 @@ Authentication → URL Configuration:
 - Filtros: tipo de relatório, paciente/terapeuta (searchable), período (mês ou De/Até), status (múltipla seleção — inclui automáticos)
 - Funções: `generateConsultasPacientePDF({ ..., draftMode, nfNumber, nfDate, returnBlob })` — quando `returnBlob=true` retorna `{ blob, filename, totalAmount }` em vez de fazer `doc.save()`; `generateConsultasTerapeutaPDF()` em `src/utils/generateReportPDF.js`
 - Card de acesso rápido ao "Relatório de Convênio" na parte superior da página
+- **Filtro de terapeutas não-equipe:** `filterConsultations` exclui consultas cujo terapeuta primário tenha `belongsToTeam === false` (checagem explícita, não afeta registros onde o campo é null/undefined).
+- **`buildUnconfiguredItems`:** verifica valor não configurado tanto para a especialidade primária quanto para cada especialidade secundária em `c.consultationTherapists.filter(t => !t.isPrimary)` — espelha a expansão que o gerador de PDF faz.
+- **Ordenação dos PDFs:** todos os relatórios PDF (consultas por paciente, por terapeuta, prontuário, faturas) ordenam os itens do mais antigo para o mais novo. A tela preserva a ordem original.
 
 ## Relatório de Convênio (`/admin/relatorios/convenio`)
 
@@ -558,7 +561,7 @@ Não é mais editável. Texto padrão fixo definido em `DESEMPENHO_FIXO` em `gen
 - **companySettings:** passado para ambas as funções PDF; exibe Razão Social, CNPJ e CNES (se configurado) no cabeçalho.
 - **Horários por sessão:** cada sessão tem campo `time` individual. Campo "Horário padrão" + botão "aplicar a todas". O PDF produz uma linha única via `buildSessionsLine(sessions, fallbackHorario)` — formato: `"02 às 17:00, 15 às 18:00 e 27 às 11:00"`.
 - **Lista de pacientes:** somente pacientes com `needs_convenio_report = true` aparecem no select. Admin vê todos os elegíveis; terapeuta vê apenas os seus (gerente do caso ou envolvido). Filtro aplicado em `accessiblePatients` na `ConvenioReportPage`.
-- **Busca de atendimentos:** filtra `consultations` por `patientId + therapistId (emissor) + specialty + date range`. Admin recebe erro se não tiver terapeuta emissor selecionado.
+- **Busca de atendimentos:** filtra `consultations` por `patientId + therapistId (emissor) + specialty + date range`. Admin recebe erro se não tiver terapeuta emissor selecionado. Exclui consultas com `belongsToTeam === false` no terapeuta primário.
 - **Auto-refresh do histórico:** após "Baixar e Registrar", seção recarrega via `historyRefreshKey`.
 - **Sugestão com IA:** botão "Sugerir com IA" (⚡ violeta), posicionado inline ao lado da label "Objetivos de Intervenção". Sugere apenas `objetivos`; encaminhamento e desempenho não são sugeridos pela IA. Requer `OPENAI_API_KEY` no Supabase + JWT Verification **DESATIVADO**.
 - **Histórico — RT:** `saveHistory` sempre persiste `responsible_therapist_id: selectedRT?.id || null` (mesmo quando RT = emissor). `handleRestore` prioriza `record.responsible_therapist_id` antes de `fd.rtId` (legado).
@@ -575,6 +578,40 @@ Não é mais editável. Texto padrão fixo definido em `DESEMPENHO_FIXO` em `gen
   - **Categorias com datas removidas** (`efemeride`, `santo`, `aniversario`, `comemorativa`) — LLMs confabulam datas especificas.
   - **Loading:** mensagem humorstica exibida enquanto aguarda a Edge Function.
   - **Deploy:** `npx supabase functions deploy dashboard-greeting --project-ref ffkkgmikvsqhutftoajh`
+
+### Estrutura de painéis e dual-role
+
+- `isDualRole = isAdmin && !!user?.id` — admin que também tem perfil de terapeuta.
+- `effectiveView = isDualRole ? dashView : isAdmin ? 'admin' : 'therapist'` — painel efetivo; `dashView` é estado local que começa em `'therapist'` para dual-role.
+- Toggle **"Meu Painel / Painel Admin"** exibido na área da saudação apenas para `isDualRole`. Permite alternar sem recarregar a página.
+- **IMPORTANTE:** todas as condições de renderização usam `effectiveView === 'admin'` / `effectiveView === 'therapist'` — NUNCA `isAdmin` diretamente, para que dual-role funcione corretamente.
+
+### Fontes de dados separadas
+
+- `clinicSessions` — todas as consultas da clínica (`event_type !== 'INTERVIEW'`); usado no painel admin.
+- `mySessions` — consultas pessoais (`therapistId === user?.id || consultationTherapists.includes(user?.id)`); retorna `[]` se `!user?.id`; **nunca** usa `isAdmin` para expandir. Usado no painel terapeuta.
+- `myPatients` — pacientes onde o usuário é gerente ou envolvido. Usado no painel terapeuta.
+- `activePatients` — todos os pacientes ativos da clínica. Usado no painel admin.
+- `clinicThisMonth`, `clinicLastMonth` — fatias mensais de `clinicSessions`.
+
+### Critérios de "realizada" e "agendada"
+
+- `realizadaIds` = `consultationStatuses` com `consumesPrepaidSession === true && !norm(s.name).includes('agend')` — mais robusto que busca por nome.
+- `agendadaIds` = `consultationStatuses` com `norm(s.name).includes('agend')`.
+- Entrevistas (`event_type === 'INTERVIEW'`) são excluídas de todos os contadores.
+
+### Pendências de preenchimento
+
+- `pendingFill` = atendimentos com `c.date < today && agendadaIds.includes(c.consultationStatusId) && c.therapistId === user?.id` (somente primário — terapeuta secundário não é responsável pelo preenchimento).
+- Exibido como tabela editável abaixo do card "Agenda de Hoje" no painel terapeuta.
+- Lápis (FiEdit2) por linha abre `ConsultationFormModal` em modo edição.
+- No painel admin: coluna "Pendências" na tabela 🏆 Terapeutas — Mês, usando `c.therapistId === t.id`.
+
+### Distribuição por especialidade
+
+- `specialtyDist` usa `effectiveView === 'admin'` para decidir branch:
+  - Admin: conta sessões de `clinicThisMonth` + coluna `realized` (realizadas no mês).
+  - Terapeuta: conta **pacientes** de `myPatients` que têm aquela especialidade no cadastro.
 
 ## Dados da Empresa (`/admin/empresa`)
 
@@ -738,6 +775,12 @@ Não é mais editável. Texto padrão fixo definido em `DESEMPENHO_FIXO` em `gen
 - **Cancelar NF (`cancelPaymentInvoice`):** restaura `previous_status_before_invoice` em cada consulta, limpa `nf_number`/`nf_issue_date`, muda invoice para CANCELLED. Confirmação modal antes.
 - **Marcar como Pago (`markInvoicePaid`):** busca status cujo nome contenha "pago" (case-insensitive), atualiza consultas e invoice para PAID. Confirmação modal antes.
 - Estado local atualizado otimisticamente após ações de cancelar/pagar.
+- **Exportação (botões no header):**
+  - **PDF Resumo** — `generatePaymentSummaryPDF()`: tabela com todas as faturas não-canceladas filtradas (NF, Paciente, Período, Status, Emissão, Total) + total geral no rodapé; ordenadas da mais antiga para a mais nova por `created_at`.
+  - **PDF Detalhado** — `generatePaymentDetailPDF()`: mesma listagem com linha de cabeçalho azul por fatura + tabela de atendimentos do snapshot; faturas canceladas excluídas.
+  - **CSV** — `handleExportCSV()`: colunas NF, Paciente, Período, Status, Data Emissão, Total, Atendimentos, Data Geração; BOM UTF-8 para compatibilidade com Excel; separador `;`.
+  - Todos os três respeitam os filtros ativos na tela; botões desabilitados se não houver faturas.
+- **`src/utils/generatePaymentReportPDF.js`** — gerador dos dois PDFs; usa `autoTable(doc, opts)` (padrão funcional do projeto, não `doc.autoTable`).
 
 ## Agenda (`/admin/agenda`)
 
@@ -823,7 +866,7 @@ Não é mais editável. Texto padrão fixo definido em `DESEMPENHO_FIXO` em `gen
 
 - Criar série: modal separado `SeriesFormModal` (não embutido no `ConsultationFormModal`).
 - Botão "Série" (`FiRepeat`) — visível para admin e membros da equipe (`isAdminOrTeam`) em **Agenda** e em **Atendimentos** (`ConsultationsPage`).
-- Ao editar atendimento de série: admin vê banner de confirmação com "Apenas esta" / "Esta e as próximas"; terapeutas auto-marcam `is_series_exception = true` sem diálogo.
+- Ao editar atendimento de série: o diálogo "Apenas esta / Esta e as próximas" só é exibido quando há mudança em campos **estruturais** (`time`, `roomId`, `appointmentTypeId`, `therapistId`, `specialty`). Alterações somente em campos de nota (Objetivo, Relato, Objetivo da Próxima) são salvas diretamente sem perguntar escopo — nota é sempre individual. Terapeutas auto-marcam `is_series_exception = true` sem diálogo.
 - Chip roxo "Consulta recorrente" exibido no `ConsultationFormModal` quando `initial.seriesId` presente.
 - Exclusão da lista: se `seriesId` presente → modal com opções "Apenas este" / "Este e os próximos" (`seriesDeleteConfirm`).
 - **Chips de recorrência nos cards (Agenda e ConsultationsPage):** indigo FiRepeat = série regular; amber FiRepeat+`!` = ocorrência alterada individualmente; 👥 N = múltiplos terapeutas com tooltip de nomes.

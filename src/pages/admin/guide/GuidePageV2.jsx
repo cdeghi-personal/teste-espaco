@@ -297,6 +297,29 @@ export default function GuidePageV2() {
       {/* ── PAINEL TERAPEUTA ── */}
       <div className={`panel${tab === 'terapeuta' ? ' active' : ''}`}>
 
+        {/* Dashboard */}
+        <div className="sec">
+          <p className="sec-title">🏠 Dashboard</p>
+          <p className="sec-sub">Visão geral da sua semana e indicadores do mês — tudo na tela inicial.</p>
+          <div className="grid-4">
+            <Card delay={0.05} icon="✅" bg="#f0fdf4" title="Realizadas no mês" desc="Conta todos os atendimentos com status que marca 'Consome Pré-pago'. Mostra variação percentual em relação ao mês anterior." tags={[['Com comparativo', 'green']]} />
+            <Card delay={0.10} icon="📅" bg="#eff6ff" title="Agenda de hoje" desc="Lista todos os atendimentos do dia com horário, paciente e sala. Clique em qualquer um para abrir os detalhes diretamente." tags={[['Acesso rápido', 'blue']]} />
+            <Card delay={0.15} icon="⚠️" bg="#fef3c7" title="Pendências de preenchimento" desc="Lista todos os atendimentos passados que ainda estão com status 'Agendada' — ou seja, que precisam ser atualizados. Clique no lápis para editar diretamente." tags={[['Ação imediata', 'orange']]} />
+            <Card delay={0.20} icon="🚨" bg="#fff1f2" title="Risco de evasão" desc="Pacientes seus que não tiveram atendimento há mais de 30 dias. Serve de alerta para retomar o contato antes de perder o vínculo." tags={[['Alerta proativo', '']]} />
+          </div>
+          {isAdmin && (
+            <div className="highlight" style={{ marginTop: 20 }}>
+              <div className="hi">🔀</div>
+              <div>
+                <h3>Painel duplo para admin-terapeuta</h3>
+                <p>Se você tem perfil de terapeuta e de administrador ao mesmo tempo, o dashboard exibe um toggle <strong>"Meu Painel / Painel Admin"</strong> no cabeçalho. Por padrão abre no painel pessoal de terapeuta. Alterne para o Painel Admin a qualquer momento para ver os indicadores globais da clínica, o ranking de terapeutas com coluna de pendências e a distribuição de sessões por especialidade do mês.</p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="divider" />
+
         {/* Agenda */}
         <div className="sec">
           <p className="sec-title">📅 Agenda Semanal</p>
@@ -519,6 +542,7 @@ export default function GuidePageV2() {
             <Card delay={0.05} icon="📄" bg="#eff6ff" title="Faturas registradas" desc="Cada Demonstrativo Definitivo gera uma fatura (NF) automaticamente. Acompanhe número da NF, paciente, período, total e status em uma lista paginada." tags={[['Histórico completo', 'blue']]} />
             <Card delay={0.10} icon="🔄" bg="#f0fdf4" title="Ciclo de vida da fatura" desc="Emitida → Paga (ao confirmar recebimento) ou Cancelada (restaura o status anterior dos atendimentos e limpa os campos de NF). Cada transição exige confirmação explícita." tags={[['Rastreável', 'green']]} />
             <Card delay={0.15} icon="🔍" bg="#fff7ed" title="Filtros e busca" desc="Filtre por mês (Mês-2 / Mês-1 / Atual), status (Emitida/Paga/Cancelada) ou busque por número de NF e nome do paciente. Clique em Ver detalhes para ver todos os atendimentos incluídos na fatura." tags={[['Transparência', 'orange']]} />
+            <Card delay={0.20} icon="📊" bg="#faf5ff" title="Exportação de relatórios" desc="Exporte as faturas filtradas em três formatos: PDF Resumo (uma linha por fatura com total geral), PDF Detalhado (com todos os atendimentos de cada fatura) e CSV (compatível com Excel). Faturas canceladas não são incluídas nos PDFs." tags={[['PDF + CSV', 'violet']]} />
           </div>
 
           <div className="divider" />
