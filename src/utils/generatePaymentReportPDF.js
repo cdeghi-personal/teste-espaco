@@ -26,6 +26,9 @@ function invoicePatientName(inv) {
 // ─── PDF Resumo ───────────────────────────────────────────────────────────────
 
 export async function generatePaymentSummaryPDF({ invoices, dateFrom, dateTo, status, companySettings }) {
+  const sorted = [...invoices]
+    .filter(i => i.status !== 'CANCELLED')
+    .sort((a, b) => (a.created_at || '').localeCompare(b.created_at || ''))
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
   const logoData = await loadLogo()
   const subtitle = 'Relatório de Faturas — Resumo'
@@ -38,7 +41,7 @@ export async function generatePaymentSummaryPDF({ invoices, dateFrom, dateTo, st
   doc.setTextColor(...PDF_GRAY)
   const statusTxt = status ? (STATUS_LABEL[status] || status) : 'Todos os status'
   doc.text(
-    `Período: ${periodFilterLabel(dateFrom, dateTo)}   ·   Status: ${statusTxt}   ·   ${invoices.length} fatura(s)`,
+    `Período: ${periodFilterLabel(dateFrom, dateTo)}   ·   Status: ${statusTxt}   ·   ${sorted.length} fatura(s)`,
     14, 27,
   )
 
@@ -46,7 +49,7 @@ export async function generatePaymentSummaryPDF({ invoices, dateFrom, dateTo, st
   autoTable(doc, {
     startY: 32,
     head: [['NF', 'Paciente', 'Período', 'Status', 'Emissão', 'Total']],
-    body: invoices.map(inv => [
+    body: sorted.map(inv => [
       inv.nf_number || '—',
       invoicePatientName(inv),
       inv.snapshot?.period || '—',
@@ -55,8 +58,8 @@ export async function generatePaymentSummaryPDF({ invoices, dateFrom, dateTo, st
       fmtCurrencyPDF(inv.total_amount),
     ]),
     foot: [[
-      { content: `Total Geral (${invoices.length} fatura${invoices.length !== 1 ? 's' : ''})`, colSpan: 5, styles: { halign: 'right' } },
-      fmtCurrencyPDF(grandTotal(invoices)),
+      { content: `Total Geral (${sorted.length} fatura${sorted.length !== 1 ? 's' : ''})`, colSpan: 5, styles: { halign: 'right' } },
+      fmtCurrencyPDF(grandTotal(sorted)),
     ]],
     theme: 'grid',
     styles: { fontSize: 8, cellPadding: 2.5, textColor: PDF_DARK },
@@ -86,6 +89,9 @@ export async function generatePaymentSummaryPDF({ invoices, dateFrom, dateTo, st
 // ─── PDF Detalhado ────────────────────────────────────────────────────────────
 
 export async function generatePaymentDetailPDF({ invoices, dateFrom, dateTo, status, companySettings }) {
+  const sorted = [...invoices]
+    .filter(i => i.status !== 'CANCELLED')
+    .sort((a, b) => (a.created_at || '').localeCompare(b.created_at || ''))
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
   const logoData = await loadLogo()
   const subtitle = 'Relatório de Faturas — Detalhado'
@@ -97,7 +103,7 @@ export async function generatePaymentDetailPDF({ invoices, dateFrom, dateTo, sta
   doc.setTextColor(...PDF_GRAY)
   const statusTxt = status ? (STATUS_LABEL[status] || status) : 'Todos os status'
   doc.text(
-    `Período: ${periodFilterLabel(dateFrom, dateTo)}   ·   Status: ${statusTxt}   ·   ${invoices.length} fatura(s)`,
+    `Período: ${periodFilterLabel(dateFrom, dateTo)}   ·   Status: ${statusTxt}   ·   ${sorted.length} fatura(s)`,
     14, 27,
   )
 
@@ -105,7 +111,7 @@ export async function generatePaymentDetailPDF({ invoices, dateFrom, dateTo, sta
   const body = []
   const invoiceHeaderIndices = new Set()
 
-  for (const inv of invoices) {
+  for (const inv of sorted) {
     const snap = inv.snapshot || {}
     const consultations = snap.consultations || []
     const patientName = invoicePatientName(inv)
@@ -155,12 +161,12 @@ export async function generatePaymentDetailPDF({ invoices, dateFrom, dateTo, sta
   // Grand total row
   body.push([
     {
-      content: `Total Geral (${invoices.length} fatura${invoices.length !== 1 ? 's' : ''})`,
+      content: `Total Geral (${sorted.length} fatura${sorted.length !== 1 ? 's' : ''})`,
       colSpan: 5,
       styles: { fontStyle: 'bold', fontSize: 8, halign: 'right', fillColor: PDF_LIGHT, textColor: PDF_DARK },
     },
     {
-      content: fmtCurrencyPDF(grandTotal(invoices)),
+      content: fmtCurrencyPDF(grandTotal(sorted)),
       styles: { fontStyle: 'bold', fontSize: 8, halign: 'right', fillColor: PDF_LIGHT, textColor: PDF_DARK },
     },
   ])

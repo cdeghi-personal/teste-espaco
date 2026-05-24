@@ -124,11 +124,12 @@ export async function generateProntuarioPDF({
 
   // ── Histórico de Atendimentos ──
   if (consultations.length > 0) {
+    const sortedConsultations = [...consultations].sort((a, b) => a.date.localeCompare(b.date))
     y = sectionBlock(doc, `Histórico de Atendimentos (${consultations.length})`, y)
     autoTable(doc, {
       startY: y, margin: { left: margin, right: margin },
       head: [['Data', 'Horário', 'Especialidade', 'Terapeuta', 'Tipo', 'Status', 'Sala']],
-      body: consultations.map(c => {
+      body: sortedConsultations.map(c => {
         const therapist = therapists.find(t => t.id === c.therapistId)
         const status = consultationStatuses.find(s => s.id === c.consultationStatusId)
         const type = appointmentTypes.find(t => t.id === c.appointmentTypeId)
