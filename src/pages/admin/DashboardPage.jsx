@@ -347,7 +347,7 @@ export default function DashboardPage() {
   const activeSpecialties = specialtiesData.filter(s => s.active !== false)
 
   const specialtyDist = useMemo(() => {
-    if (isAdmin) {
+    if (effectiveView === 'admin') {
       return activeSpecialties
         .map(spec => ({
           ...spec,
@@ -364,7 +364,7 @@ export default function DashboardPage() {
       }))
       .filter(s => s.count > 0)
       .sort((a, b) => b.count - a.count)
-  }, [isAdmin, activeSpecialties, clinicThisMonth, myPatients, realizadaIds])
+  }, [effectiveView, activeSpecialties, clinicThisMonth, myPatients, realizadaIds])
 
   // ── admin: financial data ─────────────────────────────────────────────────
   const [financial, setFinancial] = useState(null)
