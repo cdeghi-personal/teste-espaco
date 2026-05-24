@@ -160,7 +160,7 @@ export default function DashboardPage() {
   const ago30      = format(subDays(now, 30), 'yyyy-MM-dd')
 
   const isAdmin       = user?.role === 'admin'
-  const isSupportAdmin = isAdmin && !user?.id
+  const isSupportAdmin = isAdmin  // todo admin (inclusive admin+terapeuta) vê todos os chamados
   const isDualRole    = isAdmin && !!user?.id  // admin que também é terapeuta
 
   const [editingConsultation, setEditingConsultation] = useState(null)

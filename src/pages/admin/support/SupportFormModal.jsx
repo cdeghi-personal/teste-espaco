@@ -58,8 +58,8 @@ export default function SupportFormModal({ onClose, initial = null, onSaved }) {
   const { user } = useAuth()
   const { show: showToast } = useToast()
   const isAdmin = user?.role === 'admin'
-  // Admin que também é terapeuta tem acesso de terapeuta no suporte
-  const isSupportAdmin = isAdmin && !user?.id
+  // Todo admin (inclusive admin+terapeuta) tem acesso completo ao suporte
+  const isSupportAdmin = isAdmin
   const isEdit = !!initial?.id
   const readOnly = isEdit && !isSupportAdmin
 

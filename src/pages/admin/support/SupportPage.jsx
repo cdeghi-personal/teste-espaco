@@ -13,8 +13,8 @@ function formatDate(iso) {
 export default function SupportPage() {
   const { user } = useAuth()
   const isAdmin = user?.role === 'admin'
-  // Admin que também é terapeuta tem acesso de terapeuta no suporte
-  const isSupportAdmin = isAdmin && !user?.id
+  // Todo admin (inclusive admin+terapeuta) vê todos os chamados
+  const isSupportAdmin = isAdmin
 
   const [tickets, setTickets] = useState([])
   const [loading, setLoading] = useState(true)
