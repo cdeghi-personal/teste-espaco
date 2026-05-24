@@ -414,7 +414,7 @@ export default function PaymentsPage() {
             <option value="PAID">Paga</option>
             <option value="CANCELLED">Cancelada</option>
           </select>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <input
               type="date"
               value={dateFrom}

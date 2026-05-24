@@ -195,18 +195,18 @@ export default function CalendarBlockHistoryModal({ onClose, therapistId }) {
               </button>
             )
           })}
-          <div className="flex gap-1.5 ml-auto">
+          <div className="flex flex-wrap gap-1.5 sm:ml-auto">
             <input
               type="date"
               value={filterDateFrom}
               onChange={e => setFilterDateFrom(e.target.value)}
-              className="px-2 py-1.5 text-xs border border-gray-200 rounded-lg bg-white focus:ring-2 focus:ring-brand-blue outline-none"
+              className="px-2 py-1.5 text-xs border border-gray-200 rounded-lg bg-white focus:ring-2 focus:ring-brand-blue outline-none flex-1 sm:flex-none"
             />
             <input
               type="date"
               value={filterDateTo}
               onChange={e => setFilterDateTo(e.target.value)}
-              className="px-2 py-1.5 text-xs border border-gray-200 rounded-lg bg-white focus:ring-2 focus:ring-brand-blue outline-none"
+              className="px-2 py-1.5 text-xs border border-gray-200 rounded-lg bg-white focus:ring-2 focus:ring-brand-blue outline-none flex-1 sm:flex-none"
             />
           </div>
         </div>
@@ -258,89 +258,151 @@ export default function CalendarBlockHistoryModal({ onClose, therapistId }) {
       ) : filtered.length === 0 ? (
         <p className="text-sm text-gray-500 py-6 text-center">Nenhum bloqueio encontrado.</p>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-gray-100 text-left">
-                <th className="pb-2 pr-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Data</th>
-                <th className="pb-2 pr-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Horário</th>
-                <th className="pb-2 pr-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Tipo</th>
-                {isAdmin && <th className="pb-2 pr-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Terapeuta</th>}
-                <th className="pb-2 pr-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Descrição</th>
-                <th className="pb-2 pr-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</th>
-                <th className="pb-2 text-xs font-semibold text-gray-500 uppercase tracking-wide">Ações</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {filtered.map(b => {
-                const canEdit = isAdmin || user?.id === b.therapistId
-                return (
-                  <tr key={b.id} className={b.cancelled ? 'opacity-50' : ''}>
-                    <td className="py-2 pr-3 text-gray-700 whitespace-nowrap">
-                      {fmtDate(b.date)}
-                      {b.seriesId && (
-                        <span title="Bloqueio recorrente" className="ml-1 inline-flex items-center text-indigo-500"><FiRepeat size={11} /></span>
-                      )}
-                    </td>
-                    <td className="py-2 pr-3 text-gray-700 whitespace-nowrap">
-                      {fmtTime(b.startTime)}–{fmtTime(b.endTime)}
-                    </td>
-                    <td className="py-2 pr-3">
-                      <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${
-                        b.blockType === 'RIGID' ? 'bg-gray-200 text-gray-700' : 'bg-gray-100 text-gray-500'
-                      }`}>
-                        {b.blockType === 'RIGID' ? 'Rígido' : 'Flex'}
-                      </span>
-                    </td>
-                    {isAdmin && (
-                      <td className="py-2 pr-3 text-gray-700 text-xs">{getTherapistName(b.therapistId)}</td>
-                    )}
-                    <td className="py-2 pr-3 text-gray-500 text-xs max-w-[160px] truncate">
-                      {b.description || '—'}
-                    </td>
-                    <td className="py-2 pr-3">
-                      <div className="flex items-center gap-1 flex-wrap">
-                        {b.cancelled ? (
-                          <span className="px-1.5 py-0.5 rounded text-xs bg-gray-100 text-gray-500">Cancelado</span>
-                        ) : (
-                          <span className="px-1.5 py-0.5 rounded text-xs bg-green-50 text-green-700">Ativo</span>
+        <>
+          {/* Desktop: tabela */}
+          <div className="hidden sm:block overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-100 text-left">
+                  <th className="pb-2 pr-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Data</th>
+                  <th className="pb-2 pr-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Horário</th>
+                  <th className="pb-2 pr-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Tipo</th>
+                  {isAdmin && <th className="pb-2 pr-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Terapeuta</th>}
+                  <th className="pb-2 pr-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Descrição</th>
+                  <th className="pb-2 pr-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</th>
+                  <th className="pb-2 text-xs font-semibold text-gray-500 uppercase tracking-wide">Ações</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {filtered.map(b => {
+                  const canEdit = isAdmin || user?.id === b.therapistId
+                  return (
+                    <tr key={b.id} className={b.cancelled ? 'opacity-50' : ''}>
+                      <td className="py-2 pr-3 text-gray-700 whitespace-nowrap">
+                        {fmtDate(b.date)}
+                        {b.seriesId && (
+                          <span title="Bloqueio recorrente" className="ml-1 inline-flex items-center text-indigo-500"><FiRepeat size={11} /></span>
                         )}
-                        {(blockConflictMap[b.id] || []).length > 0 && (
+                      </td>
+                      <td className="py-2 pr-3 text-gray-700 whitespace-nowrap">
+                        {fmtTime(b.startTime)}–{fmtTime(b.endTime)}
+                      </td>
+                      <td className="py-2 pr-3">
+                        <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${
+                          b.blockType === 'RIGID' ? 'bg-gray-200 text-gray-700' : 'bg-gray-100 text-gray-500'
+                        }`}>
+                          {b.blockType === 'RIGID' ? 'Rígido' : 'Flex'}
+                        </span>
+                      </td>
+                      {isAdmin && (
+                        <td className="py-2 pr-3 text-gray-700 text-xs">{getTherapistName(b.therapistId)}</td>
+                      )}
+                      <td className="py-2 pr-3 text-gray-500 text-xs max-w-[160px] truncate">
+                        {b.description || '—'}
+                      </td>
+                      <td className="py-2 pr-3">
+                        <div className="flex items-center gap-1 flex-wrap">
+                          {b.cancelled ? (
+                            <span className="px-1.5 py-0.5 rounded text-xs bg-gray-100 text-gray-500">Cancelado</span>
+                          ) : (
+                            <span className="px-1.5 py-0.5 rounded text-xs bg-green-50 text-green-700">Ativo</span>
+                          )}
+                          {(blockConflictMap[b.id] || []).length > 0 && (
+                            <span
+                              title={buildConflictTooltip(blockConflictMap[b.id], { therapists, patients, consultations, calendarBlocks: [...(calendarBlocks || []), ...blocks] })}
+                              className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-xs bg-red-50 text-red-600"
+                            >
+                              ⚠ Conflito
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="py-2">
+                        {!b.cancelled && canEdit && (
+                          <div className="flex items-center gap-1">
+                            <button
+                              title="Editar bloqueio"
+                              onClick={() => setEditBlock(b)}
+                              className="w-7 h-7 flex items-center justify-center rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600 transition-colors"
+                            >
+                              <FiEdit2 size={13} />
+                            </button>
+                            <button
+                              title="Cancelar bloqueio"
+                              onClick={() => setCancelConfirm(b)}
+                              className="w-7 h-7 flex items-center justify-center rounded-lg bg-red-50 hover:bg-red-100 text-red-500 transition-colors"
+                            >
+                              <FiXCircle size={13} />
+                            </button>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Mobile: cards */}
+          <div className="sm:hidden space-y-2">
+            {filtered.map(b => {
+              const canEdit = isAdmin || user?.id === b.therapistId
+              const isRigid = b.blockType === 'RIGID'
+              const conflicts = blockConflictMap[b.id] || []
+              return (
+                <div key={b.id} className={`rounded-xl border p-3 ${b.cancelled ? 'opacity-50 bg-gray-50 border-gray-200' : 'bg-white border-gray-200'}`}>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="font-semibold text-sm text-gray-900">{fmtDate(b.date)}</span>
+                        <span className="text-xs text-gray-500">{fmtTime(b.startTime)}–{fmtTime(b.endTime)}</span>
+                        {b.seriesId && <span className="text-indigo-500"><FiRepeat size={10} /></span>}
+                      </div>
+                      {isAdmin && <div className="text-xs text-gray-500 mt-0.5">{getTherapistName(b.therapistId)}</div>}
+                      {b.description && <div className="text-xs text-gray-500 mt-0.5 truncate">{b.description}</div>}
+                      <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                        <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${isRigid ? 'bg-gray-200 text-gray-700' : 'bg-gray-100 text-gray-500'}`}>
+                          {isRigid ? 'Rígido' : 'Flex'}
+                        </span>
+                        {b.cancelled
+                          ? <span className="px-1.5 py-0.5 rounded text-xs bg-gray-100 text-gray-500">Cancelado</span>
+                          : <span className="px-1.5 py-0.5 rounded text-xs bg-green-50 text-green-700">Ativo</span>
+                        }
+                        {conflicts.length > 0 && (
                           <span
-                            title={buildConflictTooltip(blockConflictMap[b.id], { therapists, patients, consultations, calendarBlocks: [...(calendarBlocks || []), ...blocks] })}
+                            title={buildConflictTooltip(conflicts, { therapists, patients, consultations, calendarBlocks: [...(calendarBlocks || []), ...blocks] })}
                             className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-xs bg-red-50 text-red-600"
                           >
                             ⚠ Conflito
                           </span>
                         )}
                       </div>
-                    </td>
-                    <td className="py-2">
-                      {!b.cancelled && canEdit && (
-                        <div className="flex items-center gap-1">
-                          <button
-                            title="Editar bloqueio"
-                            onClick={() => setEditBlock(b)}
-                            className="w-7 h-7 flex items-center justify-center rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600 transition-colors"
-                          >
-                            <FiEdit2 size={13} />
-                          </button>
-                          <button
-                            title="Cancelar bloqueio"
-                            onClick={() => setCancelConfirm(b)}
-                            className="w-7 h-7 flex items-center justify-center rounded-lg bg-red-50 hover:bg-red-100 text-red-500 transition-colors"
-                          >
-                            <FiXCircle size={13} />
-                          </button>
-                        </div>
-                      )}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
+                    </div>
+                    {!b.cancelled && canEdit && (
+                      <div className="flex gap-1 shrink-0">
+                        <button
+                          title="Editar"
+                          onClick={() => setEditBlock(b)}
+                          className="w-8 h-8 flex items-center justify-center rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600 transition-colors"
+                        >
+                          <FiEdit2 size={14} />
+                        </button>
+                        <button
+                          title="Cancelar"
+                          onClick={() => setCancelConfirm(b)}
+                          className="w-8 h-8 flex items-center justify-center rounded-lg bg-red-50 hover:bg-red-100 text-red-500 transition-colors"
+                        >
+                          <FiXCircle size={14} />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </>
       )}
     </Modal>
   )

@@ -382,7 +382,8 @@ export default function PatientFormModal({ onClose, initial = {}, readOnly = fal
               {/* Admin visualizando (readOnly): tabela com valores */}
               {isAdmin && readOnly && form.specialties.length > 0 && (
                 <div className="rounded-xl border border-gray-200 overflow-hidden mb-2">
-                  <table className="w-full text-xs">
+                  <div className="overflow-x-auto">
+                  <table className="w-full text-[10px] sm:text-xs min-w-[340px]">
                     <thead className="bg-gray-50">
                       <tr>
                         <th className="text-left px-3 py-2 font-semibold text-gray-500">Especialidade</th>
@@ -411,6 +412,7 @@ export default function PatientFormModal({ onClose, initial = {}, readOnly = fal
                       })}
                     </tbody>
                   </table>
+                  </div>
                 </div>
               )}
 

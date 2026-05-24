@@ -667,10 +667,10 @@ export default function ConvenioReportPage() {
           </div>
           {periodType === 'month'
             ? <input type="month" value={periodMonth} onChange={e => setPeriodMonth(e.target.value)} className="px-3 py-2 text-sm border border-gray-200 rounded-xl bg-white focus:ring-2 focus:ring-brand-blue outline-none" />
-            : <div className="flex items-center gap-2">
-                <input type="date" value={periodFrom} onChange={e => setPeriodFrom(e.target.value)} className="px-3 py-2 text-sm border border-gray-200 rounded-xl bg-white focus:ring-2 focus:ring-brand-blue outline-none" />
-                <span className="text-gray-400 text-sm">até</span>
-                <input type="date" value={periodTo} onChange={e => setPeriodTo(e.target.value)} className="px-3 py-2 text-sm border border-gray-200 rounded-xl bg-white focus:ring-2 focus:ring-brand-blue outline-none" />
+            : <div className="flex flex-wrap items-center gap-2">
+                <input type="date" value={periodFrom} onChange={e => setPeriodFrom(e.target.value)} className="flex-1 min-w-0 px-3 py-2 text-sm border border-gray-200 rounded-xl bg-white focus:ring-2 focus:ring-brand-blue outline-none" />
+                <span className="text-gray-400 text-sm shrink-0">até</span>
+                <input type="date" value={periodTo} onChange={e => setPeriodTo(e.target.value)} className="flex-1 min-w-0 px-3 py-2 text-sm border border-gray-200 rounded-xl bg-white focus:ring-2 focus:ring-brand-blue outline-none" />
               </div>
           }
         </div>
@@ -709,8 +709,9 @@ export default function ConvenioReportPage() {
           </div>
 
           {sessions.length > 0 && (
-            <div className="border border-gray-100 rounded-xl overflow-x-auto">
-              <table className="w-full text-sm">
+            <div className="border border-gray-100 rounded-xl overflow-hidden">
+              <div className="overflow-x-auto">
+              <table className="w-full text-sm min-w-[380px]">
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-100">
                     <th className="text-left px-3 py-2 text-xs font-semibold text-gray-500">Data</th>
@@ -741,6 +742,7 @@ export default function ConvenioReportPage() {
                   ))}
                 </tbody>
               </table>
+              </div>
             </div>
           )}
           <button onClick={addSession} className="flex items-center gap-1.5 text-sm text-brand-blue hover:underline">

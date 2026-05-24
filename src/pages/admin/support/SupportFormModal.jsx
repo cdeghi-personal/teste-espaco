@@ -304,7 +304,8 @@ export default function SupportFormModal({ onClose, initial = null, onSaved }) {
               <FiClock size={14} /> Histórico de Mudanças de Status
             </label>
             <div className="rounded-xl border border-gray-200 overflow-hidden">
-              <table className="w-full text-xs">
+              <div className="overflow-x-auto">
+              <table className="w-full text-xs min-w-[420px]">
                 <thead className="bg-gray-50">
                   <tr>
                     <th className="text-left px-3 py-2 font-semibold text-gray-500">Evento</th>
@@ -335,6 +336,7 @@ export default function SupportFormModal({ onClose, initial = null, onSaved }) {
                   })}
                 </tbody>
               </table>
+              </div>
             </div>
           </div>
         )}

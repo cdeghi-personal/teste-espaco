@@ -33,7 +33,7 @@ export default function Modal({ title, children, onClose, size = 'md', footer })
             <FiX size={20} />
           </button>
         </div>
-        <div className="overflow-y-auto flex-1 px-6 py-4 scrollbar-thin">
+        <div className="overflow-y-auto overflow-x-hidden flex-1 px-6 py-4 scrollbar-thin">
           {children}
         </div>
         {footer && (

@@ -29,8 +29,14 @@ const CSS = `
 }
 .gr2 .hero-img img { width:100%; display:block; }
 @media (max-width:768px) {
-  .gr2 .hero { flex-direction:column; padding:32px 20px; }
+  .gr2 .hero { flex-direction:column; padding:24px 16px; }
   .gr2 .hero-img { width:100%; }
+}
+@media (max-width:480px) {
+  .gr2 .hero { padding:20px 12px; }
+  .gr2 .sec { padding:0 0 32px; }
+  .gr2 .highlight { padding:20px 16px; }
+  .gr2 .admin-banner { padding:20px 16px; }
 }
 .gr2 .hero-badge {
   display:inline-flex; align-items:center;
@@ -54,7 +60,11 @@ const CSS = `
 .gr2 .stat-chip .lbl { font-size:11px; color:var(--gray-600); line-height:1.3; text-align:left; }
 .gr2 .tabs-header {
   display:flex; background:var(--gray-100); border-radius:12px; padding:4px;
-  width:fit-content; margin:0 auto 36px;
+  width:fit-content; max-width:100%; margin:0 auto 36px;
+}
+@media (max-width:480px) {
+  .gr2 .tabs-header { width:100%; }
+  .gr2 .tab-btn { flex:1; text-align:center; padding:9px 12px; }
 }
 .gr2 .tab-btn {
   padding:9px 24px; border-radius:9px; font-size:14px; font-weight:600;

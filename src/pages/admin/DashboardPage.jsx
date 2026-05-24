@@ -605,7 +605,7 @@ export default function DashboardPage() {
                         <th className="px-3 py-2 text-center font-semibold">Total</th>
                         <th className="px-3 py-2 text-center font-semibold">Realizadas</th>
                         <th className="px-3 py-2 text-center font-semibold">Taxa</th>
-                        <th className="px-4 py-2 text-center font-semibold">Pendências</th>
+                        <th className="px-4 py-2 text-center font-semibold hidden sm:table-cell">Pendências</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
@@ -629,7 +629,7 @@ export default function DashboardPage() {
                               'bg-red-100 text-red-600'
                             }`}>{rate}%</span>
                           </td>
-                          <td className="px-4 py-2.5 text-center">
+                          <td className="px-4 py-2.5 text-center hidden sm:table-cell">
                             {pending > 0
                               ? <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-600">{pending}</span>
                               : <span className="text-gray-300 text-xs">—</span>
