@@ -179,10 +179,12 @@ export default function DashboardPage() {
   [consultationStatuses])
 
   // ── visibility filters ───────────────────────────────────────────────────
+  // belongsToTeam concede permissões operacionais (séries, terapeutas secundários)
+  // mas NÃO expande estatísticas pessoais — terapeuta vê seus próprios dados
   const activePatients = useMemo(() => {
     const activeStatusId = patientStatuses.find(s => norm(s.name).includes('ativ'))?.id
     const base = patients.filter(p => !p.deleted)
-    const mine = (isAdmin || user?.belongsToTeam)
+    const mine = isAdmin
       ? base
       : base.filter(p =>
           p.therapistId === user?.id ||
@@ -192,7 +194,7 @@ export default function DashboardPage() {
   }, [patients, patientStatuses, isAdmin, user])
 
   const mySessions = useMemo(() => {
-    const base = (isAdmin || user?.belongsToTeam)
+    const base = isAdmin
       ? consultations
       : consultations.filter(c =>
           c.therapistId === user?.id ||
@@ -231,7 +233,7 @@ export default function DashboardPage() {
   const todaySessions = useMemo(() =>
     consultations
       .filter(c => c.date === today && c.eventType !== 'INTERVIEW' &&
-        (isAdmin || user?.belongsToTeam || c.therapistId === user?.id ||
+        (isAdmin || c.therapistId === user?.id ||
          (c.consultationTherapists || []).some(ct => ct.therapistId === user?.id))
       )
       .sort((a, b) => (a.time || '').localeCompare(b.time || '')),
