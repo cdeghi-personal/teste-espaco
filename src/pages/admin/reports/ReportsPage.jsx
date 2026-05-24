@@ -278,15 +278,20 @@ export default function ReportsPage() {
 
   function buildUnconfiguredItems(consults, patientsArr, specialtiesArr) {
     const byPatient = new Map()
+    function checkSpec(patient, specKey) {
+      const spec = findPatientSpecialtyConfig(patient, specKey, specialtiesArr)
+      if (!spec) {
+        if (!byPatient.has(patient.fullName)) byPatient.set(patient.fullName, new Set())
+        const label = specialtiesArr.find(s => s.key === specKey)?.label || specKey
+        byPatient.get(patient.fullName).add(label)
+      }
+    }
     for (const c of consults) {
       const patient = patientsArr.find(p => p.id === c.patientId)
       if (!patient) continue
-      const effSpec = c.effectiveSpecialty || c.specialty
-      const spec = findPatientSpecialtyConfig(patient, effSpec, specialtiesArr)
-      if (!spec) {
-        if (!byPatient.has(patient.fullName)) byPatient.set(patient.fullName, new Set())
-        const label = specialtiesArr.find(s => s.key === effSpec)?.label || effSpec
-        byPatient.get(patient.fullName).add(label)
+      checkSpec(patient, c.effectiveSpecialty || c.specialty)
+      for (const ct of (c.consultationTherapists || []).filter(t => !t.isPrimary)) {
+        if (ct.specialty) checkSpec(patient, ct.specialty)
       }
     }
     return [...byPatient.entries()].map(([name, sps]) => ({ name, specialties: [...sps] }))
