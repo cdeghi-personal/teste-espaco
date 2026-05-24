@@ -252,7 +252,17 @@ export default function ConvenioReportPage() {
 
     const { from, to } = getDateRange()
     const found = consultations
-      .filter(c => c.patientId === patientId && c.therapistId === therapistId && c.specialty === specialty && c.date >= from && c.date <= to && c.eventType !== 'INTERVIEW')
+      .filter(c => {
+        if (c.patientId !== patientId) return false
+        if (c.therapistId !== therapistId) return false
+        if (c.specialty !== specialty) return false
+        if (c.date < from || c.date > to) return false
+        if (c.eventType === 'INTERVIEW') return false
+        // Exclui atendimentos cujo terapeuta principal não é membro da equipe
+        const t = therapists.find(t => t.id === c.therapistId)
+        if (t?.belongsToTeam === false) return false
+        return true
+      })
       .sort((a, b) => a.date.localeCompare(b.date))
 
     const patient = patients.find(p => p.id === patientId)

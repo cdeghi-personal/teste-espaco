@@ -245,6 +245,9 @@ export default function ReportsPage() {
   function filterConsultations(list) {
     return list.filter(c => {
       if (c.eventType === 'INTERVIEW') return false
+      // Exclui atendimentos cujo terapeuta principal não é membro da equipe
+      const pTherapist = (therapists || []).find(t => t.id === c.therapistId)
+      if (pTherapist?.belongsToTeam === false) return false
       if (periodType === 'month') {
         if (!c.date || !c.date.startsWith(periodMonth)) return false
       } else {
