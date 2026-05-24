@@ -345,8 +345,7 @@ export default function AgendaPage() {
             }`}
           >
             <FiRepeat size={13} />
-            <span className="hidden sm:inline">Minha Agenda</span>
-            <span className="sm:hidden">Minha</span>
+            Minha Agenda
           </button>
         )}
         <select
@@ -724,11 +723,16 @@ export default function AgendaPage() {
                   const isInterview = item.eventType === 'INTERVIEW'
                   const isRemote = isInterview && item.interviewFormat === 'REMOTE'
                   const mobileName = isPrivate ? 'Consulta Particular' : (isInterview && item.intervieweeName ? item.intervieweeName : patient?.fullName)
+                  const weekendDayLabel = selectedDayIdx === 5
+                    ? (item.date === format(saturday, 'yyyy-MM-dd') ? 'Sáb' : 'Dom')
+                    : null
                   return (
                     <div key={item.id} className="flex items-center gap-3 p-4 cursor-pointer" onClick={() => setViewItem(item)}>
                       <div className="w-1 self-stretch rounded-full shrink-0" style={{ backgroundColor: style.backgroundColor }} />
                       <div className="flex-1 min-w-0">
-                        <div className="font-semibold text-sm text-gray-900">{fmtTime(item.time)}</div>
+                        <div className="font-semibold text-sm text-gray-900">
+                          {weekendDayLabel ? `${weekendDayLabel} · ` : ''}{fmtTime(item.time)}
+                        </div>
                         <div className={`text-sm truncate ${isPrivate ? 'text-gray-400 italic' : 'text-gray-700'}`}>
                           {mobileName}
                         </div>

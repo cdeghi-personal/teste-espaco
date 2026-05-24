@@ -457,7 +457,7 @@ export default function DashboardPage() {
       {/* ── Greeting ─────────────────────────────────────────────────────── */}
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div className="flex-1 min-w-0">
-          <h1 className={`text-xl md:text-2xl font-bold transition-colors duration-300 ${greetingLoading ? 'text-gray-400 italic' : 'text-gray-900'}`}>
+          <h1 className={`hidden sm:block text-xl md:text-2xl font-bold transition-colors duration-300 ${greetingLoading ? 'text-gray-400 italic' : 'text-gray-900'}`}>
             {greetingLoading
               ? loadingMsg
               : greetingMsg || `${greeting}, ${user?.name?.split(' ')[0]}! 👋`}

@@ -29,7 +29,7 @@ export default function AdminLayout() {
           <img src="/logo.jpg" alt="Casa Amarela" className="h-8 w-auto" />
         </div>
 
-        <main className="flex-1 overflow-y-auto scrollbar-thin">
+        <main className="flex-1 overflow-y-auto overflow-x-hidden scrollbar-thin">
           <Outlet />
         </main>
       </div>
