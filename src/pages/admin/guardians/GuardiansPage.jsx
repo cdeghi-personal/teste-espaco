@@ -12,6 +12,7 @@ export default function GuardiansPage() {
   const { user } = useAuth()
   const [search, setSearch] = useState('')
   const [showInactive, setShowInactive] = useState(false)
+  const [sortBy, setSortBy] = useState('name')
   const [showModal, setShowModal] = useState(false)
   const [editGuardian, setEditGuardian] = useState(null)
   const [viewGuardian, setViewGuardian] = useState(null)
@@ -43,6 +44,14 @@ export default function GuardiansPage() {
       g.phone?.includes(search) ||
       linkedPatients.some(p => p.fullName.toLowerCase().includes(search.toLowerCase()))
     return matchActive && matchSearch
+  }).sort((a, b) => {
+    if (sortBy === 'patient') {
+      const pA = getLinkedPatients(a)[0]?.fullName || ''
+      const pB = getLinkedPatients(b)[0]?.fullName || ''
+      return pA.localeCompare(pB, 'pt-BR', { sensitivity: 'base' }) ||
+        a.fullName.localeCompare(b.fullName, 'pt-BR', { sensitivity: 'base' })
+    }
+    return a.fullName.localeCompare(b.fullName, 'pt-BR', { sensitivity: 'base' })
   })
 
   function handleDelete(id, name) {
@@ -64,6 +73,13 @@ export default function GuardiansPage() {
             <p><strong>Inativos:</strong> o botão no canto superior alterna a exibição de responsáveis inativos.</p>
             <p><strong>Um responsável pode estar vinculado a vários pacientes</strong> (ex: pai com dois filhos em atendimento).</p>
           </HelpButton>
+          <button
+            onClick={() => setSortBy(v => v === 'name' ? 'patient' : 'name')}
+            className={`flex items-center gap-1.5 px-2.5 py-2 rounded-xl border text-xs font-medium transition-all ${sortBy === 'patient' ? 'bg-brand-blue/10 text-brand-blue border-brand-blue/20' : 'bg-white text-gray-500 border-gray-200'}`}
+            title={sortBy === 'name' ? 'Ordenado por nome do responsável — clique para ordenar por paciente' : 'Ordenado por nome do paciente — clique para ordenar por responsável'}
+          >
+            {sortBy === 'patient' ? 'Por paciente' : 'Por nome'}
+          </button>
           <button
             onClick={() => setShowInactive(v => !v)}
             className={`p-2 rounded-xl border transition-all ${showInactive ? 'bg-red-50 text-red-700 border-red-200' : 'bg-white text-gray-500 border-gray-200'}`}

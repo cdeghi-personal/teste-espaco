@@ -48,7 +48,7 @@ export default function PatientsPage() {
     const matchStatus = !filterStatus || (p.statusId || p.status) === filterStatus
     const matchSpecialty = !filterSpecialty || p.specialties?.includes(filterSpecialty)
     return matchSearch && matchStatus && matchSpecialty
-  })
+  }).sort((a, b) => a.fullName.localeCompare(b.fullName, 'pt-BR', { sensitivity: 'base' }))
 
   async function handleToggleDeleted() {
     const newVal = !showDeleted

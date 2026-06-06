@@ -380,8 +380,9 @@ export function DataProvider({ children }) {
   }
 
   async function deletePatient(id) {
-    const { error } = await supabase.from('patients').update({ deleted: true }).eq('id', id)
-    if (error) { toast.show(error.message); return { error: error.message } }
+    const { data, error } = await supabase.rpc('admin_soft_delete_patient', { p_patient_id: id })
+    if (error) { toast.show(error.message, 'error'); return { error: error.message } }
+    if (data?.error) { toast.show(data.error, 'error'); return { error: data.error } }
     setPatients(prev => prev.filter(p => p.id !== id))
   }
 
