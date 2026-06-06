@@ -53,7 +53,7 @@ const PATIENT_SELECT_FALLBACK = `
 
 const GUARDIAN_SELECT = `
   id, full_name, relationship, phone, phone2, email, cpf, rg, occupation, notes,
-  address, neighborhood, city, state, cep, active, created_at,
+  address, neighborhood, city, state, cep, active, created_at, is_financial_responsible,
   patient_guardians(patient_id)
 `
 
@@ -430,6 +430,7 @@ export function DataProvider({ children }) {
         state: data.state || null,
         cep: data.cep || null,
         active: true,
+        is_financial_responsible: data.isFinancialResponsible || false,
       })
 
     if (error) return dbError(error, toast)
@@ -465,6 +466,7 @@ export function DataProvider({ children }) {
     if (data.state !== undefined) update.state = data.state || null
     if (data.cep !== undefined) update.cep = data.cep || null
     if (data.active !== undefined) update.active = data.active
+    if (data.isFinancialResponsible !== undefined) update.is_financial_responsible = data.isFinancialResponsible
 
     if (Object.keys(update).length) {
       await supabase.from('guardians').update(update).eq('id', id)
@@ -2039,6 +2041,27 @@ export function DataProvider({ children }) {
     }
   }
 
+  // ─── Patient Cleanup ────────────────────────────────────────────────────────
+
+  async function getPatientCleanupSummary(patientId) {
+    const { data, error } = await supabase.rpc('get_patient_cleanup_summary', { p_patient_id: patientId })
+    if (error) return { error: error.message }
+    if (data?.error) return { error: data.error }
+    return data
+  }
+
+  async function cleanupInactivePatientData(patientId) {
+    const { data, error } = await supabase.rpc('cleanup_inactive_patient_data', {
+      p_patient_id: patientId,
+      p_confirm: 'LIMPAR',
+    })
+    if (error) return { error: error.message }
+    if (data?.error) return { error: data.error }
+    // Remove paciente do estado local (pois os dados foram limpos)
+    setPatients(prev => prev.filter(p => p.id !== patientId))
+    return data
+  }
+
   // ─── Value ───────────────────────────────────────────────────────────────────
 
   const value = {
@@ -2067,6 +2090,7 @@ export function DataProvider({ children }) {
     batchFaturarConsultations, addPaymentDemonstrativo, getPaymentDemonstrativos,
     createPaymentInvoice, getPaymentInvoices, cancelPaymentInvoice, markInvoicePaid,
     calendarBlocks, addCalendarBlock, addCalendarBlockSeries, updateCalendarBlock, updateCalendarBlockSeriesFuture, cancelCalendarBlock, cancelCalendarBlockSeriesFuture, getCalendarBlockHistory,
+    getPatientCleanupSummary, cleanupInactivePatientData,
   }
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>

@@ -11,7 +11,7 @@ import { useData } from '../../../context/DataContext'
 const EMPTY = {
   fullName: '', relationship: '', cpf: '', rg: '', phone: '', phone2: '',
   email: '', address: '', neighborhood: '', city: '', state: 'SP', cep: '', occupation: '', notes: '',
-  patientIds: [],
+  patientIds: [], isFinancialResponsible: false,
 }
 
 const BR_STATES = ['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO']
@@ -44,9 +44,14 @@ export default function GuardianFormModal({ onClose, initial = {}, readOnly = fa
     if (!form.relationship) e.relationship = 'Parentesco obrigatório'
     if (!form.phone.trim()) e.phone = 'Telefone obrigatório'
     const cpfDigits = form.cpf?.replace(/\D/g, '') || ''
-    if (!cpfDigits) e.cpf = 'CPF obrigatório'
-    else if (cpfDigits.length !== 11) e.cpf = 'CPF inválido'
-    else if (!validateCPF(form.cpf)) e.cpf = 'CPF inválido'
+    if (form.isFinancialResponsible) {
+      if (!cpfDigits) e.cpf = 'CPF obrigatório para responsável financeiro'
+      else if (cpfDigits.length !== 11) e.cpf = 'CPF inválido'
+      else if (!validateCPF(form.cpf)) e.cpf = 'CPF inválido'
+    } else if (cpfDigits) {
+      if (cpfDigits.length !== 11) e.cpf = 'CPF inválido'
+      else if (!validateCPF(form.cpf)) e.cpf = 'CPF inválido'
+    }
     if (!form.email?.trim()) e.email = 'E-mail obrigatório'
     if (!form.address?.trim()) e.address = 'Endereço obrigatório'
     if (!form.neighborhood?.trim()) e.neighborhood = 'Bairro obrigatório'
@@ -96,9 +101,29 @@ export default function GuardianFormModal({ onClose, initial = {}, readOnly = fa
               </Select>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <Input label="CPF *" value={form.cpf} onChange={e => set('cpf', formatCPF(e.target.value))} error={errors.cpf} placeholder="000.000.000-00" disabled={readOnly} />
+              <Input
+                label={form.isFinancialResponsible ? 'CPF *' : 'CPF'}
+                value={form.cpf}
+                onChange={e => set('cpf', formatCPF(e.target.value))}
+                error={errors.cpf}
+                placeholder="000.000.000-00"
+                disabled={readOnly}
+              />
               <Input label="RG" value={form.rg} onChange={e => set('rg', e.target.value)} disabled={readOnly} />
             </div>
+            {!readOnly ? (
+              <label className="flex items-center gap-2 cursor-pointer select-none w-fit">
+                <input
+                  type="checkbox"
+                  checked={form.isFinancialResponsible}
+                  onChange={e => set('isFinancialResponsible', e.target.checked)}
+                  className="w-4 h-4 rounded accent-brand-blue"
+                />
+                <span className="text-sm text-gray-700">Responsável financeiro?</span>
+              </label>
+            ) : form.isFinancialResponsible ? (
+              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700">Responsável financeiro</span>
+            ) : null}
             <Input label="Profissão" value={form.occupation} onChange={e => set('occupation', e.target.value)} disabled={readOnly} />
           </div>
         </section>

@@ -447,6 +447,18 @@ Authentication → URL Configuration:
 - Endereço completo: `address`, `neighborhood`, `city`, `state`, `cep`
 - Seleção de pacientes vinculados: lista pesquisável com checkboxes
 - Busca na listagem: por nome, CPF, telefone ou **nome do paciente vinculado**
+- **Flag `is_financial_responsible`:** boolean, default false; indica que este responsável é o pagador da clínica. CPF obrigatório somente quando marcado como financeiro; se preenchido sem ser financeiro, formato ainda é validado. Exibido como chip verde "Financeiro" nos cards mobile e tabela desktop da `GuardiansPage`; checkbox "Responsável financeiro?" no `GuardianFormModal`. Migration: `93_guardian_financial_responsible.sql`.
+
+## Limpeza Definitiva de Dados de Paciente Inativo
+
+- **Acesso:** admin only; botão só aparece na aba de inativos (`showDeleted=true`) e somente em pacientes com `deleted=true`.
+- **Fluxo:** botão ícone `FiTrash2` → `PatientCleanupModal` → chama `get_patient_cleanup_summary` → exibe contagens → usuário digita "LIMPAR" → chama `cleanup_inactive_patient_data` → Toast de sucesso → remove da lista.
+- **O que é limpo:** todos os dados transacionais (consultas, séries, prontuário, pré-pago, demonstrativos, NFs, relatórios de convênio, vínculos do paciente). O cadastro do paciente (`patients`) é mantido com `deleted=true`.
+- **O que NÃO é limpo:** `patients`, `guardians`, `therapists`, `rooms`, `specialties`, `diagnoses`, `appointment_types`, `consultation_statuses`, `calendar_blocks`, `support_tickets`, `contact_leads`.
+- **RPCs (migration `94_patient_cleanup_rpc.sql`):**
+  - `get_patient_cleanup_summary(p_patient_id uuid)` — SECURITY DEFINER; retorna JSONB com contagens por tabela; valida que paciente existe e está inativo.
+  - `cleanup_inactive_patient_data(p_patient_id uuid, p_confirm text)` — SECURITY DEFINER; valida admin inline (`EXISTS (SELECT 1 FROM profiles ...)`), `deleted=true`, `p_confirm='LIMPAR'`; executa DELETE em ordem de FK; grava em `audit_logs`.
+- **DataContext:** `getPatientCleanupSummary(patientId)` e `cleanupInactivePatientData(patientId)` — expostos no contexto.
 
 ## PatientDetailPage
 

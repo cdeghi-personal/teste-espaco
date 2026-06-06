@@ -8,6 +8,7 @@ import Badge from '../../../components/ui/Badge'
 import Button from '../../../components/ui/Button'
 import EmptyState from '../../../components/ui/EmptyState'
 import PatientFormModal from './PatientFormModal'
+import PatientCleanupModal from './PatientCleanupModal'
 import { calculateAge, formatDateShort, calculateAgeYears } from '../../../utils/dateUtils'
 import { hexTextColor } from '../../../utils/colorUtils'
 import { ROUTES } from '../../../constants/routes'
@@ -15,6 +16,7 @@ import { ROUTES } from '../../../constants/routes'
 export default function PatientsPage() {
   const { patients, deletePatient, restorePatient, fetchInactivePatients, patientStatuses, specialtiesData, ageRanges, logAudit } = useData()
   const { user } = useAuth()
+  const isAdmin = user?.role === 'admin'
   const navigate = useNavigate()
   const [search, setSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState('')
@@ -25,6 +27,7 @@ export default function PatientsPage() {
   const [showModal, setShowModal] = useState(false)
   const [editPatient, setEditPatient] = useState(null)
   const [viewPatient, setViewPatient] = useState(null)
+  const [cleanupPatient, setCleanupPatient] = useState(null)
 
   // admin e terapeuta da equipe: RLS já retorna o conjunto correto
   // terapeuta fora da equipe: filtra no frontend também (garante que não vê extras)
@@ -200,9 +203,16 @@ export default function PatientsPage() {
                     </div>
                     <div className="flex items-center gap-1 shrink-0" onClick={e => e.stopPropagation()}>
                       {p.deleted ? (
-                        <button onClick={() => handleRestore(p.id, p.fullName)} className="p-2 rounded-lg text-gray-400">
-                          <FiRotateCcw size={15} />
-                        </button>
+                        <>
+                          <button onClick={() => handleRestore(p.id, p.fullName)} className="p-2 rounded-lg text-gray-400">
+                            <FiRotateCcw size={15} />
+                          </button>
+                          {isAdmin && (
+                            <button onClick={() => setCleanupPatient(p)} className="p-2 rounded-lg text-red-400" title="Limpar dados transacionais">
+                              <FiTrash2 size={15} />
+                            </button>
+                          )}
+                        </>
                       ) : (
                         <>
                           <button onClick={() => { setViewPatient(p); logAudit('VIEW', 'patients', p.id, p.fullName) }} className="p-2 rounded-lg text-gray-400">
@@ -280,9 +290,16 @@ export default function PatientsPage() {
                       <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
                         <div className="flex items-center gap-1 justify-end">
                           {p.deleted ? (
-                            <button onClick={() => handleRestore(p.id, p.fullName)} className="p-1.5 rounded-lg text-gray-400 hover:text-green-600 hover:bg-green-50 transition-colors">
-                              <FiRotateCcw size={15} />
-                            </button>
+                            <>
+                              <button onClick={() => handleRestore(p.id, p.fullName)} className="p-1.5 rounded-lg text-gray-400 hover:text-green-600 hover:bg-green-50 transition-colors">
+                                <FiRotateCcw size={15} />
+                              </button>
+                              {isAdmin && (
+                                <button onClick={() => setCleanupPatient(p)} className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors" title="Limpar dados transacionais">
+                                  <FiTrash2 size={15} />
+                                </button>
+                              )}
+                            </>
                           ) : (
                             <>
                               <button onClick={() => { setViewPatient(p); logAudit('VIEW', 'patients', p.id, p.fullName) }} className="p-1.5 rounded-lg text-gray-400 hover:text-brand-blue hover:bg-blue-50 transition-colors">
@@ -312,6 +329,16 @@ export default function PatientsPage() {
       )}
       {viewPatient && (
         <PatientFormModal onClose={() => setViewPatient(null)} initial={viewPatient} readOnly />
+      )}
+      {cleanupPatient && (
+        <PatientCleanupModal
+          patient={cleanupPatient}
+          onClose={() => setCleanupPatient(null)}
+          onSuccess={() => {
+            setInactivePatients(prev => prev.filter(p => p.id !== cleanupPatient.id))
+            setCleanupPatient(null)
+          }}
+        />
       )}
     </div>
   )

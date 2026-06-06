@@ -79,6 +79,7 @@ export function mapGuardian(row) {
     state: row.state || '',
     cep: row.cep || '',
     active: row.active,
+    isFinancialResponsible: row.is_financial_responsible || false,
     patientIds: (row.patient_guardians || []).map(r => r.patient_id),
     createdAt: row.created_at,
   }
