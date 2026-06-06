@@ -469,7 +469,8 @@ export function DataProvider({ children }) {
     if (data.isFinancialResponsible !== undefined) update.is_financial_responsible = data.isFinancialResponsible
 
     if (Object.keys(update).length) {
-      await supabase.from('guardians').update(update).eq('id', id)
+      const { error } = await supabase.from('guardians').update(update).eq('id', id)
+      if (error) return dbError(error, toast)
     }
 
     if (data.patientIds !== undefined) {

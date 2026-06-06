@@ -7,6 +7,7 @@ import Input from '../../../components/ui/Input'
 import Select from '../../../components/ui/Select'
 import Textarea from '../../../components/ui/Textarea'
 import { useData } from '../../../context/DataContext'
+import { useToast } from '../../../components/ui/Toast'
 
 const EMPTY = {
   fullName: '', relationship: '', cpf: '', rg: '', phone: '', phone2: '',
@@ -18,6 +19,7 @@ const BR_STATES = ['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','
 
 export default function GuardianFormModal({ onClose, initial = {}, readOnly = false }) {
   const { addGuardian, updateGuardian, patients } = useData()
+  const toast = useToast()
   const isEdit = !!initial.id
   const [form, setForm] = useState({ ...EMPTY, ...initial, patientIds: initial.patientIds || [] })
   const [errors, setErrors] = useState({})
@@ -61,11 +63,17 @@ export default function GuardianFormModal({ onClose, initial = {}, readOnly = fa
     return e
   }
 
-  function handleSave() {
+  async function handleSave() {
     const e = validate()
-    if (Object.keys(e).length) { setErrors(e); return }
-    if (isEdit) updateGuardian(initial.id, form)
-    else addGuardian(form)
+    if (Object.keys(e).length) {
+      setErrors(e)
+      toast.show('Corrija os erros indicados no formulário.', 'error')
+      return
+    }
+    let result
+    if (isEdit) result = await updateGuardian(initial.id, form)
+    else result = await addGuardian(form)
+    if (result?.error) return
     onClose()
   }
 
@@ -121,9 +129,15 @@ export default function GuardianFormModal({ onClose, initial = {}, readOnly = fa
                 />
                 <span className="text-sm text-gray-700">Responsável financeiro?</span>
               </label>
-            ) : form.isFinancialResponsible ? (
-              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700">Responsável financeiro</span>
-            ) : null}
+            ) : (
+              <div className="flex items-center gap-2 text-sm text-gray-600">
+                <span className="font-medium">Responsável financeiro:</span>
+                {form.isFinancialResponsible
+                  ? <span className="px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700">Sim</span>
+                  : <span className="px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-500">Não</span>
+                }
+              </div>
+            )}
             <Input label="Profissão" value={form.occupation} onChange={e => set('occupation', e.target.value)} disabled={readOnly} />
           </div>
         </section>
