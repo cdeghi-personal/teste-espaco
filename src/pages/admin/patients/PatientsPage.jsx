@@ -103,8 +103,9 @@ export default function PatientsPage() {
             <p><strong>Detalhe:</strong> clique na linha ou no olhinho (👁) para abrir a ficha completa com histórico de atendimentos, prontuário e pacotes pré-pagos.</p>
             <p><strong>Especialidades e Modalidade (admin):</strong> na seção Terapeutas do cadastro, defina a <em>Modalidade de Pagamento</em> por especialidade:</p>
             <p>• <strong>Pós-pago por consulta:</strong> cobrado por sessão realizada (valor por sessão).</p>
-            <p>• <strong>Pós-pago mensal:</strong> valor fixo cobrado por mês, independente da quantidade de sessões.</p>
+            <p>• <strong>Pós-pago mensal fixo:</strong> valor fixo cobrado por mês, independente da quantidade de sessões.</p>
             <p>• <strong>Pré-pago por pacote:</strong> o responsável compra antecipadamente um pacote com N sessões; o saldo é debitado automaticamente a cada sessão realizada.</p>
+            <p>• <strong>Pré-pago por consulta individual:</strong> pagamento antecipado sessão a sessão, sem pacote.</p>
             <p><strong>Inativos (admin):</strong> o botão de olho riscado exibe pacientes inativos. Admins também podem executar a <em>Limpeza definitiva</em> (ícone lixeira) que remove todos os registros transacionais (atendimentos, prontuário, dados financeiros) do paciente inativo, mantendo apenas o cadastro.</p>
           </HelpButton>
           <button

@@ -328,8 +328,9 @@ export default function PatientFormModal({ onClose, initial = {}, readOnly = fal
                         <button type="button" onClick={() => setShowPaymentHelp(false)} className="text-blue-400 hover:text-blue-600 p-0.5"><FiX size={13} /></button>
                       </div>
                       <p><strong>Pós-pago por consulta:</strong> cobrado por sessão realizada. Informe o valor por sessão nos campos Valor Paciente e Valor Terapeuta.</p>
-                      <p><strong>Pós-pago mensal:</strong> valor fixo cobrado por mês, independente da quantidade de sessões. Informe o valor mensal para paciente e terapeuta.</p>
+                      <p><strong>Pós-pago mensal fixo:</strong> valor fixo cobrado por mês, independente da quantidade de sessões. Informe o valor mensal para paciente e terapeuta.</p>
                       <p><strong>Pré-pago por pacote:</strong> o responsável compra antecipadamente um pacote com N sessões. O saldo é debitado automaticamente a cada sessão realizada. Pacotes são gerenciados na ficha do paciente.</p>
+                      <p><strong>Pré-pago por consulta individual:</strong> pagamento antecipado sessão a sessão, sem pacote. Cada sessão é paga individualmente antes de ser realizada.</p>
                     </div>
                   )}
                   {form.specialties.map(s => {

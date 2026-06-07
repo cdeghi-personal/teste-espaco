@@ -267,16 +267,16 @@ export default function AgendaPage() {
             <p><strong>Filtro "Minha Agenda":</strong> terapeutas veem automaticamente apenas seus próprios atendimentos. Admins veem todos.</p>
             <p><strong>Legenda:</strong> as cores na legenda inferior identificam cada terapeuta.</p>
           </HelpButton>
-          {isAdminOrTeam && (
-            <Button variant="ghost" onClick={() => setShowSeriesModal(true)}>
-              <FiRepeat size={15} />
-              <span className="hidden sm:inline">Série</span>
-            </Button>
-          )}
           {(user?.role === 'admin' || user?.id) && (
             <Button variant="ghost" onClick={() => { setEditBlock(null); setShowBlockModal(true) }}>
               <FiSlash size={15} />
               <span className="hidden sm:inline">Bloqueio</span>
+            </Button>
+          )}
+          {isAdminOrTeam && (
+            <Button variant="secondary" onClick={() => setShowSeriesModal(true)}>
+              <FiRepeat size={15} />
+              <span className="hidden sm:inline">Nova Série</span>
             </Button>
           )}
           <Button variant="primary" onClick={() => { setEditItem(null); setShowModal(true) }}>

@@ -137,9 +137,9 @@ export default function ConsultationsPage() {
             <p><strong>Status automáticos:</strong> configurados em Administração → Status Atendimento; aparecem nos filtros e no prontuário, mas não no formulário de registro.</p>
           </HelpButton>
           {isAdminOrTeam && (
-            <Button variant="ghost" onClick={() => setShowSeriesModal(true)}>
+            <Button variant="secondary" onClick={() => setShowSeriesModal(true)}>
               <FiRepeat size={15} />
-              <span className="hidden sm:inline">Série</span>
+              <span className="hidden sm:inline">Nova Série</span>
             </Button>
           )}
           <Button variant="primary" onClick={() => { setEditConsultation(null); setShowModal(true) }}>
