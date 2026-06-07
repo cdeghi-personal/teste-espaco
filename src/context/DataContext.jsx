@@ -1697,17 +1697,24 @@ export function DataProvider({ children }) {
       is_series_exception:    false,
     }))
 
-    const { data: insertedIds, error: consultErr } = await supabase
+    const { error: consultErr } = await supabase
       .from('consultations')
       .insert(consultationRows)
-      .select('id')
     if (consultErr) {
       await supabase.from('consultation_series').delete().eq('id', series.id)
       return dbError(consultErr, toast)
     }
-    if (!insertedIds || insertedIds.length === 0) {
+    // Busca IDs via series_id (evita depender do RETURNING, sujeito a RLS instável em bulk insert)
+    const { data: insertedIds, error: fetchIdsErr } = await supabase
+      .from('consultations')
+      .select('id')
+      .eq('series_id', series.id)
+    if (fetchIdsErr || !insertedIds || insertedIds.length === 0) {
       await supabase.from('consultation_series').delete().eq('id', series.id)
-      return dbError({ message: `0 atendimentos criados de ${dates.length} esperados. Verifique as permissões de acesso (RLS).` }, toast)
+      return dbError(
+        fetchIdsErr || { message: `0 atendimentos criados de ${dates.length} esperados.` },
+        toast
+      )
     }
 
     // 4. Bulk insert de participation (terapeuta principal em cada consulta)
