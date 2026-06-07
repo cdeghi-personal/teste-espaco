@@ -185,6 +185,7 @@ supabase/
   101_guardian_financial_responsible.sql # Flag is_financial_responsible em guardians — CPF obrigatório somente quando marcado como financeiro
   102_therapeutic_project.sql          # Adiciona therapeutic_project_description + therapeutic_project_notes TEXT em medical_records
   103_remove_school_address.sql        # Remove colunas school_address, school_neighborhood, school_city, school_state, school_zip de patients
+  104_fix_consultations_admin_rls.sql  # Fix: recria policy admin de consultations com subquery inline (is_admin() SECURITY DEFINER falhava no RETURNING de bulk INSERT, causando série criada com 0 atendimentos)
   functions/
     invite-therapist/index.ts    # Edge Function — envia convite por e-mail ao criar terapeuta
     suggest-convenio/index.ts    # Edge Function — gera sugestões de texto para relatório de convênio via OpenAI gpt-4o-mini
@@ -242,7 +243,7 @@ Encontrar em: Supabase Dashboard → Project Settings → API.
 | `patient_specialty_report_settings` | Desafios relacionados do Encaminhamento por paciente + especialidade — unique(patient_id, specialty), referral_challenges |
 | `company_settings` | Configurações da empresa — linha única (id=1, CHECK constraint); razao_social, cnpj, cnes, ai_system_prompt, updated_at |
 | `payment_invoices` | Notas fiscais / faturas — nf_number (globalmente único via índice parcial), patient_id, nf_issue_date, status (ISSUED/PAID/CANCELLED), total_amount, payment_demonstrative_id, consultation_ids (UUID[]), snapshot (JSONB), created_by, cancelled_at, cancelled_by, paid_at, paid_by; admin only |
-| `consultation_series` | Séries recorrentes — patient_id, primary_therapist_id, specialty, appointment_type_id, consultation_status_id, room_id, time, duration, recurrence_type ('by_count'/'by_date'), recurrence_days (integer[] ISO 1=Seg…7=Dom), start_date, end_date, session_count, active, notes, created_by, `event_type` (SESSION/INTERVIEW), `interview_format` (PRESENTIAL/REMOTE), `meeting_platform`, `meeting_link`, `interviewee_name`; RLS: admin tudo; terapeuta SELECT das próprias séries |
+| `consultation_series` | Séries recorrentes — patient_id, primary_therapist_id, specialty, appointment_type_id, consultation_status_id, room_id, time, duration, recurrence_type ('by_count'/'by_date'), recurrence_days (integer[] ISO 1=Seg…7=Dom), start_date, end_date, session_count, active, notes, created_by, `event_type` (SESSION/INTERVIEW), `interview_format` (PRESENTIAL/REMOTE), `meeting_platform`, `meeting_link`, `interviewee_name`; RLS: admin tudo; terapeuta SELECT/INSERT/UPDATE das próprias séries (migration 83 adicionou INSERT/UPDATE que faltava no 80) |
 | `consultation_therapists` | Participantes por consulta — consultation_id, therapist_id, specialty, is_primary; UNIQUE (consultation_id, therapist_id); sempre deve existir exatamente 1 is_primary=true; ON DELETE CASCADE de consultations |
 | `calendar_block_series` | Séries de bloqueios recorrentes — therapist_id, block_type ('RIGID'/'FLEX'), description, start_date, end_date, recurrence_type, recurrence_days (integer[]), session_count, start_time, end_time, active, cancelled, created_by |
 | `calendar_blocks` | Bloqueios de agenda por data — therapist_id, series_id (nullable), block_type ('RIGID'/'FLEX'), description, date, start_time, end_time, series_original_date, is_series_exception, active, cancelled, cancelled_at, cancelled_by, created_by; soft-delete via cancelled=true (nunca DELETE físico); RLS: admin tudo; próprio terapeuta SELECT/INSERT/UPDATE; membro da equipe SELECT |
@@ -913,7 +914,7 @@ Não é mais editável. Texto padrão fixo definido em `DESEMPENHO_FIXO` em `gen
 
 - Gera datas via `generateSeriesDates` (`src/utils/dateUtils.js`)
 - Cria `consultation_series` (inclui `event_type`, `interview_format`, `meeting_platform`, `meeting_link`, `interviewee_name`) → bulk insert `consultations` (com `series_id` e mesmos campos de entrevista) → bulk insert `consultation_therapists` (terapeuta principal, `is_primary = true`) → fetch completo com `CONSULTATION_SELECT` → atualiza estado local
-- **Não chama `handlePrepaidConsumption`** — criação de série nunca consome pré-pago
+- **Chama `handlePrepaidConsumption`** para cada consulta gerada quando `status.consumesPrepaidSession === true` e a especialidade do paciente é `PREPAID_PACKAGE` e `eventType === 'SESSION'` — espelha o comportamento de `addConsultation`; passa `oldConsumed: false` (série nova nunca consumiu antes)
 - Retorna `{ series, consultations, count }` ou `{ error }`
 
 ### `generateSeriesDates` (`src/utils/dateUtils.js`)
