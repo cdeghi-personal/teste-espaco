@@ -398,7 +398,7 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
               disabled={readOnly}
             >
               <option value="">Selecione o paciente</option>
-              {patients.filter(p => !p.deleted).map(p => (
+              {patients.filter(p => !p.deleted).sort((a, b) => a.fullName.localeCompare(b.fullName, 'pt-BR', { sensitivity: 'base' })).map(p => (
                 <option key={p.id} value={p.id}>{p.fullName}</option>
               ))}
             </Select>
@@ -489,31 +489,23 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
                   : 'bg-gray-50 border-gray-200 text-gray-600'
                 }`}>
                   <span className="shrink-0">{showPrepaidAlert ? '⚠️' : 'ℹ️'}</span>
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span>Modalidade:</span>
-                      <strong>{PAYMENT_TYPE_LABELS[patSpec.paymentType || 'POST_PER_SESSION']}</strong>
-                      {showConsumedChip && (
-                        <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium border ${
-                          initial.prepaidSessionConsumed ? 'bg-green-100 text-green-700 border-green-200' : 'bg-gray-100 text-gray-500 border-gray-200'
-                        }`}>
-                          {initial.prepaidSessionConsumed ? 'Consumiu sessão pré-paga' : 'Não consumiu sessão pré-paga'}
-                        </span>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span>
+                      Modalidade: <strong>{PAYMENT_TYPE_LABELS[patSpec.paymentType || 'POST_PER_SESSION']}</strong>
+                      {(!patSpec.paymentType || patSpec.paymentType === 'POST_PER_SESSION') && ' — Cobrança por sessão realizada.'}
+                      {patSpec.paymentType === 'POST_MONTHLY' && ' — Valor mensal fixo, independente do número de sessões.'}
+                      {patSpec.paymentType === 'PAY_PER_SESSION' && ' — Pagamento antecipado sessão a sessão, sem pacote.'}
+                      {patSpec.paymentType === 'PREPAID_PACKAGE' && prepaidBalance !== null && (
+                        <> — Saldo atual: <strong>{prepaidBalance} {Math.abs(prepaidBalance) === 1 ? 'sessão' : 'sessões'}</strong>.{' '}
+                          {showPrepaidAlert ? 'Saldo insuficiente para consumir esta sessão.' : willConsume ? 'Este status irá debitar 1 sessão.' : ''}</>
                       )}
-                    </div>
-                    {patSpec.paymentType === 'PREPAID_PACKAGE' && prepaidBalance !== null && (
-                      <p>Saldo atual: <strong>{prepaidBalance} {Math.abs(prepaidBalance) === 1 ? 'sessão' : 'sessões'}</strong>.
-                        {showPrepaidAlert ? ' Saldo insuficiente para consumir esta sessão.' : willConsume ? ' Este status irá debitar 1 sessão.' : ''}
-                      </p>
-                    )}
-                    {(!patSpec.paymentType || patSpec.paymentType === 'POST_PER_SESSION') && (
-                      <p>Cobrança por sessão realizada.</p>
-                    )}
-                    {patSpec.paymentType === 'POST_MONTHLY' && (
-                      <p>Valor mensal fixo — independente do número de sessões.</p>
-                    )}
-                    {patSpec.paymentType === 'PAY_PER_SESSION' && (
-                      <p>Pagamento antecipado sessão a sessão, sem pacote.</p>
+                    </span>
+                    {showConsumedChip && (
+                      <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium border ${
+                        initial.prepaidSessionConsumed ? 'bg-green-100 text-green-700 border-green-200' : 'bg-gray-100 text-gray-500 border-gray-200'
+                      }`}>
+                        {initial.prepaidSessionConsumed ? 'Consumiu sessão pré-paga' : 'Não consumiu sessão pré-paga'}
+                      </span>
                     )}
                   </div>
                 </div>

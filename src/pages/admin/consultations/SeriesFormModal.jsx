@@ -283,24 +283,13 @@ export default function SeriesFormModal({ onClose }) {
                   seriesPatSpec.paymentType === 'PREPAID_PACKAGE' ? 'bg-blue-50 border-blue-100 text-blue-700' : 'bg-gray-50 border-gray-200 text-gray-600'
                 }`}>
                   <span className="shrink-0">ℹ️</span>
-                  <div className="space-y-0.5">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span>Modalidade:</span>
-                      <strong>{PAYMENT_TYPE_LABELS[seriesPatSpec.paymentType || 'POST_PER_SESSION']}</strong>
-                    </div>
-                    {seriesPatSpec.paymentType === 'PREPAID_PACKAGE' && (
-                      <p>Cada sessão realizada com status consumidor debitará automaticamente 1 sessão do pacote.</p>
-                    )}
-                    {(!seriesPatSpec.paymentType || seriesPatSpec.paymentType === 'POST_PER_SESSION') && (
-                      <p>Cobrança por sessão realizada.</p>
-                    )}
-                    {seriesPatSpec.paymentType === 'POST_MONTHLY' && (
-                      <p>Valor mensal fixo — independente do número de sessões.</p>
-                    )}
-                    {seriesPatSpec.paymentType === 'PAY_PER_SESSION' && (
-                      <p>Pagamento antecipado sessão a sessão, sem pacote.</p>
-                    )}
-                  </div>
+                  <span>
+                    Modalidade: <strong>{PAYMENT_TYPE_LABELS[seriesPatSpec.paymentType || 'POST_PER_SESSION']}</strong>
+                    {seriesPatSpec.paymentType === 'PREPAID_PACKAGE' && ' — Cada sessão realizada com status consumidor debitará automaticamente 1 sessão do pacote.'}
+                    {(!seriesPatSpec.paymentType || seriesPatSpec.paymentType === 'POST_PER_SESSION') && ' — Cobrança por sessão realizada.'}
+                    {seriesPatSpec.paymentType === 'POST_MONTHLY' && ' — Valor mensal fixo, independente do número de sessões.'}
+                    {seriesPatSpec.paymentType === 'PAY_PER_SESSION' && ' — Pagamento antecipado sessão a sessão, sem pacote.'}
+                  </span>
                 </div>
               ) : null
             )}
