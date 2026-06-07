@@ -221,9 +221,11 @@ export default function PatientsPage() {
                           <button onClick={() => { setEditPatient(p); setShowModal(true); logAudit('VIEW', 'patients', p.id, p.fullName) }} className="p-2 rounded-lg text-gray-400">
                             <FiEdit2 size={15} />
                           </button>
-                          <button onClick={() => handleDelete(p.id, p.fullName)} className="p-2 rounded-lg text-gray-400">
-                            <FiTrash2 size={15} />
-                          </button>
+                          {isAdmin && (
+                            <button onClick={() => handleDelete(p.id, p.fullName)} className="p-2 rounded-lg text-gray-400">
+                              <FiTrash2 size={15} />
+                            </button>
+                          )}
                         </>
                       )}
                       {!p.deleted && <FiChevronRight size={14} className="text-gray-300" />}
@@ -308,9 +310,11 @@ export default function PatientsPage() {
                               <button onClick={() => { setEditPatient(p); setShowModal(true); logAudit('VIEW', 'patients', p.id, p.fullName) }} className="p-1.5 rounded-lg text-gray-400 hover:text-brand-blue hover:bg-blue-50 transition-colors">
                                 <FiEdit2 size={15} />
                               </button>
-                              <button onClick={() => handleDelete(p.id, p.fullName)} className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors">
-                                <FiTrash2 size={15} />
-                              </button>
+                              {isAdmin && (
+                                <button onClick={() => handleDelete(p.id, p.fullName)} className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors">
+                                  <FiTrash2 size={15} />
+                                </button>
+                              )}
                             </>
                           )}
                         </div>
