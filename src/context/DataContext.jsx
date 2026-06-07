@@ -26,8 +26,7 @@ const DataContext = createContext(null)
 const PATIENT_SELECT = `
   id, full_name, date_of_birth, sex, cpf, rg, phone, email,
   address, neighborhood, city, state, zip_code, indication,
-  school_name, school_phone, school_address, school_neighborhood,
-  school_city, school_state, school_zip, school_coordinator,
+  school_name, school_phone, school_coordinator,
   doctor_insurance, doctor_name, doctor_specialty, doctor_phone,
   diagnosis, notes, deleted, needs_convenio_report,
   status_id, payment_method_id, primary_therapist_id, created_at, updated_at,
@@ -41,8 +40,7 @@ const PATIENT_SELECT = `
 const PATIENT_SELECT_FALLBACK = `
   id, full_name, date_of_birth, sex, cpf, rg, phone, email,
   address, neighborhood, city, state, zip_code, indication,
-  school_name, school_phone, school_address, school_neighborhood,
-  school_city, school_state, school_zip, school_coordinator,
+  school_name, school_phone, school_coordinator,
   doctor_insurance, doctor_name, doctor_specialty, doctor_phone,
   diagnosis, notes, deleted, needs_convenio_report,
   status_id, payment_method_id, primary_therapist_id, created_at, updated_at,
@@ -230,11 +228,6 @@ export function DataProvider({ children }) {
         indication: data.indication || null,
         school_name: data.schoolName || null,
         school_phone: data.schoolPhone || null,
-        school_address: data.schoolAddress || null,
-        school_neighborhood: data.schoolNeighborhood || null,
-        school_city: data.schoolCity || null,
-        school_state: data.schoolState || null,
-        school_zip: data.schoolZip || null,
         school_coordinator: data.schoolCoordinator || null,
         doctor_insurance: data.doctorInsurance || null,
         doctor_name: data.doctorName || null,
@@ -331,11 +324,6 @@ export function DataProvider({ children }) {
     if (data.indication !== undefined) update.indication = data.indication || null
     if (data.schoolName !== undefined) update.school_name = data.schoolName || null
     if (data.schoolPhone !== undefined) update.school_phone = data.schoolPhone || null
-    if (data.schoolAddress !== undefined) update.school_address = data.schoolAddress || null
-    if (data.schoolNeighborhood !== undefined) update.school_neighborhood = data.schoolNeighborhood || null
-    if (data.schoolCity !== undefined) update.school_city = data.schoolCity || null
-    if (data.schoolState !== undefined) update.school_state = data.schoolState || null
-    if (data.schoolZip !== undefined) update.school_zip = data.schoolZip || null
     if (data.schoolCoordinator !== undefined) update.school_coordinator = data.schoolCoordinator || null
     if (data.doctorInsurance !== undefined) update.doctor_insurance = data.doctorInsurance || null
     if (data.doctorName !== undefined) update.doctor_name = data.doctorName || null
@@ -1154,19 +1142,40 @@ export function DataProvider({ children }) {
   // ─── Medical Records ──────────────────────────────────────────────────────────
 
   async function getOrCreateMedicalRecord(patientId, authUserId) {
+    const fields = 'id, therapeutic_project_description, therapeutic_project_notes'
     const { data: existing } = await supabase
       .from('medical_records')
-      .select('id')
+      .select(fields)
       .eq('patient_id', patientId)
       .maybeSingle()
-    if (existing) return existing.id
+    if (existing) return {
+      id: existing.id,
+      therapeuticProjectDescription: existing.therapeutic_project_description || '',
+      therapeuticProjectNotes: existing.therapeutic_project_notes || '',
+    }
 
     const { data: created, error } = await supabase
       .from('medical_records')
       .insert({ patient_id: patientId, created_by: authUserId || null })
-      .select('id').single()
+      .select(fields).single()
     if (error) { dbError(error, toast); return null }
-    return created.id
+    return {
+      id: created.id,
+      therapeuticProjectDescription: created.therapeutic_project_description || '',
+      therapeuticProjectNotes: created.therapeutic_project_notes || '',
+    }
+  }
+
+  async function updateTherapeuticProject(medicalRecordId, { description, notes }) {
+    const { error } = await supabase
+      .from('medical_records')
+      .update({
+        therapeutic_project_description: description || null,
+        therapeutic_project_notes: notes || null,
+      })
+      .eq('id', medicalRecordId)
+    if (error) return dbError(error, toast)
+    return { description, notes }
   }
 
   async function getExams(medicalRecordId) {
@@ -2107,7 +2116,7 @@ export function DataProvider({ children }) {
     appointmentTypes, addAppointmentType, updateAppointmentType,
     ageRanges, addAgeRange, updateAgeRange, deleteAgeRange,
     // Medical Records
-    getOrCreateMedicalRecord,
+    getOrCreateMedicalRecord, updateTherapeuticProject,
     getExams, addExam, updateExam, deleteExam,
     getMedications, addMedication, updateMedication, deleteMedication,
     getConducts, addConduct, updateConduct, deleteConduct,

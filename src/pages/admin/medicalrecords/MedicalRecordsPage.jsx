@@ -223,7 +223,7 @@ export default function MedicalRecordsPage() {
   const {
     patients, therapists, rooms, specialtiesData, consultations, consultationStatuses, appointmentTypes,
     updateConsultation, deleteConsultation, deleteConsultationSeries,
-    getOrCreateMedicalRecord,
+    getOrCreateMedicalRecord, updateTherapeuticProject,
     getExams, addExam, updateExam, deleteExam,
     getMedications, addMedication, updateMedication, deleteMedication,
     getConducts, addConduct, updateConduct, deleteConduct,
@@ -250,6 +250,9 @@ export default function MedicalRecordsPage() {
   const [exams, setExams] = useState([])
   const [medications, setMedications] = useState([])
   const [conducts, setConducts] = useState([])
+  const [therapeuticProject, setTherapeuticProject] = useState({ description: '', notes: '' })
+  const [projectEditing, setProjectEditing] = useState(false)
+  const [projectDraft, setProjectDraft] = useState({ description: '', notes: '' })
 
   // Draft state for new-item forms
   const [examDraft, setExamDraft] = useState(null)
@@ -327,9 +330,14 @@ export default function MedicalRecordsPage() {
 
   const loadData = useCallback(async (patientId) => {
     setLoading(true)
-    const mrId = await getOrCreateMedicalRecord(patientId, user?.authId)
-    if (!mrId) { setLoading(false); return }
+    const mrResult = await getOrCreateMedicalRecord(patientId, user?.authId)
+    if (!mrResult) { setLoading(false); return }
+    const mrId = mrResult.id
     setMedicalRecordId(mrId)
+    const proj = { description: mrResult.therapeuticProjectDescription || '', notes: mrResult.therapeuticProjectNotes || '' }
+    setTherapeuticProject(proj)
+    setProjectDraft(proj)
+    setProjectEditing(false)
     const [e, m, c] = await Promise.all([getExams(mrId), getMedications(mrId), getConducts(mrId)])
     setExams(e || [])
     setMedications(m || [])
@@ -349,7 +357,12 @@ export default function MedicalRecordsPage() {
     setFilterStatusIds([])
     setSelectedConsultIds(new Set())
     if (id) await loadData(id)
-    else setMedicalRecordId(null)
+    else {
+      setMedicalRecordId(null)
+      setTherapeuticProject({ description: '', notes: '' })
+      setProjectDraft({ description: '', notes: '' })
+      setProjectEditing(false)
+    }
   }
 
   // ─── Exams ─────────────────────────────────────────────────
@@ -368,6 +381,15 @@ export default function MedicalRecordsPage() {
     if (!confirm('Remover exame?')) return
     await deleteExam(id)
     setExams(prev => prev.filter(e => e.id !== id))
+  }
+
+  // ─── Therapeutic Project ───────────────────────────────────
+  async function saveProject() {
+    const result = await updateTherapeuticProject(medicalRecordId, projectDraft)
+    if (result && !result.error) {
+      setTherapeuticProject({ ...projectDraft })
+      setProjectEditing(false)
+    }
   }
 
   // ─── Medications ───────────────────────────────────────────
@@ -445,6 +467,7 @@ export default function MedicalRecordsPage() {
         guardians: getGuardiansForPatient(selectedPatientId),
         exams,
         medications,
+        therapeuticProject,
         conducts,
         consultations: patientConsultations,
         therapists,
@@ -626,6 +649,63 @@ export default function MedicalRecordsPage() {
                   )}
                 </div>
               </Section>
+
+              {/* ── Projeto Terapêutico ── */}
+              {(user?.role === 'admin' || user?.belongsToTeam) && (
+                <Section title="Projeto Terapêutico" defaultOpen={false}>
+                  <div className="space-y-3">
+                    {projectEditing ? (
+                      <>
+                        <Textarea
+                          label="Descrição do Projeto"
+                          value={projectDraft.description}
+                          onChange={e => setProjectDraft(d => ({ ...d, description: e.target.value }))}
+                          rows={4}
+                          placeholder="Descreva o projeto terapêutico do paciente…"
+                        />
+                        <Textarea
+                          label="Observações"
+                          value={projectDraft.notes}
+                          onChange={e => setProjectDraft(d => ({ ...d, notes: e.target.value }))}
+                          rows={3}
+                          placeholder="Observações adicionais…"
+                        />
+                        <div className="flex gap-2 justify-end">
+                          <Button variant="ghost" onClick={() => { setProjectDraft({ ...therapeuticProject }); setProjectEditing(false) }}>Cancelar</Button>
+                          <Button variant="primary" onClick={saveProject}>Salvar</Button>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        {therapeuticProject.description || therapeuticProject.notes ? (
+                          <div className="space-y-3">
+                            {therapeuticProject.description && (
+                              <div>
+                                <p className="text-xs font-medium text-gray-500 mb-1">Descrição do Projeto</p>
+                                <p className="text-sm text-gray-800 whitespace-pre-wrap">{therapeuticProject.description}</p>
+                              </div>
+                            )}
+                            {therapeuticProject.notes && (
+                              <div>
+                                <p className="text-xs font-medium text-gray-500 mb-1">Observações</p>
+                                <p className="text-sm text-gray-800 whitespace-pre-wrap">{therapeuticProject.notes}</p>
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <p className="text-sm text-gray-400 text-center py-2">Nenhum projeto terapêutico registrado.</p>
+                        )}
+                        <button
+                          onClick={() => { setProjectDraft({ ...therapeuticProject }); setProjectEditing(true) }}
+                          className="flex items-center gap-1.5 text-sm text-brand-blue hover:underline mt-1"
+                        >
+                          <FiEdit2 size={14} /> {therapeuticProject.description || therapeuticProject.notes ? 'Editar projeto' : 'Adicionar projeto terapêutico'}
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </Section>
+              )}
 
               {/* ── Conduta & Objetivo Terapêutico ── */}
               {(user?.role === 'admin' || user?.belongsToTeam) && <Section title="Conduta & Objetivo Terapêutico" count={conducts.length} defaultOpen={false}>

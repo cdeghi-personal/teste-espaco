@@ -12,7 +12,7 @@ function age(dob) {
 }
 
 export async function generateProntuarioPDF({
-  patient, guardians, exams, medications, conducts,
+  patient, guardians, exams, medications, therapeuticProject = null, conducts,
   consultations, therapists, consultationStatuses,
   appointmentTypes, rooms, specialtiesData,
   companySettings = null,
@@ -100,6 +100,37 @@ export async function generateProntuarioPDF({
       columnStyles: { 0: { cellWidth: 55 }, 1: { cellWidth: 22 }, 2: { cellWidth: 25 }, 3: { cellWidth: 'auto' } },
     })
     y = doc.lastAutoTable.finalY + 6
+  }
+
+  // ── Projeto Terapêutico ──
+  if (therapeuticProject?.description || therapeuticProject?.notes) {
+    y = sectionBlock(doc, 'Projeto Terapêutico', y)
+    const pageRight = pageW - margin
+    if (therapeuticProject.description) {
+      doc.setFontSize(8)
+      doc.setFont('helvetica', 'bold')
+      doc.setTextColor(80, 80, 80)
+      doc.text('Descrição do Projeto', margin, y)
+      y += 4
+      doc.setFont('helvetica', 'normal')
+      doc.setTextColor(30, 30, 30)
+      const descLines = doc.splitTextToSize(therapeuticProject.description, pageRight - margin)
+      doc.text(descLines, margin, y)
+      y += descLines.length * 4.5 + 3
+    }
+    if (therapeuticProject.notes) {
+      doc.setFontSize(8)
+      doc.setFont('helvetica', 'bold')
+      doc.setTextColor(80, 80, 80)
+      doc.text('Observações', margin, y)
+      y += 4
+      doc.setFont('helvetica', 'normal')
+      doc.setTextColor(30, 30, 30)
+      const notesLines = doc.splitTextToSize(therapeuticProject.notes, pageRight - margin)
+      doc.text(notesLines, margin, y)
+      y += notesLines.length * 4.5 + 3
+    }
+    y += 3
   }
 
   // ── Conduta & Objetivo Terapêutico ──

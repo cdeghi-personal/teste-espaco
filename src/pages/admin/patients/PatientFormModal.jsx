@@ -17,8 +17,7 @@ const EMPTY_EXT = { name: '', specialty: '', phone: '' }
 const EMPTY = {
   fullName: '', dateOfBirth: '', sex: '', cpf: '', rg: '',
   phone: '', email: '', address: '', neighborhood: '', city: '', state: '', zipCode: '', indication: '',
-  schoolName: '', schoolPhone: '', schoolAddress: '', schoolNeighborhood: '',
-  schoolCity: '', schoolState: '', schoolZip: '', schoolCoordinator: '',
+  schoolName: '', schoolPhone: '', schoolCoordinator: '',
   doctorInsurance: '', doctorName: '', doctorSpecialty: '', doctorPhone: '',
   diagnosis: '', conditionIds: [], specialties: [], therapistId: '',
   involvedTherapistIds: [],

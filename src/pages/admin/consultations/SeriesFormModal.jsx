@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import Modal from '../../../components/ui/Modal'
 import Button from '../../../components/ui/Button'
 import Input from '../../../components/ui/Input'
@@ -22,7 +22,7 @@ const WEEKDAYS = [
 ]
 
 export default function SeriesFormModal({ onClose }) {
-  const { patients, therapists, specialtiesData, rooms, consultationStatuses, appointmentTypes, addConsultationSeries, consultations, calendarBlocks } = useData()
+  const { patients, therapists, specialtiesData, rooms, consultationStatuses, appointmentTypes, addConsultationSeries, consultations, calendarBlocks, getPrepaidData } = useData()
   const { user } = useAuth()
   const toast = useToast()
 
@@ -43,8 +43,21 @@ export default function SeriesFormModal({ onClose }) {
   })
   const [errors, setErrors] = useState({})
   const [saving, setSaving] = useState(false)
+  const [seriesPrepaidBalance, setSeriesPrepaidBalance] = useState(null)
   const [seriesConflicts, setSeriesConflicts] = useState([]) // [{date, conflicts[]}]
   const [showConflictWarning, setShowConflictWarning] = useState(false)
+
+  useEffect(() => {
+    if (!form.patientId || !form.specialty) { setSeriesPrepaidBalance(null); return }
+    const patient = activePatients.find(p => p.id === form.patientId)
+    const spec = (patient?.specialties || []).find(s => s.key === form.specialty)
+    if (spec?.paymentType !== 'PREPAID_PACKAGE') { setSeriesPrepaidBalance(null); return }
+    let cancelled = false
+    getPrepaidData(form.patientId, form.specialty).then(d => {
+      if (!cancelled) setSeriesPrepaidBalance(d.balance)
+    })
+    return () => { cancelled = true }
+  }, [form.patientId, form.specialty, activePatients, getPrepaidData])
 
   function set(field, value) {
     setForm(f => ({ ...f, [field]: value }))
@@ -114,6 +127,9 @@ export default function SeriesFormModal({ onClose }) {
     ? ((seriesSelectedPatient.specialties || []).find(s => s.key === form.specialty) ?? null)
     : null
   const seriesPatSpecMissing = !!(seriesSelectedPatient && form.specialty && seriesPatSpec === null)
+  const seriesStatusConsumes = form.consultationStatusId
+    ? consultationStatuses.find(s => s.id === form.consultationStatusId)?.consumesPrepaidSession === true
+    : false
 
   function validate() {
     const e = {}
@@ -285,7 +301,14 @@ export default function SeriesFormModal({ onClose }) {
                   <span className="shrink-0">ℹ️</span>
                   <span>
                     Modalidade: <strong>{PAYMENT_TYPE_LABELS[seriesPatSpec.paymentType || 'POST_PER_SESSION']}</strong>
-                    {seriesPatSpec.paymentType === 'PREPAID_PACKAGE' && ' — Cada sessão realizada com status consumidor debitará automaticamente 1 sessão do pacote.'}
+                    {seriesPatSpec.paymentType === 'PREPAID_PACKAGE' && seriesPrepaidBalance !== null && (
+                      <> — Saldo atual: <strong>{seriesPrepaidBalance} sessão{seriesPrepaidBalance !== 1 ? 'ões' : ''}</strong>.{' '}
+                        {seriesStatusConsumes && previewDates.length > 0
+                          ? <>A criação debitará <strong>{previewDates.length}</strong> sessão{previewDates.length !== 1 ? 'ões' : ''} (saldo após: <strong>{seriesPrepaidBalance - previewDates.length}</strong>).</>
+                          : 'Cada sessão com status consumidor debitará 1 sessão do pacote.'}
+                      </>
+                    )}
+                    {seriesPatSpec.paymentType === 'PREPAID_PACKAGE' && seriesPrepaidBalance === null && ' — Carregando saldo…'}
                     {(!seriesPatSpec.paymentType || seriesPatSpec.paymentType === 'POST_PER_SESSION') && ' — Cobrança por sessão realizada.'}
                     {seriesPatSpec.paymentType === 'POST_MONTHLY' && ' — Valor mensal fixo, independente do número de sessões.'}
                     {seriesPatSpec.paymentType === 'PAY_PER_SESSION' && ' — Pagamento antecipado sessão a sessão, sem pacote.'}
