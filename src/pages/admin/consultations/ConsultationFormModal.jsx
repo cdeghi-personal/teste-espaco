@@ -591,7 +591,7 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
           {requiresNote && !readOnly && (
             <div className="flex items-start gap-2 p-3 mb-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800">
               <span className="shrink-0 mt-0.5">⚠️</span>
-              <span>Este status exige uma observação. Informe no Objetivo da Sessão as razões ou contexto da alteração do status do atendimento.</span>
+              <span>Este status exige uma observação. Informe no Objetivo da Sessão a justificativa ou contexto da alteração do status do atendimento.</span>
             </div>
           )}
           <Textarea

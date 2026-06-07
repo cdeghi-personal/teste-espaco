@@ -5,6 +5,7 @@ import { useData } from '../../../context/DataContext'
 import { useAuth } from '../../../context/AuthContext'
 import { generateProntuarioPDF } from '../../../utils/generateProntuarioPDF'
 import Button from '../../../components/ui/Button'
+import Modal from '../../../components/ui/Modal'
 import Input from '../../../components/ui/Input'
 import Select from '../../../components/ui/Select'
 import Textarea from '../../../components/ui/Textarea'
@@ -221,7 +222,7 @@ function Section({ title, count, children, defaultOpen = true }) {
 export default function MedicalRecordsPage() {
   const {
     patients, therapists, rooms, specialtiesData, consultations, consultationStatuses, appointmentTypes,
-    updateConsultation,
+    updateConsultation, deleteConsultation, deleteConsultationSeries,
     getOrCreateMedicalRecord,
     getExams, addExam, updateExam, deleteExam,
     getMedications, addMedication, updateMedication, deleteMedication,
@@ -232,6 +233,14 @@ export default function MedicalRecordsPage() {
   } = useData()
   const { user } = useAuth()
   const isAdminOrTeam = user?.role === 'admin' || user?.belongsToTeam
+
+  function handleDeleteConsultation(c) {
+    if (c.seriesId && user?.role === 'admin') {
+      setSeriesDeleteConfirm({ id: c.id, seriesId: c.seriesId, date: c.date })
+      return
+    }
+    if (confirm('Excluir este registro de atendimento?')) deleteConsultation(c.id)
+  }
 
   const [search, setSearch] = useState('')
   const [selectedPatientId, setSelectedPatientId] = useState('')
@@ -255,6 +264,7 @@ export default function MedicalRecordsPage() {
   const [showConsultationModal, setShowConsultationModal] = useState(false)
   const [showSeriesModal, setShowSeriesModal] = useState(false)
   const [editConsultation, setEditConsultation] = useState(null)
+  const [seriesDeleteConfirm, setSeriesDeleteConfirm] = useState(null) // { id, seriesId, date }
   const [selectedConsultIds, setSelectedConsultIds] = useState(new Set())
   const selectAllRef = useRef(null)
 
@@ -824,12 +834,20 @@ export default function MedicalRecordsPage() {
                               </span>
                             )}
                             {(user?.role === 'admin' || user?.id === c.therapistId) && (
-                            <button
-                              onClick={() => { setEditConsultation(c); setShowConsultationModal(true) }}
-                              className="ml-auto p-1 rounded-lg text-gray-400 hover:text-brand-blue hover:bg-blue-50 transition-colors"
-                            >
-                              <FiEdit2 size={13} />
-                            </button>
+                            <div className="ml-auto flex gap-0.5 shrink-0">
+                              <button
+                                onClick={() => { setEditConsultation(c); setShowConsultationModal(true) }}
+                                className="p-1 rounded-lg text-gray-400 hover:text-brand-blue hover:bg-blue-50 transition-colors"
+                              >
+                                <FiEdit2 size={13} />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteConsultation(c)}
+                                className="p-1 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+                              >
+                                <FiTrash2 size={13} />
+                              </button>
+                            </div>
                             )}
                           </div>
                           {c.mainObjective && (
@@ -868,6 +886,22 @@ export default function MedicalRecordsPage() {
           onClose={() => setShowSeriesModal(false)}
           initial={selectedPatientId ? { patientId: selectedPatientId } : {}}
         />
+      )}
+      {seriesDeleteConfirm && (
+        <Modal
+          title="Excluir da Série"
+          onClose={() => setSeriesDeleteConfirm(null)}
+          size="sm"
+          footer={
+            <>
+              <Button variant="ghost" onClick={() => setSeriesDeleteConfirm(null)}>Cancelar</Button>
+              <Button variant="outline" onClick={() => { deleteConsultation(seriesDeleteConfirm.id); setSeriesDeleteConfirm(null) }}>Apenas este</Button>
+              <Button variant="danger" onClick={() => { deleteConsultationSeries(seriesDeleteConfirm.seriesId, seriesDeleteConfirm.date); setSeriesDeleteConfirm(null) }}>Este e os próximos</Button>
+            </>
+          }
+        >
+          <p className="text-sm text-gray-700">Esta consulta faz parte de uma série recorrente. Deseja excluir apenas este atendimento ou este e todos os atendimentos futuros não faturados da série?</p>
+        </Modal>
       )}
     </div>
   )

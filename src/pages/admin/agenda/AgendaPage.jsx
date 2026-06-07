@@ -1,11 +1,12 @@
 import { useState, useMemo } from 'react'
-import { FiPlus, FiChevronLeft, FiChevronRight, FiSearch, FiCalendar, FiEdit2, FiRepeat, FiSlash, FiVideo, FiMapPin, FiExternalLink } from 'react-icons/fi'
+import { FiPlus, FiChevronLeft, FiChevronRight, FiSearch, FiCalendar, FiEdit2, FiTrash2, FiRepeat, FiSlash, FiVideo, FiMapPin, FiExternalLink } from 'react-icons/fi'
 import HelpButton from '../../../components/ui/HelpButton'
 import { addDays, startOfWeek, format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { useData } from '../../../context/DataContext'
 import { useAuth } from '../../../context/AuthContext'
 import Button from '../../../components/ui/Button'
+import Modal from '../../../components/ui/Modal'
 import ConsultationFormModal from '../consultations/ConsultationFormModal'
 import SeriesFormModal from '../consultations/SeriesFormModal'
 import CalendarBlockFormModal from './CalendarBlockFormModal'
@@ -89,7 +90,7 @@ function BlockCard({ block, therapist, onEdit, onView, isAdmin, userId, conflict
 }
 
 export default function AgendaPage() {
-  const { consultations, patients, rooms, therapists, calendarBlocks, logAudit } = useData()
+  const { consultations, patients, rooms, therapists, calendarBlocks, logAudit, deleteConsultation, deleteConsultationSeries } = useData()
   const { user } = useAuth()
   const [weekRef, setWeekRef] = useState(new Date())
   const [search, setSearch] = useState('')
@@ -110,6 +111,7 @@ export default function AgendaPage() {
     return (d === 0 || d === 6) ? 5 : d - 1
   })
   const [myAgenda, setMyAgenda] = useState(user?.role !== 'admin')
+  const [seriesDeleteConfirm, setSeriesDeleteConfirm] = useState(null) // { id, seriesId, date }
   // Toggle visível para: admin+terapeuta OU terapeuta da equipe (que pode ver agenda dos colegas)
   // Não-equipe não tem o que filtrar — só vê a própria agenda
   const canFilterMine = !!user?.id && (user?.role === 'admin' || user?.belongsToTeam)
@@ -123,6 +125,14 @@ export default function AgendaPage() {
   const sunday = addDays(weekStart, 6)
 
   const isAdminOrTeam = user?.role === 'admin' || user?.belongsToTeam
+
+  function handleDelete(item) {
+    if (item.seriesId && user?.role === 'admin') {
+      setSeriesDeleteConfirm({ id: item.id, seriesId: item.seriesId, date: item.date })
+      return
+    }
+    if (confirm('Excluir este registro de atendimento?')) deleteConsultation(item.id)
+  }
 
   // Mapa centralizado de conflitos — recalculado quando dados ou semana mudam
   const conflictMap = useMemo(() => {
@@ -479,6 +489,12 @@ export default function AgendaPage() {
                           >
                             <FiEdit2 size={10} />
                           </button>
+                          <button
+                            onClick={e => { e.stopPropagation(); handleDelete(item) }}
+                            className="w-5 h-5 rounded flex items-center justify-center bg-black/20 hover:bg-red-500/70 transition-colors"
+                          >
+                            <FiTrash2 size={9} />
+                          </button>
                         </div>
                       )}
                       {isPrivate && user?.role === 'admin' && (
@@ -488,6 +504,12 @@ export default function AgendaPage() {
                             className="w-5 h-5 rounded flex items-center justify-center bg-black/20 hover:bg-black/40 transition-colors"
                           >
                             <FiEdit2 size={10} />
+                          </button>
+                          <button
+                            onClick={e => { e.stopPropagation(); handleDelete(item) }}
+                            className="w-5 h-5 rounded flex items-center justify-center bg-black/20 hover:bg-red-500/70 transition-colors"
+                          >
+                            <FiTrash2 size={9} />
                           </button>
                         </div>
                       )}
@@ -609,6 +631,12 @@ export default function AgendaPage() {
                           >
                             <FiEdit2 size={10} />
                           </button>
+                          <button
+                            onClick={e => { e.stopPropagation(); handleDelete(item) }}
+                            className="w-5 h-5 rounded flex items-center justify-center bg-black/20 hover:bg-red-500/70 transition-colors"
+                          >
+                            <FiTrash2 size={9} />
+                          </button>
                         </div>
                       )}
                       {isPrivate && user?.role === 'admin' && (
@@ -618,6 +646,12 @@ export default function AgendaPage() {
                             className="w-5 h-5 rounded flex items-center justify-center bg-black/20 hover:bg-black/40 transition-colors"
                           >
                             <FiEdit2 size={10} />
+                          </button>
+                          <button
+                            onClick={e => { e.stopPropagation(); handleDelete(item) }}
+                            className="w-5 h-5 rounded flex items-center justify-center bg-black/20 hover:bg-red-500/70 transition-colors"
+                          >
+                            <FiTrash2 size={9} />
                           </button>
                         </div>
                       )}
@@ -788,15 +822,21 @@ export default function AgendaPage() {
                       </div>
                       {!isPrivate && (user?.role === 'admin' || user?.id === item.therapistId) && (
                         <div className="flex gap-1 shrink-0">
-                          <button onClick={() => { setEditItem(item); setShowModal(true); logAudit('VIEW', 'consultations', item.id, patient?.fullName || item.id) }} className="p-2 rounded-lg text-gray-400 hover:text-brand-blue hover:bg-blue-50">
+                          <button onClick={e => { e.stopPropagation(); setEditItem(item); setShowModal(true); logAudit('VIEW', 'consultations', item.id, patient?.fullName || item.id) }} className="p-2 rounded-lg text-gray-400 hover:text-brand-blue hover:bg-blue-50">
                             <FiEdit2 size={15} />
+                          </button>
+                          <button onClick={e => { e.stopPropagation(); handleDelete(item) }} className="p-2 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50">
+                            <FiTrash2 size={15} />
                           </button>
                         </div>
                       )}
                       {isPrivate && user?.role === 'admin' && (
                         <div className="flex gap-1 shrink-0">
-                          <button onClick={() => { setEditItem(item); setShowModal(true) }} className="p-2 rounded-lg text-gray-400 hover:text-brand-blue hover:bg-blue-50">
+                          <button onClick={e => { e.stopPropagation(); setEditItem(item); setShowModal(true) }} className="p-2 rounded-lg text-gray-400 hover:text-brand-blue hover:bg-blue-50">
                             <FiEdit2 size={15} />
+                          </button>
+                          <button onClick={e => { e.stopPropagation(); handleDelete(item) }} className="p-2 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50">
+                            <FiTrash2 size={15} />
                           </button>
                         </div>
                       )}
@@ -931,6 +971,23 @@ export default function AgendaPage() {
           onClose={() => setShowBlockHistory(false)}
           therapistId={filterTherapist || (user?.role !== 'admin' ? user?.id : null)}
         />
+      )}
+
+      {seriesDeleteConfirm && (
+        <Modal
+          title="Excluir da Série"
+          onClose={() => setSeriesDeleteConfirm(null)}
+          size="sm"
+          footer={
+            <>
+              <Button variant="ghost" onClick={() => setSeriesDeleteConfirm(null)}>Cancelar</Button>
+              <Button variant="outline" onClick={() => { deleteConsultation(seriesDeleteConfirm.id); setSeriesDeleteConfirm(null) }}>Apenas este</Button>
+              <Button variant="danger" onClick={() => { deleteConsultationSeries(seriesDeleteConfirm.seriesId, seriesDeleteConfirm.date); setSeriesDeleteConfirm(null) }}>Este e os próximos</Button>
+            </>
+          }
+        >
+          <p className="text-sm text-gray-700">Esta consulta faz parte de uma série recorrente. Deseja excluir apenas este atendimento ou este e todos os atendimentos futuros não faturados da série?</p>
+        </Modal>
       )}
     </div>
   )

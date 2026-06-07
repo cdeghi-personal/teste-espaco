@@ -1667,7 +1667,7 @@ export function DataProvider({ children }) {
       .single()
     if (seriesErr) return dbError(seriesErr, toast)
 
-    // 3. Bulk insert das consultas — sem chamar handlePrepaidConsumption (série não consome pré-pago)
+    // 3. Bulk insert das consultas
     const consultationRows = dates.map(date => ({
       patient_id:             patientId,
       therapist_id:           primaryTherapistId,
@@ -1716,6 +1716,31 @@ export function DataProvider({ children }) {
 
     const mapped = (full || []).map(mapConsultation)
     setConsultations(prev => [...mapped, ...prev])
+
+    // 6. Consome sessões pré-pagas se o status da série exige (espelha comportamento de addConsultation)
+    if (consultationStatusId && patientId && specialty && (eventType || 'SESSION') === 'SESSION') {
+      const patient = patients.find(p => p.id === patientId)
+      const patSpec = (patient?.specialties || []).find(s => s.key === specialty)
+      if (patSpec?.paymentType === 'PREPAID_PACKAGE') {
+        const status = consultationStatuses.find(s => s.id === consultationStatusId)
+        if (status?.consumesPrepaidSession) {
+          const primaryTherapist = therapists.find(t => t.id === primaryTherapistId)
+          for (const consult of mapped) {
+            await handlePrepaidConsumption(consult.id, {
+              oldConsumed: false,
+              newPatientId: patientId,
+              newSpecialty: specialty,
+              newStatusId: consultationStatusId,
+              operation: 'CONSULTATION_ADD',
+              date: consult.date,
+              time: consult.time || time,
+              therapistName: primaryTherapist?.name || '',
+              statusName: status.name,
+            })
+          }
+        }
+      }
+    }
 
     // Persiste conflitos por data se fornecidos
     if (conflictsPerDate.length > 0) {
