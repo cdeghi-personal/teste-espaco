@@ -126,7 +126,7 @@ export default function ConsultationsPage() {
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <HelpButton title="Como usar Atendimentos">
-            <p><strong>Registrar atendimento:</strong> clique em <em>Novo Registro</em> e preencha paciente, terapeuta, especialidade, data, horário, status e tipo.</p>
+            <p><strong>Registrar atendimento:</strong> clique em <em>Novo Atendimento</em> e preencha paciente, terapeuta, especialidade, data, horário, status e tipo.</p>
             <p><strong>Criar série:</strong> clique em <em>Série</em> para criar atendimentos recorrentes (ex.: toda segunda por 10 semanas).</p>
             <p><strong>Entrevistas:</strong> selecione o tipo "Entrevista" para entrevistas com responsáveis ou candidatos. Paciente opcional; campo entrevistado obrigatório. Entrevistas remotas não exigem sala e não conflitam com bloqueios Flex. Entrevistas não aparecem nos relatórios financeiros.</p>
             <p><strong>Chips nos cards:</strong> 🔵 indigo = série regular; 🟡 âmbar + ! = ocorrência alterada individualmente; 👥 N = múltiplos terapeutas (passe o mouse para ver os nomes); 🔴 ⚠ = conflito de agenda (passe o mouse para detalhes).</p>
@@ -144,7 +144,7 @@ export default function ConsultationsPage() {
           )}
           <Button variant="primary" onClick={() => { setEditConsultation(null); setShowModal(true) }}>
             <FiPlus size={16} />
-            <span className="hidden sm:inline">Novo Registro</span>
+            <span className="hidden sm:inline">Novo Atendimento</span>
             <span className="sm:hidden">Novo</span>
           </Button>
         </div>
@@ -252,8 +252,8 @@ export default function ConsultationsPage() {
             <EmptyState
               icon={FiClipboard}
               title="Nenhum registro encontrado"
-              description="Registre o primeiro atendimento clicando em 'Novo Registro'."
-              action={<Button variant="primary" onClick={() => setShowModal(true)}><FiPlus size={14} /> Novo Registro</Button>}
+              description="Registre o primeiro atendimento clicando em 'Novo Atendimento'."
+              action={<Button variant="primary" onClick={() => setShowModal(true)}><FiPlus size={14} /> Novo Atendimento</Button>}
             />
           </div>
         ) : filtered.map(c => {

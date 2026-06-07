@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { FiPlus, FiTrash2, FiEdit2, FiCheck, FiX, FiSearch, FiChevronLeft, FiChevronRight, FiCalendar, FiFileText } from 'react-icons/fi'
+import { FiPlus, FiTrash2, FiEdit2, FiCheck, FiX, FiSearch, FiChevronLeft, FiChevronRight, FiCalendar, FiFileText, FiRepeat } from 'react-icons/fi'
 import HelpButton from '../../../components/ui/HelpButton'
 import { useData } from '../../../context/DataContext'
 import { useAuth } from '../../../context/AuthContext'
@@ -10,6 +10,7 @@ import Select from '../../../components/ui/Select'
 import Textarea from '../../../components/ui/Textarea'
 import Badge from '../../../components/ui/Badge'
 import ConsultationFormModal from '../consultations/ConsultationFormModal'
+import SeriesFormModal from '../consultations/SeriesFormModal'
 import { formatDateBR, formatDateShort, isoToday } from '../../../utils/dateUtils'
 
 const CONDUCT_STATUS = {
@@ -230,6 +231,7 @@ export default function MedicalRecordsPage() {
     companySettings,
   } = useData()
   const { user } = useAuth()
+  const isAdminOrTeam = user?.role === 'admin' || user?.belongsToTeam
 
   const [search, setSearch] = useState('')
   const [selectedPatientId, setSelectedPatientId] = useState('')
@@ -251,6 +253,7 @@ export default function MedicalRecordsPage() {
   const [rangeTo, setRangeTo] = useState('')
   const [filterStatusIds, setFilterStatusIds] = useState([])
   const [showConsultationModal, setShowConsultationModal] = useState(false)
+  const [showSeriesModal, setShowSeriesModal] = useState(false)
   const [editConsultation, setEditConsultation] = useState(null)
   const [selectedConsultIds, setSelectedConsultIds] = useState(new Set())
   const selectAllRef = useRef(null)
@@ -837,12 +840,16 @@ export default function MedicalRecordsPage() {
                     })}
                   </div>
                 )}
-                <button
-                  onClick={() => { setEditConsultation(null); setShowConsultationModal(true) }}
-                  className="flex items-center gap-1.5 text-sm text-brand-blue hover:underline mt-2"
-                >
-                  <FiPlus size={14} /> Adicionar atendimento
-                </button>
+                <div className="flex items-center gap-2 mt-3">
+                  <Button variant="primary" onClick={() => { setEditConsultation(null); setShowConsultationModal(true) }}>
+                    <FiPlus size={15} /> Novo Atendimento
+                  </Button>
+                  {isAdminOrTeam && (
+                    <Button variant="secondary" onClick={() => setShowSeriesModal(true)}>
+                      <FiRepeat size={15} /> Nova Série
+                    </Button>
+                  )}
+                </div>
               </Section>
 
             </div>
@@ -854,6 +861,12 @@ export default function MedicalRecordsPage() {
         <ConsultationFormModal
           onClose={() => setShowConsultationModal(false)}
           initial={editConsultation || (selectedPatientId ? { patientId: selectedPatientId } : {})}
+        />
+      )}
+      {showSeriesModal && (
+        <SeriesFormModal
+          onClose={() => setShowSeriesModal(false)}
+          initial={selectedPatientId ? { patientId: selectedPatientId } : {}}
         />
       )}
     </div>

@@ -10,6 +10,7 @@ import { useData } from '../../../context/DataContext'
 import { useAuth } from '../../../context/AuthContext'
 import { useToast } from '../../../components/ui/Toast'
 import { PAYMENT_TYPE_OPTIONS } from '../../../constants/paymentTypes'
+import { hexTextColor } from '../../../utils/colorUtils'
 
 const EMPTY_EXT = { name: '', specialty: '', phone: '' }
 
@@ -342,7 +343,7 @@ export default function PatientFormModal({ onClose, initial = {}, readOnly = fal
                     return (
                       <div key={s.key} className="border border-gray-200 rounded-xl p-3 space-y-2.5">
                         <div className="flex items-center justify-between">
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium text-white" style={{ backgroundColor: color }}>
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium" style={{ backgroundColor: color, color: hexTextColor(color) }}>
                             {spec?.label || s.key}
                           </span>
                           <button type="button" onClick={() => removeSpecialtyRow(s.key)} className="p-1 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors">
@@ -441,7 +442,7 @@ export default function PatientFormModal({ onClose, initial = {}, readOnly = fal
                         return (
                           <tr key={s.key} className="border-t border-gray-100">
                             <td className="px-3 py-2">
-                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium text-white" style={{ backgroundColor: color }}>{spec?.label || s.key}</span>
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium" style={{ backgroundColor: color, color: hexTextColor(color) }}>{spec?.label || s.key}</span>
                             </td>
                             <td className="px-3 py-2 text-gray-600">{ptLabel}</td>
                             <td className="px-3 py-2 text-gray-700">{isMonthly ? fmtVal(s.monthlyPatientValue) : fmtVal(s.patientValue)}{isMonthly && <span className="text-gray-400 ml-0.5">/mês</span>}</td>
@@ -469,7 +470,7 @@ export default function PatientFormModal({ onClose, initial = {}, readOnly = fal
                         return (
                           <tr key={s.key} className="border-t border-gray-100">
                             <td className="px-3 py-2">
-                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium text-white" style={{ backgroundColor: color }}>{spec?.label || s.key}</span>
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium" style={{ backgroundColor: color, color: hexTextColor(color) }}>{spec?.label || s.key}</span>
                             </td>
                           </tr>
                         )
