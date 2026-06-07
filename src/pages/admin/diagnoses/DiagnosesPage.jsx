@@ -19,7 +19,7 @@ export default function DiagnosesPage() {
     const matchActive = showInactive ? d.active === false : d.active !== false
     const matchSearch = !search || d.name.toLowerCase().includes(search.toLowerCase())
     return matchActive && matchSearch
-  })
+  }).sort((a, b) => a.name.localeCompare(b.name, 'pt-BR', { sensitivity: 'base' }))
 
   function getPatientCount(diag) {
     return patients.filter(p =>

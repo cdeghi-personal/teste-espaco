@@ -133,6 +133,17 @@ export default function PatientFormModal({ onClose, initial = {}, readOnly = fal
       }),
     }))
   }
+  function recalcMonthlyTherapistValue(key) {
+    setForm(f => ({
+      ...f,
+      specialties: f.specialties.map(s => {
+        if (s.key !== key) return s
+        const pv = parseFloat(s.monthlyPatientValue)
+        if (isNaN(pv) || pv <= 0) return s
+        return { ...s, monthlyTherapistValue: String(+(pv * (1 - discountPct / 100)).toFixed(2)) }
+      }),
+    }))
+  }
 
   function validate() {
     const e = {}
@@ -168,7 +179,9 @@ export default function PatientFormModal({ onClose, initial = {}, readOnly = fal
 
   const activeTherapists = therapists.filter(t => t.active !== false)
   const activePaymentMethods = paymentMethods.filter(pm => pm.active !== false)
-  const activeDiagnoses = diagnoses.filter(d => d.active !== false)
+  const activeDiagnoses = diagnoses
+    .filter(d => d.active !== false)
+    .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR', { sensitivity: 'base' }))
   const activeSpecialties = specialtiesData.filter(s => s.active !== false)
   // Terapeutas disponíveis para "Envolvidos": exclui o Gerente do Caso selecionado
   const involvedTherapistOptions = activeTherapists.filter(t => t.id !== form.therapistId)
@@ -379,7 +392,15 @@ export default function PatientFormModal({ onClose, initial = {}, readOnly = fal
                                 onChange={e => updateSpecialtyValue(s.key, 'monthlyPatientValue', e.target.value)} className={inputCls} />
                             </div>
                             <div>
-                              <label className="block text-xs text-gray-500 mb-1">Valor Mensal Terapeuta</label>
+                              <div className="flex items-center justify-between mb-1">
+                                <label className="text-xs text-gray-500">Valor Mensal Terapeuta</label>
+                                {discountPct > 0 && (
+                                  <button type="button" onClick={() => recalcMonthlyTherapistValue(s.key)}
+                                    className="flex items-center gap-0.5 text-[10px] text-brand-blue hover:underline">
+                                    <FiRefreshCw size={9} /> {discountPct}%
+                                  </button>
+                                )}
+                              </div>
                               <input type="number" min="0" step="0.01" value={s.monthlyTherapistValue ?? ''} placeholder="0,00"
                                 onChange={e => updateSpecialtyValue(s.key, 'monthlyTherapistValue', e.target.value)} className={inputCls} />
                             </div>
