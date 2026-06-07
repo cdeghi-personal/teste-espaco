@@ -1813,7 +1813,7 @@ export function DataProvider({ children }) {
       .from('consultations')
       .select('id, patient_id, specialty, prepaid_session_consumed')
       .eq('series_id', seriesId)
-      .gt('date', fromDate)
+      .gte('date', fromDate)
       .is('nf_number', null)
     if (fetchErr) { toast.show(fetchErr.message); return }
     if (!targets?.length) return

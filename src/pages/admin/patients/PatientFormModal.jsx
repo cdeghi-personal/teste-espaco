@@ -504,23 +504,10 @@ export default function PatientFormModal({ onClose, initial = {}, readOnly = fal
           <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3 pb-2 border-b border-gray-100">
             Dados Escolares
           </h3>
-          <div className="space-y-3">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <Input label="Nome da Escola" value={form.schoolName} onChange={e => set('schoolName', e.target.value)} placeholder="Nome da instituição" disabled={readOnly} />
-              <Input label="Telefone" value={form.schoolPhone} onChange={e => set('schoolPhone', e.target.value)} placeholder="(11) 3333-3333" disabled={readOnly} />
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <Input label="Endereço" value={form.schoolAddress} onChange={e => set('schoolAddress', e.target.value)} placeholder="Rua, número" disabled={readOnly} />
-              <Input label="Bairro" value={form.schoolNeighborhood} onChange={e => set('schoolNeighborhood', e.target.value)} placeholder="Bairro" disabled={readOnly} />
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <div className="col-span-2 sm:col-span-1">
-                <Input label="Cidade" value={form.schoolCity} onChange={e => set('schoolCity', e.target.value)} placeholder="Cidade" disabled={readOnly} />
-              </div>
-              <Input label="Estado" value={form.schoolState} onChange={e => set('schoolState', e.target.value)} placeholder="SP" disabled={readOnly} />
-              <Input label="CEP" value={form.schoolZip} onChange={e => set('schoolZip', e.target.value)} placeholder="00000-000" disabled={readOnly} />
-              <Input label="Coordenador(a)" value={form.schoolCoordinator} onChange={e => set('schoolCoordinator', e.target.value)} placeholder="Nome" disabled={readOnly} />
-            </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <Input label="Nome da Escola" value={form.schoolName} onChange={e => set('schoolName', e.target.value)} placeholder="Nome da instituição" disabled={readOnly} />
+            <Input label="Telefone" value={form.schoolPhone} onChange={e => set('schoolPhone', e.target.value)} placeholder="(11) 3333-3333" disabled={readOnly} />
+            <Input label="Coordenador(a)" value={form.schoolCoordinator} onChange={e => set('schoolCoordinator', e.target.value)} placeholder="Nome" disabled={readOnly} />
           </div>
         </section>
 
@@ -542,7 +529,7 @@ export default function PatientFormModal({ onClose, initial = {}, readOnly = fal
         {/* Terapeutas Externos */}
         <section>
           <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3 pb-2 border-b border-gray-100">
-            Terapeutas Externos
+            Terapeutas / Médicos Externos
           </h3>
           <div className="space-y-2">
             {form.externalTherapists.length > 0 && (

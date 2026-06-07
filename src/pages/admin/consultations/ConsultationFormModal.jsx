@@ -49,6 +49,7 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
   const [confirmSeriesEdit, setConfirmSeriesEdit] = useState(false)
   const [conflictsToConfirm, setConflictsToConfirm] = useState(null) // null | conflicts[]
   const [pendingConflicts, setPendingConflicts] = useState([])
+  const [saving, setSaving] = useState(false)
 
   const hasSeries = isEdit && !!initial.seriesId
 
@@ -173,7 +174,7 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
     proceedSave([])
   }
 
-  function proceedSave(conflicts) {
+  async function proceedSave(conflicts) {
     const canShowSeriesDialog = hasSeries && (isAdmin || user?.id === initial.therapistId)
     if (canShowSeriesDialog) {
       // Only ask scope when a propagatable (structural) field actually changed.
@@ -189,31 +190,36 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
         return
       }
       // Notes-only change: save directly without marking as exception
-      if (isEdit) updateConsultation(initial.id, { ...form, conflicts })
-      else addConsultation({ ...form, conflicts })
+      setSaving(true)
+      if (isEdit) await updateConsultation(initial.id, { ...form, conflicts })
+      else await addConsultation({ ...form, conflicts })
+      setSaving(false)
       onClose()
       return
     }
     const saveData = hasSeries ? { ...form, isSeriesException: true } : form
-    if (isEdit) updateConsultation(initial.id, { ...saveData, conflicts })
-    else addConsultation({ ...saveData, conflicts })
+    setSaving(true)
+    if (isEdit) await updateConsultation(initial.id, { ...saveData, conflicts })
+    else await addConsultation({ ...saveData, conflicts })
+    setSaving(false)
     onClose()
   }
 
-  function handleSaveAnyway() {
+  async function handleSaveAnyway() {
     const conflicts = conflictsToConfirm || []
     setConflictsToConfirm(null)
-    proceedSave(conflicts)
+    await proceedSave(conflicts)
   }
 
-  function doSave(scope) {
+  async function doSave(scope) {
     const saveData = { ...form }
     if (scope === 'single') saveData.isSeriesException = true
     const conflicts = pendingConflicts
+    setSaving(true)
     if (isEdit) {
-      updateConsultation(initial.id, { ...saveData, conflicts })
+      await updateConsultation(initial.id, { ...saveData, conflicts })
       if (scope === 'forward') {
-        updateConsultationSeries(initial.seriesId, initial.date, {
+        await updateConsultationSeries(initial.seriesId, initial.date, {
           time: form.time,
           roomId: form.roomId,
           appointmentTypeId: form.appointmentTypeId,
@@ -222,8 +228,9 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
         })
       }
     } else {
-      addConsultation({ ...saveData, conflicts })
+      await addConsultation({ ...saveData, conflicts })
     }
+    setSaving(false)
     onClose()
   }
 
@@ -268,18 +275,18 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
             </>
           : conflictsToConfirm !== null
           ? <>
-              <Button variant="ghost" onClick={() => setConflictsToConfirm(null)}>Cancelar</Button>
-              <Button variant="danger" onClick={handleSaveAnyway}>Salvar mesmo assim</Button>
+              <Button variant="ghost" onClick={() => setConflictsToConfirm(null)} disabled={saving}>Cancelar</Button>
+              <Button variant="danger" onClick={handleSaveAnyway} disabled={saving}>{saving ? 'Salvando…' : 'Salvar mesmo assim'}</Button>
             </>
           : confirmSeriesEdit
           ? <>
-              <Button variant="ghost" onClick={() => setConfirmSeriesEdit(false)}>Voltar</Button>
-              <Button variant="outline" onClick={() => doSave('single')}>Apenas esta</Button>
-              <Button variant="primary" onClick={() => doSave('forward')}>Esta e as próximas</Button>
+              <Button variant="ghost" onClick={() => setConfirmSeriesEdit(false)} disabled={saving}>Voltar</Button>
+              <Button variant="outline" onClick={() => doSave('single')} disabled={saving}>{saving ? 'Salvando…' : 'Apenas esta'}</Button>
+              <Button variant="primary" onClick={() => doSave('forward')} disabled={saving}>{saving ? 'Salvando…' : 'Esta e as próximas'}</Button>
             </>
           : <>
-              <Button variant="ghost" onClick={onClose}>Cancelar</Button>
-              {!isBlocked && <Button variant="primary" onClick={handleSave}>{isEdit ? 'Salvar' : 'Registrar Atendimento'}</Button>}
+              <Button variant="ghost" onClick={onClose} disabled={saving}>Cancelar</Button>
+              {!isBlocked && <Button variant="primary" onClick={handleSave} disabled={saving}>{saving ? 'Salvando…' : (isEdit ? 'Salvar' : 'Registrar Atendimento')}</Button>}
             </>
       }
     >
