@@ -92,7 +92,20 @@ supabase/
   09_consultation_status_automatic.sql  # Flag automatic em consultation_statuses
   10_guardian_neighborhood.sql   # Campo neighborhood em guardians
   11_consultation_time_room.sql  # Campos time e room_id em consultations
+  12_color_specialty_therapist_room.sql # Adiciona coluna color (hex) em specialties, therapists e rooms
   12_involved_therapists.sql     # Tabela patient_involved_therapists + RLS atualizado para Gerente do Caso + Envolvidos
+  13_fix_circular_rls.sql        # Fix: recursão circular nas policies de patient_involved_therapists
+  14_fix_therapist_rls.sql       # Fix: RLS de medical_records e patients para terapeutas envolvidos
+  15_belongs_to_team.sql         # Flag belongs_to_team no terapeuta — terapeutas de equipe veem todos os pacientes/prontuários
+  16_therapist_write_rls.sql     # Políticas de escrita (INSERT/DELETE) para terapeutas em pacientes e sub-tabelas
+  17_fix_circular_rls2.sql       # Fix: recursão circular criada pelo 16 em patient_involved_therapists
+  18_fix_team_patient_visibility.sql # Fix: terapeuta da equipe vê apenas pacientes de outros terapeutas da equipe
+  19_fix_consultations_team_rls.sql  # Terapeuta da equipe vê atendimentos de pacientes da equipe
+  20_fix_consultations_team_select.sql # Terapeuta da equipe vê apenas consultas de terapeutas da equipe
+  21_guardian_write_rls.sql      # Políticas de escrita (INSERT/UPDATE/DELETE) para terapeutas em guardians e patient_guardians
+  22_fix_guardian_insert_rls.sql # Adiciona colunas de endereço/contato extras em guardians; corrige policy de INSERT
+  23_fix_guardian_insert_rls2.sql # Fix: INSERT em guardians usa auth.uid() IS NOT NULL (qualquer autenticado pode criar)
+  24_fix_guardian_insert_final.sql # Fix: INSERT em guardians com WITH CHECK (true) — sem campo de "dono"
   25_audit_log.sql               # Cria tabela audit_logs + triggers INSERT/UPDATE/DELETE em todas as tabelas principais
   26_fix_audit_log.sql           # Fix: usa current_setting('request.jwt.claims') em vez de auth.uid()
   27_fix_audit_always_log.sql    # Fix: remove guard de NULL — trigger sempre grava (diagnóstico)
@@ -161,6 +174,17 @@ supabase/
   90_fix_audit_calendar_blocks.sql     # Fix triggers de auditoria: ignora operações sem JWT (SQL Editor/migrations); completa migração 89
   91_interviews.sql                    # Adiciona event_type (SESSION/INTERVIEW), interview_format (PRESENTIAL/REMOTE), meeting_platform, meeting_link em consultations e consultation_series
   92_interviewee_name.sql              # Adiciona interviewee_name TEXT em consultations e consultation_series — obrigatório quando event_type=INTERVIEW
+  93_consultations_patient_optional.sql # Torna patient_id opcional em consultations — suporte a entrevistas sem paciente vinculado
+  94_patient_cleanup_rpc.sql           # RPCs get_patient_cleanup_summary + cleanup_inactive_patient_data — limpeza de dados transacionais de paciente inativo
+  95_fix_patients_therapist_rls.sql    # Fix: WITH CHECK da policy de UPDATE de terapeuta em patients — permite soft-delete sem falhar RLS de dual-role
+  96_admin_soft_delete_patient.sql     # RPC admin_soft_delete_patient SECURITY DEFINER — substitui UPDATE direto que sofria de silent failure com múltiplas policies RLS
+  97_fix_rpc_auth_uid.sql              # Fix: auth.uid() → current_setting('request.jwt.claims')::jsonb->>'sub' nos RPCs de admin (SECURITY DEFINER)
+  98_fix_soft_delete_no_admin_check.sql # Fix: remove verificação de admin do RPC admin_soft_delete_patient — instável para dual-role; segurança via frontend
+  99_fix_cleanup_audit_resource_id.sql # Fix: tipo do resource_id no INSERT de audit_logs dentro de cleanup_inactive_patient_data (uuid, não text)
+  100_fix_cleanup_fk_order.sql         # Fix: order de DELETE em cleanup — payment_invoices antes de payment_demonstratives (FK constraint)
+  101_guardian_financial_responsible.sql # Flag is_financial_responsible em guardians — CPF obrigatório somente quando marcado como financeiro
+  102_therapeutic_project.sql          # Adiciona therapeutic_project_description + therapeutic_project_notes TEXT em medical_records
+  103_remove_school_address.sql        # Remove colunas school_address, school_neighborhood, school_city, school_state, school_zip de patients
   functions/
     invite-therapist/index.ts    # Edge Function — envia convite por e-mail ao criar terapeuta
     suggest-convenio/index.ts    # Edge Function — gera sugestões de texto para relatório de convênio via OpenAI gpt-4o-mini
@@ -202,7 +226,7 @@ Encontrar em: Supabase Dashboard → Project Settings → API.
 | `patient_external_therapists` | Terapeutas externos vinculados ao paciente (nome, especialidade, telefone) |
 | `consultation_statuses` | Status do atendimento — toggle `active`, cor configurável, flag `automatic` |
 | `appointment_types` | Tipos de atendimento (Sessão Individual, Grupo etc.) — toggle `active` |
-| `medical_records` | Prontuário do paciente — 1:1, criado automaticamente ao abrir |
+| `medical_records` | Prontuário do paciente — 1:1, criado automaticamente ao abrir; campos `therapeutic_project_description` e `therapeutic_project_notes` TEXT (Projeto Terapêutico) |
 | `medical_record_exams` | Exames complementares do paciente — N por prontuário |
 | `medical_record_medications` | Medicamentos do paciente — N por prontuário |
 | `medical_record_conducts` | Conduta & objetivo terapêutico — N por prontuário, vinculado ao terapeuta/especialidade |
@@ -434,7 +458,7 @@ Authentication → URL Configuration:
 - **Terapeutas:** `primary_therapist_id` (**Gerente do Caso**) + tabela `patient_involved_therapists` (Terapeutas Envolvidos, N:N). No app: `therapistId` e `involvedTherapistIds[]`.
 - **Especialidades em Atendimento:** tabela `patient_specialties` com colunas `specialty` (key), `patient_value` e `therapist_value`. No app: `patient.specialties = [{ key, patientValue, therapistValue }]`. Valores visíveis/editáveis somente por admin.
 - **Dados pessoais extras:** `rg`, `phone`, `email`, `address`, `neighborhood`, `city`, `state`, `zip_code`, `indication`
-- **Dados escolares:** `school_name`, `school_phone`, `school_address`, `school_neighborhood`, `school_city`, `school_state`, `school_zip`, `school_coordinator`
+- **Dados escolares:** `school_name`, `school_phone`, `school_coordinator` (campos de endereço escolar removidos do DB em 103)
 - **Médico responsável:** `doctor_insurance`, `doctor_name`, `doctor_specialty`, `doctor_phone`
 - **Terapeutas externos:** tabela `patient_external_therapists` — lista N por paciente, com `name`, `specialty`, `phone`
 - **Diagnóstico Principal:** campo `diagnosis` (texto livre via Select)
@@ -447,7 +471,7 @@ Authentication → URL Configuration:
 - Endereço completo: `address`, `neighborhood`, `city`, `state`, `cep`
 - Seleção de pacientes vinculados: lista pesquisável com checkboxes
 - Busca na listagem: por nome, CPF, telefone ou **nome do paciente vinculado**
-- **Flag `is_financial_responsible`:** boolean, default false; indica que este responsável é o pagador da clínica. CPF obrigatório somente quando marcado como financeiro; se preenchido sem ser financeiro, formato ainda é validado. Exibido como chip verde "Financeiro" nos cards mobile e tabela desktop da `GuardiansPage`; checkbox "Responsável financeiro?" no `GuardianFormModal`. Migration: `93_guardian_financial_responsible.sql`.
+- **Flag `is_financial_responsible`:** boolean, default false; indica que este responsável é o pagador da clínica. CPF obrigatório somente quando marcado como financeiro; se preenchido sem ser financeiro, formato ainda é validado. Exibido como chip verde "Financeiro" nos cards mobile e tabela desktop da `GuardiansPage`; checkbox "Responsável financeiro?" no `GuardianFormModal`. Migration: `101_guardian_financial_responsible.sql`.
 
 ## Limpeza Definitiva de Dados de Paciente Inativo
 
@@ -469,7 +493,9 @@ Authentication → URL Configuration:
 
 ## Prontuário Clínico (MedicalRecordsPage — `/admin/prontuario`)
 
-4 seções colapsáveis: Exames Complementares, Medicamentos, Conduta & Objetivo Terapêutico, Histórico de Atendimentos.
+5 seções colapsáveis: Exames Complementares, Medicamentos, **Projeto Terapêutico**, Conduta & Objetivo Terapêutico, Histórico de Atendimentos.
+
+**Projeto Terapêutico:** seção entre Medicamentos e Conduta. Dois campos texto livres — Descrição do Projeto e Observações. Único por prontuário (colunas `therapeutic_project_description` e `therapeutic_project_notes` em `medical_records`). Editável por admin e terapeutas da equipe. `getOrCreateMedicalRecord` retorna `{ id, therapeuticProjectDescription, therapeuticProjectNotes }` (objeto, não string). DataContext expõe `updateTherapeuticProject(medicalRecordId, { description, notes })`. Incluído no PDF do prontuário quando preenchido.
 
 **Histórico de Atendimentos — filtros:**
 - **Período:** 4 botões fixos — Mês -2, Mês Anterior, Mês Corrente (default), Período (De & Até). "Mês Seguinte" foi removido — não faz sentido prontuário futuro. Cálculo usa `new Date(y, m-1, 1)` (local) para evitar bug de timezone UTC-3.
