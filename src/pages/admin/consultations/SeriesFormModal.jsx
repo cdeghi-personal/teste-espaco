@@ -47,18 +47,6 @@ export default function SeriesFormModal({ onClose }) {
   const [seriesConflicts, setSeriesConflicts] = useState([]) // [{date, conflicts[]}]
   const [showConflictWarning, setShowConflictWarning] = useState(false)
 
-  useEffect(() => {
-    if (!form.patientId || !form.specialty) { setSeriesPrepaidBalance(null); return }
-    const patient = activePatients.find(p => p.id === form.patientId)
-    const spec = (patient?.specialties || []).find(s => s.key === form.specialty)
-    if (spec?.paymentType !== 'PREPAID_PACKAGE') { setSeriesPrepaidBalance(null); return }
-    let cancelled = false
-    getPrepaidData(form.patientId, form.specialty).then(d => {
-      if (!cancelled) setSeriesPrepaidBalance(d.balance)
-    })
-    return () => { cancelled = true }
-  }, [form.patientId, form.specialty, activePatients, getPrepaidData])
-
   function set(field, value) {
     setForm(f => ({ ...f, [field]: value }))
     setErrors(e => ({ ...e, [field]: undefined }))
@@ -78,6 +66,19 @@ export default function SeriesFormModal({ onClose }) {
     () => (patients || []).filter(p => !p.deleted).sort((a, b) => a.fullName.localeCompare(b.fullName)),
     [patients]
   )
+
+  useEffect(() => {
+    if (!form.patientId || !form.specialty) { setSeriesPrepaidBalance(null); return }
+    const patient = activePatients.find(p => p.id === form.patientId)
+    const spec = (patient?.specialties || []).find(s => s.key === form.specialty)
+    if (spec?.paymentType !== 'PREPAID_PACKAGE') { setSeriesPrepaidBalance(null); return }
+    let cancelled = false
+    getPrepaidData(form.patientId, form.specialty).then(d => {
+      if (!cancelled) setSeriesPrepaidBalance(d.balance)
+    })
+    return () => { cancelled = true }
+  }, [form.patientId, form.specialty, activePatients, getPrepaidData])
+
   const isAdmin = user?.role === 'admin'
   const isAdminOrTeam = isAdmin || user?.belongsToTeam
 
