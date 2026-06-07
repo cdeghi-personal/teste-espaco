@@ -1,12 +1,14 @@
 ﻿import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { FiArrowLeft, FiEdit2, FiUser, FiPhone, FiMail } from 'react-icons/fi'
+import { FiArrowLeft, FiEdit2, FiTrash2, FiUser, FiPhone, FiMail } from 'react-icons/fi'
 import { useData } from '../../../context/DataContext'
 import { useAuth } from '../../../context/AuthContext'
+import { useToast } from '../../../components/ui/Toast'
 import Badge from '../../../components/ui/Badge'
 import Button from '../../../components/ui/Button'
 import PatientFormModal from './PatientFormModal'
-import { calculateAge, formatDateBR, formatDateShort } from '../../../utils/dateUtils'
+import ConsultationFormModal from '../consultations/ConsultationFormModal'
+import { calculateAge, formatDateBR, formatDateShort, isoToday } from '../../../utils/dateUtils'
 import { hexTextColor } from '../../../utils/colorUtils'
 import { PAYMENT_TYPE_LABELS } from '../../../constants/paymentTypes'
 import PrepaidSection from './PrepaidSection'
@@ -15,10 +17,14 @@ import PrepaidSection from './PrepaidSection'
 export default function PatientDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { getPatientById, getGuardiansForPatient, consultations, therapists, paymentMethods, patientStatuses, diagnoses, consultationStatuses, appointmentTypes, rooms, specialtiesData, logAudit } = useData()
+  const { getPatientById, getGuardiansForPatient, consultations, therapists, paymentMethods, patientStatuses, diagnoses, consultationStatuses, appointmentTypes, rooms, specialtiesData, logAudit, deleteConsultation } = useData()
   const { user } = useAuth()
+  const toast = useToast()
   const isAdmin = user?.role === 'admin'
   const [showEdit, setShowEdit] = useState(false)
+  const [editConsultation, setEditConsultation] = useState(null)
+  const [deleteConfirm, setDeleteConfirm] = useState(null)
+  const [deleting, setDeleting] = useState(false)
 
   const patient = getPatientById(id)
 
@@ -43,9 +49,20 @@ export default function PatientDetailPage() {
     .filter(Boolean)
   const paymentMethod = paymentMethods.find(pm => pm.id === patient.paymentMethodId)
   const prepaidSpecialties = (patient.specialties || []).filter(s => s.paymentType === 'PREPAID_PACKAGE')
-  const patientConsultations = consultations
-    .filter(c => c.patientId === id)
-    .sort((a, b) => b.date.localeCompare(a.date))
+  const today = isoToday()
+  const upcomingConsultations = consultations
+    .filter(c => c.patientId === id && c.date >= today)
+    .sort((a, b) => a.date.localeCompare(b.date) || (a.time || '').localeCompare(b.time || ''))
+    .slice(0, 20)
+
+  async function handleDeleteConsultation() {
+    if (!deleteConfirm) return
+    setDeleting(true)
+    await deleteConsultation(deleteConfirm.id)
+    setDeleteConfirm(null)
+    setDeleting(false)
+    toast.show('Atendimento excluído.', 'success')
+  }
 
   // For comorbidades: filter out the primary diagnosis
   const comorbidadeIds = (patient.conditionIds || patient.conditions || []).filter(condId => {
@@ -273,30 +290,78 @@ export default function PatientDetailPage() {
             )
           })}
 
-          {/* Últimas consultas */}
-          {patientConsultations.length > 0 && (
+          {/* Próximos atendimentos */}
+          {upcomingConsultations.length > 0 && (
             <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-100 p-5">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="font-semibold text-gray-900 text-sm">
-                  Últimos Atendimentos
-                  <span className="ml-2 text-xs font-normal text-gray-400">({patientConsultations.length} no total)</span>
+                  Próximos Atendimentos
+                  <span className="ml-2 text-xs font-normal text-gray-400">({upcomingConsultations.length})</span>
                 </h3>
               </div>
               <div className="space-y-2">
-                {patientConsultations.slice(0, 10).map(c => {
+                {upcomingConsultations.map(c => {
                   const t = therapists.find(th => th.id === c.therapistId)
                   const status = consultationStatuses.find(s => s.id === c.consultationStatusId)
                   const apptType = appointmentTypes.find(at => at.id === c.appointmentTypeId)
                   const room = rooms.find(r => r.id === c.roomId)
+                  const canManage = isAdmin || c.therapistId === user?.id
+                  const isConfirmingDelete = deleteConfirm?.id === c.id
+
+                  if (isConfirmingDelete) {
+                    return (
+                      <div key={c.id} className="bg-red-50 rounded-xl px-4 py-3 border border-red-200 flex items-center justify-between gap-3">
+                        <span className="text-sm text-red-700 font-medium">
+                          Excluir atendimento de {formatDateShort(c.date)}{c.time && ` às ${c.time.slice(0, 5)}`}?
+                        </span>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <button
+                            onClick={() => setDeleteConfirm(null)}
+                            className="px-3 py-1 text-xs rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-100"
+                          >
+                            Cancelar
+                          </button>
+                          <button
+                            onClick={handleDeleteConsultation}
+                            disabled={deleting}
+                            className="px-3 py-1 text-xs rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-50"
+                          >
+                            {deleting ? 'Excluindo…' : 'Confirmar'}
+                          </button>
+                        </div>
+                      </div>
+                    )
+                  }
+
                   return (
                     <div key={c.id} className="bg-gray-50 rounded-xl px-4 py-2.5 border border-gray-100">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-medium text-sm text-gray-900">{formatDateShort(c.date)}{c.time && <span className="font-normal text-gray-500"> {c.time}</span>}</span>
-                        <Badge specialty={c.specialty} />
-                        {status && <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${status.color}`}>{status.name}</span>}
-                        {apptType && <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-200 text-gray-600">{apptType.name}</span>}
-                        <span className="text-xs text-gray-500">{t?.name || '—'}</span>
-                        {room && <span className="text-xs text-gray-400">{room.name}</span>}
+                        <div className="flex items-center gap-2 flex-1 flex-wrap min-w-0">
+                          <span className="font-medium text-sm text-gray-900">{formatDateShort(c.date)}{c.time && <span className="font-normal text-gray-500"> {c.time.slice(0, 5)}</span>}</span>
+                          <Badge specialty={c.specialty} />
+                          {status && <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${status.color}`}>{status.name}</span>}
+                          {apptType && <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-200 text-gray-600">{apptType.name}</span>}
+                          <span className="text-xs text-gray-500">{t?.name || '—'}</span>
+                          {room && <span className="text-xs text-gray-400">{room.name}</span>}
+                        </div>
+                        {canManage && (
+                          <div className="flex items-center gap-1 shrink-0">
+                            <button
+                              onClick={() => setEditConsultation(c)}
+                              className="p-1.5 rounded-lg text-gray-400 hover:text-brand-blue hover:bg-blue-50"
+                              title="Editar atendimento"
+                            >
+                              <FiEdit2 size={13} />
+                            </button>
+                            <button
+                              onClick={() => setDeleteConfirm(c)}
+                              className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50"
+                              title="Excluir atendimento"
+                            >
+                              <FiTrash2 size={13} />
+                            </button>
+                          </div>
+                        )}
                       </div>
                       {c.mainObjective && <p className="text-xs text-gray-600 mt-1 line-clamp-1">{c.mainObjective}</p>}
                     </div>
@@ -309,6 +374,9 @@ export default function PatientDetailPage() {
 
       {showEdit && (
         <PatientFormModal onClose={() => setShowEdit(false)} initial={patient} />
+      )}
+      {editConsultation && (
+        <ConsultationFormModal initial={editConsultation} onClose={() => setEditConsultation(null)} />
       )}
     </div>
   )
