@@ -10,6 +10,7 @@ import { useAuth } from '../../../context/AuthContext'
 import { generateId } from '../../../utils/storageUtils'
 import { isoToday } from '../../../utils/dateUtils'
 import { detectConflicts, buildConflictTooltip } from '../../../utils/conflictUtils'
+import { PAYMENT_TYPE_LABELS } from '../../../constants/paymentTypes'
 
 const EMPTY_ACTIVITY = { id: '', name: '', description: '', outcome: 'achieved' }
 
@@ -247,11 +248,12 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
   const mainObjectiveRequired = realizadaRequired || requiresNote
   const willConsume = selectedStatus?.consumesPrepaidSession === true
   const showPrepaidAlert = prepaidBalance !== null && willConsume && prepaidBalance <= 0
-  const showConsumedChip = isEdit && initial.prepaidSessionConsumed !== undefined
-
-  const payPerSessionSpec = form.patientId && form.specialty
-    ? patients.find(p => p.id === form.patientId)?.specialties?.find(s => s.key === form.specialty && s.paymentType === 'PAY_PER_SESSION')
+  const selectedPatient = form.patientId ? patients.find(p => p.id === form.patientId) : null
+  const patSpec = (selectedPatient && form.specialty)
+    ? ((selectedPatient.specialties || []).find(s => s.key === form.specialty) ?? null)
     : null
+  const patSpecMissing = !!(selectedPatient && form.specialty && patSpec === null)
+  const showConsumedChip = isEdit && patSpec?.paymentType === 'PREPAID_PACKAGE' && initial.prepaidSessionConsumed !== undefined
 
   return (
     <Modal
@@ -382,29 +384,6 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
             Este atendimento está com status <strong>{currentStatus?.name}</strong> (automático) e não pode ser editado.
           </div>
         )}
-        {showConsumedChip && (
-          <div className="flex items-center gap-2">
-            {initial.prepaidSessionConsumed
-              ? <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">Consumiu sessão pré-paga</span>
-              : <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-500">Não consumiu sessão pré-paga</span>
-            }
-          </div>
-        )}
-        {payPerSessionSpec && (
-          <div className="flex items-center gap-2 p-3 rounded-xl text-xs border bg-amber-50 border-amber-200 text-amber-800">
-            <span className="shrink-0">ℹ️</span>
-            <span>Modalidade <strong>Por Sessão</strong> — cobrança individual por atendimento.</span>
-          </div>
-        )}
-        {prepaidBalance !== null && (
-          <div className={`flex items-center gap-2 p-3 rounded-xl text-xs border ${showPrepaidAlert ? 'bg-red-50 border-red-200 text-red-700' : 'bg-blue-50 border-blue-100 text-blue-700'}`}>
-            <span className="shrink-0">{showPrepaidAlert ? '⚠️' : 'ℹ️'}</span>
-            <span>
-              Pacote pré-pago — saldo atual: <strong>{prepaidBalance} {Math.abs(prepaidBalance) === 1 ? 'sessão' : 'sessões'}</strong>.
-              {showPrepaidAlert ? ' Saldo insuficiente para consumir esta sessão.' : willConsume ? ' Este status irá debitar 1 sessão.' : ''}
-            </span>
-          </div>
-        )}
         {/* Dados do Atendimento */}
         <section>
           <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3 pb-2 border-b border-gray-100">
@@ -495,6 +474,51 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
                 </Select>
               )}
             </div>
+
+            {/* Modalidade de Pagamento */}
+            {form.patientId && form.specialty && form.eventType === 'SESSION' && (
+              patSpecMissing ? (
+                <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800">
+                  <span className="shrink-0">⚠️</span>
+                  <span>Especialidade <strong>não configurada</strong> para este paciente — verifique as Especialidades em Atendimento na ficha do paciente antes de faturar.</span>
+                </div>
+              ) : patSpec ? (
+                <div className={`flex items-start gap-2 p-3 rounded-xl text-xs border ${
+                  showPrepaidAlert ? 'bg-red-50 border-red-200 text-red-800'
+                  : patSpec.paymentType === 'PREPAID_PACKAGE' ? 'bg-blue-50 border-blue-100 text-blue-700'
+                  : 'bg-gray-50 border-gray-200 text-gray-600'
+                }`}>
+                  <span className="shrink-0">{showPrepaidAlert ? '⚠️' : 'ℹ️'}</span>
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span>Modalidade:</span>
+                      <strong>{PAYMENT_TYPE_LABELS[patSpec.paymentType || 'POST_PER_SESSION']}</strong>
+                      {showConsumedChip && (
+                        <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium border ${
+                          initial.prepaidSessionConsumed ? 'bg-green-100 text-green-700 border-green-200' : 'bg-gray-100 text-gray-500 border-gray-200'
+                        }`}>
+                          {initial.prepaidSessionConsumed ? 'Consumiu sessão pré-paga' : 'Não consumiu sessão pré-paga'}
+                        </span>
+                      )}
+                    </div>
+                    {patSpec.paymentType === 'PREPAID_PACKAGE' && prepaidBalance !== null && (
+                      <p>Saldo atual: <strong>{prepaidBalance} {Math.abs(prepaidBalance) === 1 ? 'sessão' : 'sessões'}</strong>.
+                        {showPrepaidAlert ? ' Saldo insuficiente para consumir esta sessão.' : willConsume ? ' Este status irá debitar 1 sessão.' : ''}
+                      </p>
+                    )}
+                    {(!patSpec.paymentType || patSpec.paymentType === 'POST_PER_SESSION') && (
+                      <p>Cobrança por sessão realizada.</p>
+                    )}
+                    {patSpec.paymentType === 'POST_MONTHLY' && (
+                      <p>Valor mensal fixo — independente do número de sessões.</p>
+                    )}
+                    {patSpec.paymentType === 'PAY_PER_SESSION' && (
+                      <p>Pagamento antecipado sessão a sessão, sem pacote.</p>
+                    )}
+                  </div>
+                </div>
+              ) : null
+            )}
 
             {!readOnly && patientAppointments.length > 0 && (
               <Select label="Vincular ao Agendamento" value={form.appointmentId} onChange={e => set('appointmentId', e.target.value)}>

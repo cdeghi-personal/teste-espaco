@@ -9,6 +9,7 @@ import { useAuth } from '../../../context/AuthContext'
 import { useToast } from '../../../components/ui/Toast'
 import { isoToday, generateSeriesDates } from '../../../utils/dateUtils'
 import { detectSeriesConflicts, buildConflictTooltip } from '../../../utils/conflictUtils'
+import { PAYMENT_TYPE_LABELS } from '../../../constants/paymentTypes'
 
 const WEEKDAYS = [
   { value: 1, label: 'Seg' },
@@ -107,6 +108,12 @@ export default function SeriesFormModal({ onClose }) {
 
   const today = isoToday()
   const hasPastDates = previewDates.some(d => d < today)
+
+  const seriesSelectedPatient = form.patientId ? activePatients.find(p => p.id === form.patientId) : null
+  const seriesPatSpec = (seriesSelectedPatient && form.specialty)
+    ? ((seriesSelectedPatient.specialties || []).find(s => s.key === form.specialty) ?? null)
+    : null
+  const seriesPatSpecMissing = !!(seriesSelectedPatient && form.specialty && seriesPatSpec === null)
 
   function validate() {
     const e = {}
@@ -263,6 +270,40 @@ export default function SeriesFormModal({ onClose }) {
                 {therapistSpecialties.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
               </Select>
             </div>
+
+            {/* Modalidade de Pagamento */}
+            {form.patientId && form.specialty && (
+              seriesPatSpecMissing ? (
+                <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800">
+                  <span className="shrink-0">⚠️</span>
+                  <span>Especialidade <strong>não configurada</strong> para este paciente — verifique as Especialidades em Atendimento na ficha do paciente antes de faturar.</span>
+                </div>
+              ) : seriesPatSpec ? (
+                <div className={`flex items-start gap-2 p-3 rounded-xl text-xs border ${
+                  seriesPatSpec.paymentType === 'PREPAID_PACKAGE' ? 'bg-blue-50 border-blue-100 text-blue-700' : 'bg-gray-50 border-gray-200 text-gray-600'
+                }`}>
+                  <span className="shrink-0">ℹ️</span>
+                  <div className="space-y-0.5">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span>Modalidade:</span>
+                      <strong>{PAYMENT_TYPE_LABELS[seriesPatSpec.paymentType || 'POST_PER_SESSION']}</strong>
+                    </div>
+                    {seriesPatSpec.paymentType === 'PREPAID_PACKAGE' && (
+                      <p>Cada sessão realizada com status consumidor debitará automaticamente 1 sessão do pacote.</p>
+                    )}
+                    {(!seriesPatSpec.paymentType || seriesPatSpec.paymentType === 'POST_PER_SESSION') && (
+                      <p>Cobrança por sessão realizada.</p>
+                    )}
+                    {seriesPatSpec.paymentType === 'POST_MONTHLY' && (
+                      <p>Valor mensal fixo — independente do número de sessões.</p>
+                    )}
+                    {seriesPatSpec.paymentType === 'PAY_PER_SESSION' && (
+                      <p>Pagamento antecipado sessão a sessão, sem pacote.</p>
+                    )}
+                  </div>
+                </div>
+              ) : null
+            )}
           </div>
         </section>
 
