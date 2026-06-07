@@ -1675,6 +1675,7 @@ export function DataProvider({ children }) {
       .select()
       .single()
     if (seriesErr) return dbError(seriesErr, toast)
+    if (!series?.id) return dbError({ message: 'Série criada mas não foi possível recuperar o registro. Verifique as permissões de acesso.' }, toast)
 
     // 3. Bulk insert das consultas
     const consultationRows = dates.map(date => ({
@@ -1704,6 +1705,10 @@ export function DataProvider({ children }) {
       await supabase.from('consultation_series').delete().eq('id', series.id)
       return dbError(consultErr, toast)
     }
+    if (!insertedIds || insertedIds.length === 0) {
+      await supabase.from('consultation_series').delete().eq('id', series.id)
+      return dbError({ message: `0 atendimentos criados de ${dates.length} esperados. Verifique as permissões de acesso (RLS).` }, toast)
+    }
 
     // 4. Bulk insert de participation (terapeuta principal em cada consulta)
     const { error: ctErr } = await supabase
@@ -1717,13 +1722,20 @@ export function DataProvider({ children }) {
     if (ctErr) console.error('[addConsultationSeries] consultation_therapists error:', ctErr)
 
     // 5. Busca registros completos para atualizar estado local
-    const { data: full } = await supabase
+    let fullRes = await supabase
       .from('consultations')
       .select(CONSULTATION_SELECT)
       .in('id', insertedIds.map(c => c.id))
       .order('date', { ascending: true })
-
-    const mapped = (full || []).map(mapConsultation)
+    if (fullRes.error) {
+      // Fallback sem JOINs complexos (mesmo padrão do fetchAll)
+      fullRes = await supabase
+        .from('consultations')
+        .select(CONSULTATION_SELECT.replace(/,\s*consultation_conflicts\([^)]*\)/, ''))
+        .in('id', insertedIds.map(c => c.id))
+        .order('date', { ascending: true })
+    }
+    const mapped = (fullRes.data || []).map(mapConsultation)
     setConsultations(prev => [...mapped, ...prev])
 
     // 6. Consome sessões pré-pagas se o status da série exige (espelha comportamento de addConsultation)

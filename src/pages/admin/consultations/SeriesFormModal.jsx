@@ -196,6 +196,9 @@ export default function SeriesFormModal({ onClose }) {
         toast.show(`Série criada com ${result.count} atendimento${result.count !== 1 ? 's' : ''}.`, 'success')
         onClose()
       }
+    } catch (err) {
+      console.error('[SeriesFormModal] erro inesperado ao criar série:', err)
+      toast.show(`Erro inesperado: ${err?.message || 'verifique o console.'}`, 'error')
     } finally {
       setSaving(false)
     }
