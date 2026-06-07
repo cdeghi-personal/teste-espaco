@@ -97,12 +97,15 @@ export default function PatientsPage() {
             <span className="hidden sm:inline">Busca Avançada</span>
           </button>
           <HelpButton title="Como usar Pacientes">
-            <p><strong>Buscar:</strong> use o campo de busca para filtrar por nome, CPF, diagnóstico ou terapeuta.</p>
-            <p><strong>Cadastrar:</strong> clique em <em>Novo Paciente</em> e preencha dados pessoais, clínicos e vínculos com responsáveis e terapeutas.</p>
-            <p><strong>Editar:</strong> clique no lápis (✏) na linha do paciente para editar os dados.</p>
-            <p><strong>Detalhe:</strong> clique na linha ou no olhinho (👁) para abrir a ficha completa do paciente com histórico de atendimentos.</p>
-            <p><strong>Excluídos:</strong> o botão de lixeira no canto superior ativa/desativa a exibição de pacientes excluídos (soft delete).</p>
-            <p><strong>Especialidades:</strong> na edição, a seção Terapeutas permite adicionar as especialidades em atendimento com valores por especialidade.</p>
+            <p><strong>Buscar:</strong> use o campo de busca para filtrar por nome, CPF ou diagnóstico. Para filtros combinados (terapeuta, especialidade, modalidade, status, faixa etária), use o botão <em>Busca Avançada</em> — que também exporta os resultados em CSV.</p>
+            <p><strong>Filtros rápidos:</strong> os selects de Status e Especialidade no topo da página filtram a lista sem sair da tela.</p>
+            <p><strong>Cadastrar:</strong> clique em <em>Novo Paciente</em> e preencha dados pessoais, clínicos, vínculos com responsáveis e terapeutas, e as especialidades em atendimento.</p>
+            <p><strong>Detalhe:</strong> clique na linha ou no olhinho (👁) para abrir a ficha completa com histórico de atendimentos, prontuário e pacotes pré-pagos.</p>
+            <p><strong>Especialidades e Modalidade (admin):</strong> na seção Terapeutas do cadastro, defina a <em>Modalidade de Pagamento</em> por especialidade:</p>
+            <p>• <strong>Pós-pago por consulta:</strong> cobrado por sessão realizada (valor por sessão).</p>
+            <p>• <strong>Pós-pago mensal:</strong> valor fixo cobrado por mês, independente da quantidade de sessões.</p>
+            <p>• <strong>Pré-pago por pacote:</strong> o responsável compra antecipadamente um pacote com N sessões; o saldo é debitado automaticamente a cada sessão realizada.</p>
+            <p><strong>Inativos (admin):</strong> o botão de olho riscado exibe pacientes inativos. Admins também podem executar a <em>Limpeza definitiva</em> (ícone lixeira) que remove todos os registros transacionais (atendimentos, prontuário, dados financeiros) do paciente inativo, mantendo apenas o cadastro.</p>
           </HelpButton>
           <button
             onClick={handleToggleDeleted}

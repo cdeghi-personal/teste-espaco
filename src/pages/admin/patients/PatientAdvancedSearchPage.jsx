@@ -10,6 +10,7 @@ import EmptyState from '../../../components/ui/EmptyState'
 import HelpButton from '../../../components/ui/HelpButton'
 import { calculateAge, calculateAgeYears, formatDateShort } from '../../../utils/dateUtils'
 import { hexTextColor } from '../../../utils/colorUtils'
+import { PAYMENT_TYPE_OPTIONS } from '../../../constants/paymentTypes'
 
 // ─── MultiSelectFilter ────────────────────────────────────────────────────────
 
@@ -137,6 +138,7 @@ export default function PatientAdvancedSearchPage() {
   const [filterCaseManagers,  setFilterCaseManagers]  = useState([])
   const [filterSpecialties,   setFilterSpecialties]   = useState([])
   const [filterPayments,      setFilterPayments]      = useState([])
+  const [filterPaymentTypes,  setFilterPaymentTypes]  = useState([])
   const [filterDiagnoses,     setFilterDiagnoses]     = useState([])
   const [filterStatuses,      setFilterStatuses]      = useState([])
   const [filterAgeRanges,     setFilterAgeRanges]     = useState([])
@@ -182,6 +184,11 @@ export default function PatientAdvancedSearchPage() {
 
       if (filterPayments.length > 0 && !filterPayments.includes(p.paymentMethodId)) return false
 
+      if (filterPaymentTypes.length > 0) {
+        const hasType = (p.specialties || []).some(s => filterPaymentTypes.includes(s.paymentType || 'POST_PER_SESSION'))
+        if (!hasType) return false
+      }
+
       if (filterDiagnoses.length > 0) {
         const match = filterDiagnoses.some(id => {
           const diag = diagnoses.find(d => d.id === id)
@@ -202,25 +209,26 @@ export default function PatientAdvancedSearchPage() {
       }
 
       return true
-    })
+    }).sort((a, b) => a.fullName.localeCompare(b.fullName, 'pt-BR', { sensitivity: 'base' }))
   }, [
     accessiblePatients, search,
     filterCaseManagers, filterTherapists, filterSpecialties,
-    filterPayments, filterDiagnoses, filterStatuses, filterAgeRanges,
+    filterPayments, filterPaymentTypes, filterDiagnoses, filterStatuses, filterAgeRanges,
     diagnoses, ageRanges,
   ])
 
   const hasFilters =
     filterTherapists.length > 0 || filterCaseManagers.length > 0 ||
     filterSpecialties.length > 0 || filterPayments.length > 0 ||
-    filterDiagnoses.length > 0 || filterStatuses.length > 0 ||
-    filterAgeRanges.length > 0 || search
+    filterPaymentTypes.length > 0 || filterDiagnoses.length > 0 ||
+    filterStatuses.length > 0 || filterAgeRanges.length > 0 || search
 
   function clearFilters() {
     setFilterTherapists([]);   setFilterCaseManagers([])
     setFilterSpecialties([]);  setFilterPayments([])
-    setFilterDiagnoses([]);    setFilterStatuses([])
-    setFilterAgeRanges([]);    setSearch('')
+    setFilterPaymentTypes([]); setFilterDiagnoses([])
+    setFilterStatuses([]);     setFilterAgeRanges([])
+    setSearch('')
   }
 
   function getAgeRange(dateOfBirth) {
@@ -315,6 +323,13 @@ export default function PatientAdvancedSearchPage() {
             options={activePayments.map(m => ({ value: m.id, label: m.name }))}
             value={filterPayments}
             onChange={setFilterPayments}
+            placeholder="Todas"
+          />
+          <MultiSelectFilter
+            label="Modalidade de Pagamento"
+            options={PAYMENT_TYPE_OPTIONS}
+            value={filterPaymentTypes}
+            onChange={setFilterPaymentTypes}
             placeholder="Todas"
           />
           <MultiSelectFilter

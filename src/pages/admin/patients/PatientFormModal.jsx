@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { FiPlus, FiTrash2, FiRefreshCw } from 'react-icons/fi'
+import { FiPlus, FiTrash2, FiRefreshCw, FiHelpCircle, FiX } from 'react-icons/fi'
 import { formatCPF, validateCPF } from '../../../utils/validators'
 import Modal from '../../../components/ui/Modal'
 import Button from '../../../components/ui/Button'
@@ -91,6 +91,7 @@ export default function PatientFormModal({ onClose, initial = {}, readOnly = fal
   }
 
   const [newSpecialtyKey, setNewSpecialtyKey] = useState('')
+  const [showPaymentHelp, setShowPaymentHelp] = useState(false)
   const discountPct = parseFloat(companySettings?.therapistDiscountPercent ?? 0)
 
   function addSpecialtyRow(key) {
@@ -307,6 +308,17 @@ export default function PatientFormModal({ onClose, initial = {}, readOnly = fal
               {/* Admin editando: cards com campos de pagamento */}
               {isAdmin && !readOnly && form.specialties.length > 0 && (
                 <div className="space-y-3 mb-3">
+                  {showPaymentHelp && (
+                    <div className="p-3 bg-blue-50 border border-blue-100 rounded-xl text-xs text-blue-800 space-y-1.5">
+                      <div className="flex items-center justify-between mb-0.5">
+                        <span className="font-semibold text-blue-900">Modalidades de Pagamento</span>
+                        <button type="button" onClick={() => setShowPaymentHelp(false)} className="text-blue-400 hover:text-blue-600 p-0.5"><FiX size={13} /></button>
+                      </div>
+                      <p><strong>Pós-pago por consulta:</strong> cobrado por sessão realizada. Informe o valor por sessão nos campos Valor Paciente e Valor Terapeuta.</p>
+                      <p><strong>Pós-pago mensal:</strong> valor fixo cobrado por mês, independente da quantidade de sessões. Informe o valor mensal para paciente e terapeuta.</p>
+                      <p><strong>Pré-pago por pacote:</strong> o responsável compra antecipadamente um pacote com N sessões. O saldo é debitado automaticamente a cada sessão realizada. Pacotes são gerenciados na ficha do paciente.</p>
+                    </div>
+                  )}
                   {form.specialties.map(s => {
                     const spec = activeSpecialties.find(sp => sp.key === s.key)
                     const color = spec?.color || '#6b7280'
@@ -324,7 +336,12 @@ export default function PatientFormModal({ onClose, initial = {}, readOnly = fal
                           </button>
                         </div>
                         <div>
-                          <label className="block text-xs text-gray-500 mb-1">Modalidade de Pagamento</label>
+                          <div className="flex items-center gap-1 mb-1">
+                            <label className="text-xs text-gray-500">Modalidade de Pagamento</label>
+                            <button type="button" onClick={() => setShowPaymentHelp(v => !v)} className="p-0.5 text-gray-400 hover:text-brand-blue transition-colors" title="O que é cada modalidade?">
+                              <FiHelpCircle size={11} />
+                            </button>
+                          </div>
                           <select value={s.paymentType || 'POST_PER_SESSION'} onChange={e => updateSpecialtyValue(s.key, 'paymentType', e.target.value)}
                             className={inputCls}>
                             {PAYMENT_TYPE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}

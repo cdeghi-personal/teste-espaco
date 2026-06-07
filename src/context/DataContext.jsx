@@ -2059,8 +2059,8 @@ export function DataProvider({ children }) {
     })
     if (error) return { error: error.message }
     if (data?.error) return { error: data.error }
-    // Remove paciente do estado local (pois os dados foram limpos)
     setPatients(prev => prev.filter(p => p.id !== patientId))
+    setConsultations(prev => prev.filter(c => c.patientId !== patientId))
     return data
   }
 
