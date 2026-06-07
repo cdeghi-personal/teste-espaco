@@ -175,7 +175,7 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
   }
 
   async function proceedSave(conflicts) {
-    const canShowSeriesDialog = hasSeries && (isAdmin || user?.id === initial.therapistId)
+    const canShowSeriesDialog = hasSeries && isAdmin
     if (canShowSeriesDialog) {
       // Only ask scope when a propagatable (structural) field actually changed.
       // Note fields (mainObjective, sessionReport, nextObjective) are always per-session

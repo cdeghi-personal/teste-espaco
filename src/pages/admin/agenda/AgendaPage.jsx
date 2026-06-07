@@ -283,7 +283,7 @@ export default function AgendaPage() {
               <span className="hidden sm:inline">Bloqueio</span>
             </Button>
           )}
-          {isAdminOrTeam && (
+          {isAdmin && (
             <Button variant="secondary" onClick={() => setShowSeriesModal(true)}>
               <FiRepeat size={15} />
               <span className="hidden sm:inline">Nova Série</span>

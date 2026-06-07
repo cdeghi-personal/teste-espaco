@@ -274,7 +274,7 @@ export default function SeriesFormModal({ onClose }) {
                 value={form.primaryTherapistId}
                 onChange={e => { set('primaryTherapistId', e.target.value); set('specialty', '') }}
                 error={errors.primaryTherapistId}
-                disabled={!isAdminOrTeam}
+                disabled={!isAdmin}
               >
                 <option value="">Selecione</option>
                 {activeTherapists.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}

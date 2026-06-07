@@ -828,7 +828,7 @@ Não é mais editável. Texto padrão fixo definido em `DESEMPENHO_FIXO` em `gen
 - Card: `HH:MM - PrimeiroNome Ultimo` (ou `intervieweeName` para entrevistas) + sala em 10px
 - Coluna Sáb-Dom: coluna única; day label (Sáb/Dom) embutido na primeira linha do card junto ao horário — sem linha separada.
 - Legenda inferior exibe nome completo do terapeuta
-- **Botão "Série" (`FiRepeat`):** visível para `isAdminOrTeam` (admin OU membro da equipe); admin puro (`user.id = null`) também vê o botão.
+- **Botão "Série" (`FiRepeat`):** visível apenas para admin (`isAdmin`). Terapeutas sem perfil admin não têm acesso a séries.
 - **Toggle "Minha Agenda":** visível para qualquer usuário com `user.id` preenchido (`canFilterMine = !!user?.id`); padrão `true` para não-admin (terapeutas veem só os seus por padrão), `false` para admin. Ao ativar, `filterConsultation` exige que o usuário seja primário ou participante secundário (`consultationTherapists`).
 - **Chips visuais nos cards de consulta:** desktop — `bg-white/25`; mobile — `bg-indigo-50`/`bg-amber-50`/`bg-blue-50`/`bg-orange-50`. Semântica: indigo = série, amber+`!` = ocorrência alterada, 👥 N = múltiplos terapeutas, vermelho `⚠` = conflito, laranja "Entrevista" = `event_type === 'INTERVIEW'`, laranja "Remota" = entrevista remota. Chips de série/múltiplos terapeutas/entrevista exibidos apenas quando `!isPrivate`; chip de conflito sempre visível.
 - **Chips visuais nos BlockCards (bloqueios):** chip `⚠` vermelho pequeno quando `consultations.some(c => c.conflicts.some(cf => !cf.resolved && cf.calendarBlockId === block.id))`. Desktop: inline na linha de chips do BlockCard. Mobile: chip "⚠ Conflito" na linha de badges abaixo do tipo RIGID/FLEX.
@@ -904,8 +904,8 @@ Não é mais editável. Texto padrão fixo definido em `DESEMPENHO_FIXO` em `gen
 ### UX
 
 - Criar série: modal separado `SeriesFormModal` (não embutido no `ConsultationFormModal`).
-- Botão "Série" (`FiRepeat`) — visível para admin e membros da equipe (`isAdminOrTeam`) em **Agenda** e em **Atendimentos** (`ConsultationsPage`).
-- Ao editar atendimento de série: o diálogo "Apenas esta / Esta e as próximas" só é exibido quando há mudança em campos **estruturais** (`time`, `roomId`, `appointmentTypeId`, `therapistId`, `specialty`). Alterações somente em campos de nota (Objetivo, Relato, Objetivo da Próxima) são salvas diretamente sem perguntar escopo — nota é sempre individual. Terapeutas auto-marcam `is_series_exception = true` sem diálogo.
+- Botão "Série" (`FiRepeat`) — visível apenas para **admin** (`isAdmin`) em **Agenda** e em **Atendimentos** (`ConsultationsPage`). Terapeutas sem perfil admin não veem o botão.
+- Ao editar atendimento de série: o diálogo "Apenas esta / Esta e as próximas" é exibido apenas para admin (`canShowSeriesDialog = hasSeries && isAdmin`). Quando há mudança em campos estruturais (`time`, `roomId`, `appointmentTypeId`, `therapistId`, `specialty`). Alterações somente em campos de nota (Objetivo, Relato, Objetivo da Próxima) são salvas diretamente sem perguntar escopo — nota é sempre individual. Terapeutas salvam a consulta diretamente como exceção individual (`is_series_exception = true`) sem diálogo.
 - Chip roxo "Consulta recorrente" exibido no `ConsultationFormModal` quando `initial.seriesId` presente.
 - Exclusão da lista: se `seriesId` presente → modal com opções "Apenas este" / "Este e os próximos" (`seriesDeleteConfirm`).
 - **Chips de recorrência nos cards (Agenda e ConsultationsPage):** indigo FiRepeat = série regular; amber FiRepeat+`!` = ocorrência alterada individualmente; 👥 N = múltiplos terapeutas com tooltip de nomes.

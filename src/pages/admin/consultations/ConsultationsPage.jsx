@@ -136,7 +136,7 @@ export default function ConsultationsPage() {
             <p><strong>Status "Realizada":</strong> ao selecionar esse status, os campos Objetivo da Sessão, Relato de Evolução e Objetivo da Próxima Sessão tornam-se obrigatórios.</p>
             <p><strong>Status automáticos:</strong> configurados em Administração → Status Atendimento; aparecem nos filtros e no prontuário, mas não no formulário de registro.</p>
           </HelpButton>
-          {isAdminOrTeam && (
+          {isAdmin && (
             <Button variant="secondary" onClick={() => setShowSeriesModal(true)}>
               <FiRepeat size={15} />
               <span className="hidden sm:inline">Nova Série</span>
