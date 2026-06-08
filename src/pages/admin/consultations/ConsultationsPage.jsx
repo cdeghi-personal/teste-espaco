@@ -48,6 +48,7 @@ export default function ConsultationsPage() {
   const [seriesDeleteConfirm, setSeriesDeleteConfirm] = useState(null) // { id, seriesId, date }
   const [showSeriesModal, setShowSeriesModal] = useState(false)
   const [myConsultations, setMyConsultations] = useState(false)
+  const [filterConflicts, setFilterConflicts] = useState(false)
 
   const isAdmin = user?.role === 'admin'
   const isAdminOrTeam = isAdmin || user?.belongsToTeam
@@ -75,6 +76,18 @@ export default function ConsultationsPage() {
     return consultations
   })()
 
+  // Mapa de conflitos calculado sobre visibleConsultations (antes de filtered) para
+  // evitar dependência circular quando filterConflicts está ativo.
+  const conflictMap = useMemo(() => {
+    const activeCBlocks = (calendarBlocks || []).filter(b => !b.cancelled && b.active !== false)
+    const map = {}
+    for (const c of visibleConsultations) {
+      const cfs = detectConflicts(c, consultations, activeCBlocks)
+      if (cfs.length > 0) map[c.id] = cfs
+    }
+    return map
+  }, [visibleConsultations, consultations, calendarBlocks]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const filtered = visibleConsultations
     .filter(c => {
       const patient = getPatient(c.patientId)
@@ -84,23 +97,10 @@ export default function ConsultationsPage() {
       const matchTherapist = !filterTherapist || c.therapistId === filterTherapist || (c.consultationTherapists || []).some(ct => ct.therapistId === filterTherapist)
       const matchDate = (!filterDateFrom || c.date >= filterDateFrom) && (!filterDateTo || c.date <= filterDateTo)
       const matchEventType = !filterEventType || (c.eventType || 'SESSION') === filterEventType
-      return matchSearch && matchSpecialty && matchStatus && matchTherapist && matchDate && matchEventType
+      const matchConflict = !filterConflicts || !!conflictMap[c.id]
+      return matchSearch && matchSpecialty && matchStatus && matchTherapist && matchDate && matchEventType && matchConflict
     })
     .sort((a, b) => b.date.localeCompare(a.date))
-
-  // Mapa centralizado de conflitos — computed fresh, não depende de dados armazenados no DB
-  const conflictMap = useMemo(() => {
-    const activeCBlocks = (calendarBlocks || []).filter(b => !b.cancelled && b.active !== false)
-    const map = {}
-    for (const c of filtered) {
-      const cfs = detectConflicts(c, consultations, activeCBlocks)
-      if (cfs.length > 0) {
-        map[c.id] = cfs
-        console.log('[CONFLICT_RENDER_DEBUG]', { eventType: 'consultation', eventId: c.id, conflicts: cfs, hasConflict: true })
-      }
-    }
-    return map
-  }, [filtered, consultations, calendarBlocks]) // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleDelete(consultation) {
     if (consultation.seriesId && isAdmin) {
@@ -243,6 +243,17 @@ export default function ConsultationsPage() {
               <span className="hidden sm:inline">Meus</span>
             </button>
           )}
+          <button
+            type="button"
+            onClick={() => setFilterConflicts(v => !v)}
+            className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg border text-sm font-medium transition-all shrink-0 ${
+              filterConflicts
+                ? 'border-red-500 bg-red-500 text-white'
+                : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+            }`}
+          >
+            ⚠ <span className="hidden sm:inline">Conflitos</span>
+          </button>
         </div>
       </div>
 

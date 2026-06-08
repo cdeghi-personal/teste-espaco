@@ -112,6 +112,7 @@ export default function AgendaPage() {
     return (d === 0 || d === 6) ? 5 : d - 1
   })
   const [myAgenda, setMyAgenda] = useState(user?.role !== 'admin')
+  const [filterConflicts, setFilterConflicts] = useState(false)
   const [seriesDeleteConfirm, setSeriesDeleteConfirm] = useState(null) // { id, seriesId, date }
   // Toggle visível para: admin+terapeuta OU terapeuta da equipe (que pode ver agenda dos colegas)
   // Não-equipe não tem o que filtrar — só vê a própria agenda
@@ -196,6 +197,7 @@ export default function AgendaPage() {
     if (filterRoom && c.roomId !== filterRoom) return false
     if (filterTherapist && c.therapistId !== filterTherapist && !(c.consultationTherapists || []).some(t => t.therapistId === filterTherapist)) return false
     if (filterEventType && (c.eventType || 'SESSION') !== filterEventType) return false
+    if (filterConflicts && !conflictMap[c.id]) return false
     return true
   }
 
@@ -368,6 +370,17 @@ export default function AgendaPage() {
           <option value="SESSION">Atendimento</option>
           <option value="INTERVIEW">Entrevista</option>
         </select>
+        <button
+          type="button"
+          onClick={() => setFilterConflicts(v => !v)}
+          className={`flex items-center gap-1 px-3 py-2 rounded-xl border text-sm font-medium transition-all shrink-0 ${
+            filterConflicts
+              ? 'border-red-500 bg-red-500 text-white'
+              : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+          }`}
+        >
+          ⚠ <span className="hidden sm:inline">Conflitos</span>
+        </button>
       </div>
 
       {/* ── Weekly grid — desktop ── */}
