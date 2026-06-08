@@ -100,7 +100,7 @@ export default function PatientsPage() {
             <p><strong>Buscar:</strong> use o campo de busca para filtrar por nome, CPF ou diagnóstico. Para filtros combinados (terapeuta, especialidade, modalidade, status, faixa etária), use o botão <em>Busca Avançada</em> — que também exporta os resultados em CSV.</p>
             <p><strong>Filtros rápidos:</strong> os selects de Status e Especialidade no topo da página filtram a lista sem sair da tela.</p>
             <p><strong>Cadastrar:</strong> clique em <em>Novo Paciente</em> e preencha dados pessoais, clínicos, vínculos com responsáveis e terapeutas, e as especialidades em atendimento.</p>
-            <p><strong>Detalhe:</strong> clique na linha ou no olhinho (👁) para abrir a ficha completa com histórico de atendimentos, prontuário e pacotes pré-pagos.</p>
+            <p><strong>Detalhe:</strong> clique na linha ou no olhinho (👁) para abrir a ficha completa do paciente. A seção <em>Próximos Atendimentos</em> exibe até 20 atendimentos futuros com botões de edição e exclusão. Para o histórico completo, acesse o Prontuário.</p>
             <p><strong>Especialidades e Modalidade (admin):</strong> na seção Terapeutas do cadastro, defina a <em>Modalidade de Pagamento</em> por especialidade:</p>
             <p>• <strong>Pós-pago por consulta:</strong> cobrado por sessão realizada (valor por sessão).</p>
             <p>• <strong>Pós-pago mensal fixo:</strong> valor fixo cobrado por mês, independente da quantidade de sessões.</p>

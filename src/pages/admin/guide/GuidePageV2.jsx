@@ -337,7 +337,7 @@ export default function GuidePageV2() {
           <SectionImage src="/Tela_Agenda.png" alt="Tela da Agenda Semanal" />
           <div className="grid-4">
             <Card delay={0.05} icon="📅" bg="#eff6ff" title="Visão semanal completa" desc="Seis colunas (Seg–Sex + Sáb/Dom) com atendimentos organizados por dia e horário. No celular, abas por dia." tags={[['Desktop e mobile', 'blue']]} />
-            <Card delay={0.10} icon="✏️" bg="#f0fdf4" title="Crie e edite na hora" desc="Novo atendimento ou edição com um clique direto na agenda. Campos de paciente, terapeuta, especialidade, horário e sala." tags={[['Rápido', 'green']]} />
+            <Card delay={0.10} icon="✏️" bg="#f0fdf4" title="Crie e edite na hora" desc="Novo atendimento ou edição com um clique direto na agenda. Campos de paciente, terapeuta, especialidade, horário e sala. Admin também pode criar séries recorrentes pelo botão Série." tags={[['Rápido', 'green']]} />
             <Card delay={0.15} icon="🎨" bg="#faf5ff" title="Legenda por terapeuta" desc="Cada terapeuta tem uma cor própria. A legenda inferior mostra o nome completo de cada profissional." />
             <Card delay={0.20} icon="🔍" bg="#fff7ed" title={'Filtro "Minha Agenda"'} desc="Terapeutas veem automaticamente apenas seus próprios atendimentos. Administradores têm visão de toda a equipe." tags={[['Personalizado', 'orange']]} />
             <Card delay={0.25} icon="🎤" bg="#fff7ed" title="Entrevistas" desc="Registre entrevistas com responsáveis ou candidatos — presenciais ou remotas. Chip laranja identifica entrevistas na agenda. Entrevistas remotas exibem plataforma e link de acesso direto pelo card." tags={[['Presencial ou Remota', 'orange']]} />
@@ -363,7 +363,7 @@ export default function GuidePageV2() {
               <Card delay={0.15} icon="💰" bg="#faf5ff" title="Especialidades com valores" desc="Cada especialidade tem valor separado para o paciente e repasse ao terapeuta — usado automaticamente nos relatórios." tags={[['Financeiro integrado', 'violet']]} />
               <Card delay={0.20} icon="🔍" bg="#fff7ed" title="Busca Avançada + CSV" desc="Filtre por terapeuta, especialidade, diagnóstico, status, forma de pagamento e faixa etária com múltipla seleção. Exporte em CSV." tags={[['Exportação', 'orange']]} />
               <Card delay={0.25} icon="🎂" bg="#f0fdf4" title="Faixas Etárias automáticas" desc="Tags coloridas calculadas em tempo real a partir da data de nascimento. Faixas e cores configuráveis pelo administrador." tags={[['Automático', 'green']]} />
-              <Card delay={0.30} icon="⏱️" bg="#eff6ff" title="Últimos 10 atendimentos" desc="A ficha do paciente exibe diretamente os 10 atendimentos mais recentes — sem precisar mudar de tela." tags={[['Tudo na mesma tela', 'blue']]} />
+              <Card delay={0.30} icon="📆" bg="#eff6ff" title="Próximos Atendimentos" desc="A ficha do paciente exibe os próximos 20 atendimentos futuros (a partir de hoje), ordenados por data. Edite ou exclua diretamente pela lista — sem precisar mudar de tela." tags={[['Com edição e exclusão', 'blue']]} />
             </div>
           </div>
         </div>
@@ -380,7 +380,7 @@ export default function GuidePageV2() {
             <Card delay={0.10} icon="🏷️" bg="#f0fdf4" title="Status configuráveis" desc="Realizada, Cancelada, Falta… os status são definidos pela clínica. Status automáticos podem ser atribuídos pelo sistema." tags={[['Flexível', 'green']]} />
             <Card delay={0.15} icon="🏢" bg="#fff7ed" title="Sala + Horário" desc="Cada atendimento registra a sala utilizada e o horário exato — essenciais para o relatório de convênio e organização da agenda." tags={[['Gestão de espaço', 'orange']]} />
             <Card delay={0.20} icon="🔒" bg="#faf5ff" title="Controle de acesso" desc="Cada terapeuta edita e exclui apenas os próprios atendimentos. O administrador tem acesso completo a todos os registros." tags={[['Seguro', 'violet']]} />
-            <Card delay={0.25} icon="🔁" bg="#eff6ff" title="Recorrência em Série" desc='Crie múltiplos atendimentos recorrentes de uma vez com o botão "Série". Escolha dias da semana, número de sessões ou data final. Edite um item ou todos os próximos.' tags={[['Agilidade', 'blue']]} />
+            <Card delay={0.25} icon="🔁" bg="#eff6ff" title="Recorrência em Série (admin)" desc='Administradores criam múltiplos atendimentos recorrentes de uma vez com o botão "Série". Escolha dias da semana, número de sessões ou data final. Edite um item ou todos os próximos. Terapeutas podem editar campos individuais de cada ocorrência.' tags={[['Apenas admin', 'blue']]} />
             <Card delay={0.30} icon="👥" bg="#f0fdf4" title="Múltiplos Terapeutas" desc="Adicione terapeutas secundários a um atendimento quando a sessão é multidisciplinar. Cada participante aparece no relatório com sua própria especialidade e valor de repasse." tags={[['Multidisciplinar', 'green']]} />
             <Card delay={0.35} icon="🎤" bg="#fff7ed" title="Entrevistas" desc="Registre entrevistas com responsáveis ou candidatos. Paciente é opcional; o campo entrevistado é obrigatório. Entrevistas remotas têm plataforma + link de acesso e não exigem sala. Não impactam ledger pré-pago nem faturamento." tags={[['Presencial ou Remota', 'orange']]} />
             <Card delay={0.40} icon="🏷️" bg="#faf5ff" title="Chips e alertas nos cards" desc="Chips visuais identificam o tipo de cada registro: 🔵 série recorrente (indigo), 🟡 ocorrência alterada individualmente (âmbar + !), 👥 múltiplos terapeutas com tooltip dos nomes (azul), 🔴 conflito de agenda (vermelho ⚠). Passe o mouse no chip ⚠ para ver o detalhamento do conflito." tags={[['Visual instantâneo', 'violet']]} />
@@ -392,13 +392,14 @@ export default function GuidePageV2() {
         {/* Prontuário */}
         <div className="sec">
           <p className="sec-title">🏥 Prontuário Clínico</p>
-          <p className="sec-sub">O histórico clínico completo do paciente em quatro seções organizadas.</p>
+          <p className="sec-sub">O histórico clínico completo do paciente em cinco seções organizadas.</p>
           <SectionImage src="/Tela_Prontuario.png" alt="Tela do Prontuário Clínico" />
           <div className="grid-4">
             <Card delay={0.05} icon="🧪" bg="#eff6ff" title="Exames Complementares" desc="Registre exames com data, link/anexo e observações. Histórico cronológico completo e editável." />
             <Card delay={0.10} icon="💊" bg="#fff7ed" title="Medicamentos" desc="Controle de medicamentos em uso ou interrompidos, com data de início/fim e observações clínicas." />
-            <Card delay={0.15} icon="🎯" bg="#f0fdf4" title="Conduta & Objetivo Terapêutico" desc="Registre a conduta de cada terapeuta com objetivos, datas e status de andamento. Vinculado por especialidade." tags={[['Por terapeuta', 'green']]} />
-            <Card delay={0.20} icon="📅" bg="#faf5ff" title="Histórico de Atendimentos" desc="Navegue com filtros de período (Mês -2, Anterior, Corrente, Seguinte ou intervalo personalizado) e filtre por status." tags={[['Filtros avançados', 'violet']]} />
+            <Card delay={0.15} icon="📋" bg="#f0fdf4" title="Projeto Terapêutico" desc="Campos de texto livre para descrever o projeto terapêutico — Descrição do Projeto e Observações. Único por prontuário; editável por admin e terapeutas da equipe." tags={[['Por paciente', 'green']]} />
+            <Card delay={0.20} icon="🎯" bg="#faf5ff" title="Conduta & Objetivo Terapêutico" desc="Registre a conduta de cada terapeuta com objetivos, datas e status de andamento. Vinculado por especialidade." tags={[['Por terapeuta', 'violet']]} />
+            <Card delay={0.25} icon="📅" bg="#eff6ff" title="Histórico de Atendimentos" desc="Navegue com filtros de período (Mês -2, Anterior, Corrente ou intervalo personalizado) e filtre por status. Clique no lápis para editar diretamente." tags={[['Filtros avançados', 'blue']]} />
           </div>
           <div className="highlight">
             <div className="hi">⚡</div>

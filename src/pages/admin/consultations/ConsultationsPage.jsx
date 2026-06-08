@@ -127,7 +127,7 @@ export default function ConsultationsPage() {
         <div className="flex items-center gap-2 shrink-0">
           <HelpButton title="Como usar Atendimentos">
             <p><strong>Registrar atendimento:</strong> clique em <em>Novo Atendimento</em> e preencha paciente, terapeuta, especialidade, data, horário, status e tipo.</p>
-            <p><strong>Criar série:</strong> clique em <em>Série</em> para criar atendimentos recorrentes (ex.: toda segunda por 10 semanas).</p>
+            <p><strong>Criar série (admin):</strong> apenas administradores podem criar, editar e excluir séries recorrentes. Clique em <em>Série</em> para criar atendimentos recorrentes (ex.: toda segunda por 10 semanas). Terapeutas podem editar campos individuais de uma ocorrência, mas sem alterar o escopo da série.</p>
             <p><strong>Entrevistas:</strong> selecione o tipo "Entrevista" para entrevistas com responsáveis ou candidatos. Paciente opcional; campo entrevistado obrigatório. Entrevistas remotas não exigem sala e não conflitam com bloqueios Flex. Entrevistas não aparecem nos relatórios financeiros.</p>
             <p><strong>Chips nos cards:</strong> 🔵 indigo = série regular; 🟡 âmbar + ! = ocorrência alterada individualmente; 👥 N = múltiplos terapeutas (passe o mouse para ver os nomes); 🔴 ⚠ = conflito de agenda (passe o mouse para detalhes).</p>
             <p><strong>Conflitos de agenda:</strong> ao criar ou editar, o sistema detecta sobreposições de terapeuta, sala ou bloqueios. O aviso em âmbar exibe os conflitos — você pode salvar mesmo assim ou cancelar para corrigir.</p>

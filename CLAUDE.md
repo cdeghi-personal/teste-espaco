@@ -490,7 +490,7 @@ Authentication → URL Configuration:
 - **Informações Clínicas:** Diagnóstico Principal, Comorbidades, Forma de Pagamento (especialidades removidas daqui)
 - **Terapeutas:** Gerente do Caso, Terapeutas Envolvidos, **tabela de Especialidades em Atendimento** (Especialidade | Valor Paciente | Valor Terapeuta — colunas de valor apenas para admin)
 - **Responsáveis:** card inline
-- **Últimos Atendimentos:** 10 mais recentes
+- **Próximos Atendimentos:** até 20 atendimentos futuros (data ≥ hoje), ordenados ASC; botões de editar (lápis) e excluir (lixeira) visíveis para admin ou terapeuta responsável do atendimento (`isAdmin || c.therapistId === user?.id`)
 
 ## Prontuário Clínico (MedicalRecordsPage — `/admin/prontuario`)
 

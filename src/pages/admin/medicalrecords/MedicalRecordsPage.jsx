@@ -504,6 +504,7 @@ export default function MedicalRecordsPage() {
           <p><strong>Selecionar paciente:</strong> use o campo de busca para encontrar o paciente. O prontuário é carregado automaticamente.</p>
           <p><strong>Exames Complementares:</strong> registre exames realizados com data, link/anexo e observações. Clique em <em>+ Adicionar exame</em>.</p>
           <p><strong>Medicamentos:</strong> registre medicamentos em uso ou interrompidos com data e observações.</p>
+          <p><strong>Projeto Terapêutico:</strong> campos de texto livre para descrever o projeto terapêutico — Descrição do Projeto e Observações. Único por prontuário; editável por admin e terapeutas da equipe.</p>
           <p><strong>Conduta & Objetivo Terapêutico:</strong> registre a conduta de cada terapeuta com objetivos, datas e status de andamento.</p>
           <p><strong>Histórico de Atendimentos:</strong> navegue pelo histórico usando os filtros de período (Mês -2, Mês Anterior, Mês Corrente ou Período personalizado) e filtre por status. Clique no lápis (✏) para editar um atendimento.</p>
           <p><strong>Ações em lote:</strong> admin pode selecionar múltiplos atendimentos e alterar o status em massa.</p>
