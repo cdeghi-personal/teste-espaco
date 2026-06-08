@@ -91,6 +91,14 @@ export function DataProvider({ children }) {
 
   const fetchAll = useCallback(async () => {
     setIsLoading(true)
+    // Janela de 12 meses passados + 12 meses futuros para limitar o volume carregado em memória
+    // e contornar o max_rows=1000 do PostgREST sem precisar buscar toda a base.
+    const _now = new Date()
+    const _from = new Date(_now); _from.setMonth(_from.getMonth() - 12)
+    const _to   = new Date(_now); _to.setMonth(_to.getMonth() + 12)
+    const _consultDateFrom = _from.toISOString().slice(0, 10)
+    const _consultDateTo   = _to.toISOString().slice(0, 10)
+
     const [
       patientsRes, guardiansRes, appointmentsRes, consultationsRes,
       therapistsRes, specialtiesRes, paymentRes, diagnosesRes, statusesRes, roomsRes, consultStatusRes, apptTypesRes, ageRangesRes, companyRes, calendarBlocksRes,
@@ -105,16 +113,25 @@ export function DataProvider({ children }) {
       }),
       supabase.from('guardians').select(GUARDIAN_SELECT),
       supabase.from('appointments').select('*').order('date').order('time'),
-      supabase.from('consultations').select(CONSULTATION_SELECT).order('date', { ascending: false }).then(res => {
-        // Se a query falhar (ex: tabela consultation_conflicts ainda não existe),
-        // tenta sem a relação para não quebrar o carregamento
-        if (res.error) {
-          const SELECT_FALLBACK = CONSULTATION_SELECT
-            .replace(/,\s*consultation_conflicts[^(]*\([^)]*\)/, '')
-          return supabase.from('consultations').select(SELECT_FALLBACK).order('date', { ascending: false })
-        }
-        return res
-      }),
+      supabase.from('consultations')
+        .select(CONSULTATION_SELECT)
+        .gte('date', _consultDateFrom)
+        .lte('date', _consultDateTo)
+        .order('date', { ascending: false })
+        .limit(3000)
+        .then(res => {
+          if (res.error) {
+            const SELECT_FALLBACK = CONSULTATION_SELECT
+              .replace(/,\s*consultation_conflicts[^(]*\([^)]*\)/, '')
+            return supabase.from('consultations')
+              .select(SELECT_FALLBACK)
+              .gte('date', _consultDateFrom)
+              .lte('date', _consultDateTo)
+              .order('date', { ascending: false })
+              .limit(3000)
+          }
+          return res
+        }),
       supabase.from('therapists').select('*, therapist_specialties(specialty, credential, can_be_rt)').order('name'),
       supabase.from('specialties').select('*').order('label'),
       supabase.from('payment_methods').select('*').order('name'),
