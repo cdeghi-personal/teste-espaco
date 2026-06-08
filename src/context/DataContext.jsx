@@ -113,25 +113,41 @@ export function DataProvider({ children }) {
       }),
       supabase.from('guardians').select(GUARDIAN_SELECT),
       supabase.from('appointments').select('*').order('date').order('time'),
-      supabase.from('consultations')
-        .select(CONSULTATION_SELECT)
-        .gte('date', _consultDateFrom)
-        .lte('date', _consultDateTo)
-        .order('date', { ascending: false })
-        .limit(3000)
-        .then(res => {
-          if (res.error) {
-            const SELECT_FALLBACK = CONSULTATION_SELECT
-              .replace(/,\s*consultation_conflicts[^(]*\([^)]*\)/, '')
-            return supabase.from('consultations')
-              .select(SELECT_FALLBACK)
-              .gte('date', _consultDateFrom)
-              .lte('date', _consultDateTo)
-              .order('date', { ascending: false })
-              .limit(3000)
+      // Paginação automática: contorna max_rows=1000 do servidor buscando páginas
+      // de 1000 até esgotar os dados dentro da janela de datas.
+      (async () => {
+        const PAGE = 1000
+        let allData = []
+        let offset = 0
+        let selectStr = CONSULTATION_SELECT
+        let fellback = false
+
+        while (true) {
+          const res = await supabase
+            .from('consultations')
+            .select(selectStr)
+            .gte('date', _consultDateFrom)
+            .lte('date', _consultDateTo)
+            .order('date', { ascending: false })
+            .range(offset, offset + PAGE - 1)
+
+          if (res.error && !fellback) {
+            // consultation_conflicts não existe ou erro no embed — tenta sem ela
+            selectStr = CONSULTATION_SELECT.replace(/,\s*consultation_conflicts[^(]*\([^)]*\)/, '')
+            fellback = true
+            allData = []
+            offset = 0
+            continue
           }
-          return res
-        }),
+
+          const rows = res.data || []
+          allData = allData.concat(rows)
+          if (rows.length < PAGE || allData.length >= 6000) break
+          offset += PAGE
+        }
+
+        return { data: allData, error: null }
+      })(),
       supabase.from('therapists').select('*, therapist_specialties(specialty, credential, can_be_rt)').order('name'),
       supabase.from('specialties').select('*').order('label'),
       supabase.from('payment_methods').select('*').order('name'),
