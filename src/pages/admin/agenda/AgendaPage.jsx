@@ -92,6 +92,7 @@ function BlockCard({ block, therapist, onEdit, onView, isAdmin, userId, conflict
 export default function AgendaPage() {
   const { consultations, patients, rooms, therapists, calendarBlocks, logAudit, deleteConsultation, deleteConsultationSeries } = useData()
   const { user } = useAuth()
+  const isAdmin = user?.role === 'admin'
   const [weekRef, setWeekRef] = useState(new Date())
   const [search, setSearch] = useState('')
   const [filterRoom, setFilterRoom] = useState('')
