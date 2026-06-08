@@ -65,7 +65,7 @@ const CONSULTATION_SELECT = `
   session_quality, created_at,
   consultation_activities(id, name, description, outcome, sort_order),
   consultation_therapists(id, therapist_id, specialty, is_primary),
-  consultation_conflicts(id, conflict_type, related_consultation_id, therapist_id, room_id, calendar_block_id, conflict_date, start_time, end_time, description, resolved)
+  consultation_conflicts!consultation_id(id, conflict_type, related_consultation_id, therapist_id, room_id, calendar_block_id, conflict_date, start_time, end_time, description, resolved)
 `
 
 // ─── Provider ─────────────────────────────────────────────────────────────────
@@ -110,7 +110,7 @@ export function DataProvider({ children }) {
         // tenta sem a relação para não quebrar o carregamento
         if (res.error) {
           const SELECT_FALLBACK = CONSULTATION_SELECT
-            .replace(/,\s*consultation_conflicts\([^)]*\)/, '')
+            .replace(/,\s*consultation_conflicts[^(]*\([^)]*\)/, '')
           return supabase.from('consultations').select(SELECT_FALLBACK).order('date', { ascending: false })
         }
         return res
@@ -1738,7 +1738,7 @@ export function DataProvider({ children }) {
       // Fallback sem JOINs complexos (mesmo padrão do fetchAll)
       fullRes = await supabase
         .from('consultations')
-        .select(CONSULTATION_SELECT.replace(/,\s*consultation_conflicts\([^)]*\)/, ''))
+        .select(CONSULTATION_SELECT.replace(/,\s*consultation_conflicts[^(]*\([^)]*\)/, ''))
         .in('id', insertedIds.map(c => c.id))
         .order('date', { ascending: true })
     }
