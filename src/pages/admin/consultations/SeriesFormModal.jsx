@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from 'react'
+import { FiPlus, FiTrash2 } from 'react-icons/fi'
 import Modal from '../../../components/ui/Modal'
 import Button from '../../../components/ui/Button'
 import Input from '../../../components/ui/Input'
@@ -10,6 +11,7 @@ import { useToast } from '../../../components/ui/Toast'
 import { isoToday, generateSeriesDates } from '../../../utils/dateUtils'
 import { detectSeriesConflicts, buildConflictTooltip } from '../../../utils/conflictUtils'
 import { PAYMENT_TYPE_LABELS } from '../../../constants/paymentTypes'
+import { generateId } from '../../../utils/storageUtils'
 
 const WEEKDAYS = [
   { value: 1, label: 'Seg' },
@@ -40,6 +42,7 @@ export default function SeriesFormModal({ onClose }) {
     sessionCount: 10,
     endDate: '',
     notes: '',
+    secondaryTherapists: [],
   })
   const [errors, setErrors] = useState({})
   const [saving, setSaving] = useState(false)
@@ -50,6 +53,16 @@ export default function SeriesFormModal({ onClose }) {
   function set(field, value) {
     setForm(f => ({ ...f, [field]: value }))
     setErrors(e => ({ ...e, [field]: undefined }))
+  }
+
+  function addSecondaryTherapist() {
+    set('secondaryTherapists', [...form.secondaryTherapists, { tempId: generateId(), therapistId: '', specialty: '' }])
+  }
+  function updateSecondaryTherapist(tempId, field, value) {
+    set('secondaryTherapists', form.secondaryTherapists.map(t => t.tempId === tempId ? { ...t, [field]: value } : t))
+  }
+  function removeSecondaryTherapist(tempId) {
+    set('secondaryTherapists', form.secondaryTherapists.filter(t => t.tempId !== tempId))
   }
 
   function toggleDay(val) {
@@ -85,6 +98,10 @@ export default function SeriesFormModal({ onClose }) {
   const activeTherapists = useMemo(
     () => (therapists || []).filter(t => t.active !== false).sort((a, b) => a.name.localeCompare(b.name)),
     [therapists]
+  )
+  const activeSpecialties = useMemo(
+    () => (specialtiesData || []).filter(s => s.active !== false),
+    [specialtiesData]
   )
   const activeRooms = useMemo(() => (rooms || []).filter(r => r.active !== false), [rooms])
   const activeStatuses = useMemo(
@@ -150,6 +167,14 @@ export default function SeriesFormModal({ onClose }) {
     if (previewDates.length === 0 && Object.keys(e).length === 0) {
       e.recurrenceDays = 'Nenhuma sessão será gerada com estes parâmetros'
     }
+    // Terapeutas adicionais: terapeuta e especialidade obrigatórios se linha adicionada
+    const usedIds = [form.primaryTherapistId]
+    for (const sec of form.secondaryTherapists) {
+      if (!sec.therapistId) { e.secondaryTherapists = 'Selecione o terapeuta em todas as linhas adicionadas'; break }
+      if (!sec.specialty)   { e.secondaryTherapists = 'Selecione a especialidade em todas as linhas adicionadas'; break }
+      if (usedIds.includes(sec.therapistId)) { e.secondaryTherapists = 'Terapeuta duplicado — remova a linha repetida'; break }
+      usedIds.push(sec.therapistId)
+    }
     return e
   }
 
@@ -157,9 +182,19 @@ export default function SeriesFormModal({ onClose }) {
     const e = validate()
     if (Object.keys(e).length) { setErrors(e); return }
 
-    // Detecta conflitos em todas as datas da série
+    const validSecondaries = form.secondaryTherapists.filter(t => t.therapistId && t.specialty)
+
+    // Detecta conflitos em todas as datas da série (inclui terapeutas adicionais)
     if (!showConflictWarning) {
-      const detected = detectSeriesConflicts(form, previewDates, consultations, calendarBlocks)
+      const detected = detectSeriesConflicts(
+        {
+          ...form,
+          consultationTherapists: validSecondaries.map(t => ({ therapistId: t.therapistId, specialty: t.specialty, isPrimary: false })),
+        },
+        previewDates,
+        consultations,
+        calendarBlocks
+      )
       if (detected.length > 0) {
         setSeriesConflicts(detected)
         setShowConflictWarning(true)
@@ -188,6 +223,7 @@ export default function SeriesFormModal({ onClose }) {
         endDate:               form.endDate || null,
         sessionCount:          Number(form.sessionCount) || null,
         notes:                 form.notes || null,
+        secondaryTherapists:   validSecondaries,
         conflictsPerDate:      seriesConflicts,
       })
       if (result?.error) {
@@ -320,6 +356,61 @@ export default function SeriesFormModal({ onClose }) {
                 </div>
               ) : null
             )}
+          </div>
+        </section>
+
+        {/* Terapeutas Adicionais */}
+        <section>
+          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3 pb-2 border-b border-gray-100">
+            Terapeutas Adicionais
+          </h3>
+          <div className="space-y-2">
+            {form.secondaryTherapists.map(sec => {
+              const usedIds = [form.primaryTherapistId, ...form.secondaryTherapists.filter(t => t.tempId !== sec.tempId).map(t => t.therapistId)]
+              return (
+                <div key={sec.tempId} className="flex items-end gap-2">
+                  <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <Select
+                      label="Terapeuta"
+                      value={sec.therapistId}
+                      onChange={e => updateSecondaryTherapist(sec.tempId, 'therapistId', e.target.value)}
+                    >
+                      <option value="">Selecione</option>
+                      {activeTherapists.filter(t => !usedIds.includes(t.id)).map(t => (
+                        <option key={t.id} value={t.id}>{t.name}</option>
+                      ))}
+                    </Select>
+                    <Select
+                      label="Especialidade"
+                      value={sec.specialty}
+                      onChange={e => updateSecondaryTherapist(sec.tempId, 'specialty', e.target.value)}
+                    >
+                      <option value="">Selecione</option>
+                      {activeSpecialties.map(s => (
+                        <option key={s.key} value={s.key}>{s.label}</option>
+                      ))}
+                    </Select>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => removeSecondaryTherapist(sec.tempId)}
+                    className="mb-1 p-1.5 text-gray-400 hover:text-red-500 transition-colors shrink-0"
+                  >
+                    <FiTrash2 size={14} />
+                  </button>
+                </div>
+              )
+            })}
+            {errors.secondaryTherapists && (
+              <p className="text-xs text-red-500">{errors.secondaryTherapists}</p>
+            )}
+            <button
+              type="button"
+              onClick={addSecondaryTherapist}
+              className="flex items-center gap-1.5 text-sm text-brand-blue hover:underline mt-1"
+            >
+              <FiPlus size={14} /> Adicionar terapeuta
+            </button>
           </div>
         </section>
 

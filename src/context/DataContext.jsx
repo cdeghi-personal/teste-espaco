@@ -1664,6 +1664,7 @@ export function DataProvider({ children }) {
       time, recurrenceType, recurrenceDays, startDate, endDate, sessionCount, notes,
       eventType, interviewFormat, meetingPlatform, meetingLink, intervieweeName,
       conflictsPerDate = [],
+      secondaryTherapists = [],
     } = data
 
     const { data: { session } } = await supabase.auth.getSession()
@@ -1760,6 +1761,19 @@ export function DataProvider({ children }) {
         is_primary:      true,
       })))
     if (ctErr) console.error('[addConsultationSeries] consultation_therapists error:', ctErr)
+
+    // 4b. Bulk insert de terapeutas secundários (um registro por consulta × terapeuta secundário)
+    const validSecondaries = (secondaryTherapists || []).filter(t => t.therapistId && t.specialty)
+    if (validSecondaries.length > 0) {
+      const secondaryRows = []
+      for (const c of insertedIds) {
+        for (const st of validSecondaries) {
+          secondaryRows.push({ consultation_id: c.id, therapist_id: st.therapistId, specialty: st.specialty, is_primary: false })
+        }
+      }
+      const { error: secErr } = await supabase.from('consultation_therapists').insert(secondaryRows)
+      if (secErr) console.error('[addConsultationSeries] secondary therapists error:', secErr)
+    }
 
     // 5. Busca registros completos para atualizar estado local
     let fullRes = await supabase

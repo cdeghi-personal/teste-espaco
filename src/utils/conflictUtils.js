@@ -164,7 +164,7 @@ export function detectSeriesConflicts(seriesInput, dates, allConsultations, cale
           roomId: seriesInput.roomId || null,
           eventType: seriesInput.eventType || 'SESSION',
           interviewFormat: seriesInput.interviewFormat || null,
-          consultationTherapists: [],
+          consultationTherapists: seriesInput.consultationTherapists || [],
         },
         allConsultations,
         calendarBlocks
