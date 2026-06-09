@@ -7,6 +7,7 @@ import Select from '../../../components/ui/Select'
 import Textarea from '../../../components/ui/Textarea'
 import { useData } from '../../../context/DataContext'
 import { useAuth } from '../../../context/AuthContext'
+import { useToast } from '../../../components/ui/Toast'
 import { generateId } from '../../../utils/storageUtils'
 import { isoToday } from '../../../utils/dateUtils'
 import { detectConflicts, buildConflictTooltip } from '../../../utils/conflictUtils'
@@ -50,6 +51,8 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
   const [conflictsToConfirm, setConflictsToConfirm] = useState(null) // null | conflicts[]
   const [pendingConflicts, setPendingConflicts] = useState([])
   const [saving, setSaving] = useState(false)
+  const [replicateNextObjective, setReplicateNextObjective] = useState(false)
+  const { show } = useToast()
 
   const hasSeries = isEdit && !!initial.seriesId
 
@@ -163,6 +166,31 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
     }
   }
 
+  async function doReplicateObjective() {
+    if (!replicateNextObjective || !form.nextObjectives.trim() || !form.patientId) return
+    const norm = s => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+    const agendadaIds = consultationStatuses.filter(s => norm(s.name).includes('agend')).map(s => s.id)
+    const curDT = `${form.date}T${form.time || '00:00'}`
+    const next = consultations
+      .filter(c =>
+        c.id !== initial?.id &&
+        c.patientId === form.patientId &&
+        (c.therapistId === form.therapistId || c.consultationTherapists?.some(t => t.therapistId === form.therapistId)) &&
+        agendadaIds.includes(c.consultationStatusId) &&
+        `${c.date}T${c.time || '00:00'}` > curDT
+      )
+      .sort((a, b) => {
+        const da = `${a.date}T${a.time || '00:00'}`
+        const db = `${b.date}T${b.time || '00:00'}`
+        return da < db ? -1 : 1
+      })[0]
+    if (!next) return
+    await updateConsultation(next.id, { mainObjective: form.nextObjectives })
+    const dd = next.date ? `${next.date.slice(8, 10)}/${next.date.slice(5, 7)}` : ''
+    const hh = next.time ? ` às ${next.time.slice(0, 5)}` : ''
+    show(`Atendimento de ${dd}${hh} teve os objetivos atualizados`, 'success')
+  }
+
   function handleSave() {
     const e = validate()
     if (Object.keys(e).length) { setErrors(e); return }
@@ -193,6 +221,7 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
       setSaving(true)
       if (isEdit) await updateConsultation(initial.id, { ...form, conflicts })
       else await addConsultation({ ...form, conflicts })
+      await doReplicateObjective()
       setSaving(false)
       onClose()
       return
@@ -201,6 +230,7 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
     setSaving(true)
     if (isEdit) await updateConsultation(initial.id, { ...saveData, conflicts })
     else await addConsultation({ ...saveData, conflicts })
+    await doReplicateObjective()
     setSaving(false)
     onClose()
   }
@@ -230,6 +260,7 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
     } else {
       await addConsultation({ ...saveData, conflicts })
     }
+    await doReplicateObjective()
     setSaving(false)
     onClose()
   }
@@ -689,12 +720,23 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
               rows={2}
               disabled={readOnly}
             />
+            {!readOnly && form.patientId && form.eventType !== 'INTERVIEW' && (
+              <label className="flex items-center gap-2 cursor-pointer select-none -mt-1">
+                <input
+                  type="checkbox"
+                  checked={replicateNextObjective}
+                  onChange={e => setReplicateNextObjective(e.target.checked)}
+                  className="w-3.5 h-3.5 rounded border-gray-300 accent-brand-blue"
+                />
+                <span className="text-xs text-gray-500">Replicar como objetivo da próxima sessão agendada deste paciente</span>
+              </label>
+            )}
             <Textarea label="Orientações Passadas ao Responsável" value={form.guardianFeedback} onChange={e => set('guardianFeedback', e.target.value)} placeholder="O que foi comunicado ao responsável ao final da sessão..." rows={2} disabled={readOnly} />
           </div>
         </section>
 
-        {/* Seção NF — oculta para entrevistas; admin sempre vê em edição; terapeuta vê apenas se já preenchido */}
-        {isEdit && form.eventType !== 'INTERVIEW' && (isAdmin || initial.nfNumber || initial.nfIssueDate) && (
+        {/* Seção NF — visível apenas para admin em modo edição */}
+        {isEdit && form.eventType !== 'INTERVIEW' && isAdmin && (
           <section className="space-y-3">
             <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Nota Fiscal / Faturamento</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
