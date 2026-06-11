@@ -199,6 +199,9 @@ export default function AdminSidebar({ open, onClose }) {
           Sair
         </button>
         <p className="text-center text-xs text-gray-400 mt-2">Powered by ©DGT</p>
+        <p className="text-center text-gray-300 mt-0.5" style={{ fontSize: '10px' }}>
+          build {new Date(__BUILD_DATE__).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' })}
+        </p>
       </div>
     </aside>
   )
