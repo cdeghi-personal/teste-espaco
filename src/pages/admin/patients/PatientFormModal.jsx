@@ -42,6 +42,8 @@ export default function PatientFormModal({ onClose, initial = {}, readOnly = fal
   const toast = useToast()
   const isAdmin = user?.role === 'admin'
   const isEdit = !!initial.id
+  const isGerente = !isAdmin && isEdit && !!user?.id && user?.id === initial.therapistId
+  const canSeePricing = isAdmin || isGerente
 
   const activeStatuses = patientStatuses.filter(s => s.active !== false)
   const defaultStatusId = !isEdit
@@ -318,8 +320,8 @@ export default function PatientFormModal({ onClose, initial = {}, readOnly = fal
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Especialidades em Atendimento</label>
 
-              {/* Admin editando: cards com campos de pagamento */}
-              {isAdmin && !readOnly && form.specialties.length > 0 && (
+              {/* Admin ou Gerente do Caso editando: cards com campos de pagamento */}
+              {canSeePricing && !readOnly && form.specialties.length > 0 && (
                 <div className="space-y-3 mb-3">
                   {showPaymentHelp && (
                     <div className="p-3 bg-blue-50 border border-blue-100 rounded-xl text-xs text-blue-800 space-y-1.5">
@@ -418,8 +420,8 @@ export default function PatientFormModal({ onClose, initial = {}, readOnly = fal
                 </div>
               )}
 
-              {/* Admin visualizando (readOnly): tabela com valores */}
-              {isAdmin && readOnly && form.specialties.length > 0 && (
+              {/* Admin ou Gerente do Caso visualizando (readOnly): tabela com valores */}
+              {canSeePricing && readOnly && form.specialties.length > 0 && (
                 <div className="rounded-xl border border-gray-200 overflow-hidden mb-2">
                   <div className="overflow-x-auto">
                   <table className="w-full text-[10px] sm:text-xs min-w-[340px]">
@@ -455,8 +457,8 @@ export default function PatientFormModal({ onClose, initial = {}, readOnly = fal
                 </div>
               )}
 
-              {/* Terapeuta: apenas lista de especialidades */}
-              {!isAdmin && form.specialties.length > 0 && (
+              {/* Terapeuta sem acesso a preços: apenas lista de especialidades */}
+              {!canSeePricing && form.specialties.length > 0 && (
                 <div className="rounded-xl border border-gray-200 overflow-hidden mb-2">
                   <table className="w-full text-xs">
                     <thead className="bg-gray-50">
@@ -605,7 +607,7 @@ export default function PatientFormModal({ onClose, initial = {}, readOnly = fal
 
           </div>
 
-          {isAdmin && (
+          {canSeePricing && (
             <div className="flex items-center gap-3 p-3 mt-3 bg-gray-50 rounded-xl">
               <input
                 id="pat-needs-convenio"

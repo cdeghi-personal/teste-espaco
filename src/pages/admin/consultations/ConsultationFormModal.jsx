@@ -19,7 +19,7 @@ const EMPTY = {
   patientId: '', therapistId: '', specialty: '', date: isoToday(), time: '',
   consultationStatusId: '', appointmentTypeId: '', roomId: '',
   eventType: 'SESSION', interviewFormat: '', meetingPlatform: '', meetingLink: '', intervieweeName: '',
-  mainObjective: '', activities: [],
+  notes: '', mainObjective: '', activities: [],
   evolutionNotes: '', nextObjectives: '',
   sessionQuality: 'good', guardianFeedback: '', appointmentId: '',
   secondaryTherapists: [],
@@ -51,7 +51,7 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
   const [conflictsToConfirm, setConflictsToConfirm] = useState(null) // null | conflicts[]
   const [pendingConflicts, setPendingConflicts] = useState([])
   const [saving, setSaving] = useState(false)
-  const [replicateNextObjective, setReplicateNextObjective] = useState(false)
+  const [replicateNextObjective, setReplicateNextObjective] = useState(true)
   const { show } = useToast()
 
   const hasSeries = isEdit && !!initial.seriesId
@@ -115,13 +115,13 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
     if (!form.consultationStatusId) e.consultationStatusId = 'Selecione o status'
     if (!form.appointmentTypeId && form.eventType !== 'INTERVIEW') e.appointmentTypeId = 'Selecione o tipo'
     const selectedStatus = consultationStatuses.find(s => s.id === form.consultationStatusId)
-    if (selectedStatus?.name?.toLowerCase().includes('realizada')) {
+    const _requiresNote = selectedStatus?.requiresObjectiveNote === true
+    if (_requiresNote) {
+      if (!form.notes?.trim()) e.notes = 'Informe a observação do atendimento'
+    } else if (selectedStatus?.name?.toLowerCase().includes('realizada')) {
       if (!form.mainObjective.trim()) e.mainObjective = 'Informe o objetivo da sessão'
       if (!form.evolutionNotes.trim()) e.evolutionNotes = 'Informe o relato da sessão / evolução'
       if (!form.nextObjectives.trim()) e.nextObjectives = 'Informe o objetivo da próxima sessão'
-    }
-    if (selectedStatus?.requiresObjectiveNote && !form.mainObjective.trim()) {
-      e.mainObjective = 'Este status exige uma observação no Objetivo da Sessão'
     }
     // Validações de terapeutas secundários
     const secIds = form.secondaryTherapists.map(t => t.therapistId).filter(Boolean)
@@ -624,116 +624,128 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
           </section>
         )}
 
-        {/* Objetivo principal */}
-        <section>
-          {requiresNote && !readOnly && (
-            <div className="flex items-start gap-2 p-3 mb-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800">
-              <span className="shrink-0 mt-0.5">⚠️</span>
-              <span>Este status exige uma observação. Informe no Objetivo da Sessão a justificativa ou contexto da alteração do status do atendimento.</span>
-            </div>
-          )}
-          <Textarea
-            label={mainObjectiveRequired ? 'Objetivo Principal da Sessão *' : 'Objetivo Principal da Sessão'}
-            value={form.mainObjective}
-            onChange={e => set('mainObjective', e.target.value)}
-            error={errors.mainObjective}
-            placeholder="Descreva o objetivo terapêutico desta sessão..."
-            rows={2}
-            disabled={readOnly}
-          />
-        </section>
+        {/* Seção clínica: Observação do Atendimento (requiresNote) ou campos normais */}
+        {(requiresNote || (readOnly && form.notes)) ? (
+          <section>
+            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3 pb-2 border-b border-gray-100">
+              Observação do Atendimento
+            </h3>
+            <Textarea
+              label={requiresNote && !readOnly ? 'Observação do Atendimento *' : 'Observação do Atendimento'}
+              value={form.notes || ''}
+              onChange={e => set('notes', e.target.value)}
+              error={errors.notes}
+              placeholder="Descreva a observação relacionada ao atendimento..."
+              rows={4}
+              disabled={readOnly}
+            />
+          </section>
+        ) : (
+          <>
+            {/* Objetivo principal */}
+            <section>
+              <Textarea
+                label={realizadaRequired ? 'Objetivo Principal da Sessão *' : 'Objetivo Principal da Sessão'}
+                value={form.mainObjective}
+                onChange={e => set('mainObjective', e.target.value)}
+                error={errors.mainObjective}
+                placeholder="Descreva o objetivo terapêutico desta sessão..."
+                rows={2}
+                disabled={readOnly}
+              />
+            </section>
 
-        {/* Atividades */}
-        <section>
-          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3 pb-2 border-b border-gray-100">
-            Atividades Realizadas ({form.activities.length})
-          </h3>
-
-          <div className="space-y-3">
-            {form.activities.map((act, idx) => (
-              <div key={act.id} className="bg-gray-50 rounded-xl p-4 relative">
-                {!readOnly && (
-                  <button onClick={() => removeActivity(idx)} className="absolute top-3 right-3 p-1 text-gray-400 hover:text-red-500 transition-colors">
-                    <FiTrash2 size={14} />
-                  </button>
-                )}
-                <div className="text-xs font-semibold text-gray-500 mb-3">Atividade {idx + 1}</div>
-                <div className="space-y-3">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <Input label="Nome da Atividade" value={act.name} onChange={e => updateActivity(idx, 'name', e.target.value)} placeholder="Ex: Jogo de encaixe, treino de marcha..." disabled={readOnly} />
-                    <Select label="Resultado" value={act.outcome} onChange={e => updateActivity(idx, 'outcome', e.target.value)} disabled={readOnly}>
-                      <option value="achieved">Objetivo Alcançado</option>
-                      <option value="partial">Parcialmente Alcançado</option>
-                      <option value="not_achieved">Não Alcançado</option>
-                    </Select>
+            {/* Atividades */}
+            <section>
+              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3 pb-2 border-b border-gray-100">
+                Atividades Realizadas ({form.activities.length})
+              </h3>
+              <div className="space-y-3">
+                {form.activities.map((act, idx) => (
+                  <div key={act.id} className="bg-gray-50 rounded-xl p-4 relative">
+                    {!readOnly && (
+                      <button onClick={() => removeActivity(idx)} className="absolute top-3 right-3 p-1 text-gray-400 hover:text-red-500 transition-colors">
+                        <FiTrash2 size={14} />
+                      </button>
+                    )}
+                    <div className="text-xs font-semibold text-gray-500 mb-3">Atividade {idx + 1}</div>
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <Input label="Nome da Atividade" value={act.name} onChange={e => updateActivity(idx, 'name', e.target.value)} placeholder="Ex: Jogo de encaixe, treino de marcha..." disabled={readOnly} />
+                        <Select label="Resultado" value={act.outcome} onChange={e => updateActivity(idx, 'outcome', e.target.value)} disabled={readOnly}>
+                          <option value="achieved">Objetivo Alcançado</option>
+                          <option value="partial">Parcialmente Alcançado</option>
+                          <option value="not_achieved">Não Alcançado</option>
+                        </Select>
+                      </div>
+                      <Textarea label="Descrição" value={act.description} onChange={e => updateActivity(idx, 'description', e.target.value)} placeholder="Como a atividade foi realizada..." rows={2} disabled={readOnly} />
+                    </div>
                   </div>
-                  <Textarea label="Descrição" value={act.description} onChange={e => updateActivity(idx, 'description', e.target.value)} placeholder="Como a atividade foi realizada..." rows={2} disabled={readOnly} />
-                </div>
+                ))}
+                {!readOnly && (newActivityDraft ? (
+                  <div className="rounded-xl border-2 border-brand-blue border-dashed p-4 space-y-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <Input label="Nome da Atividade *" value={newActivityDraft.name} onChange={e => setNewActivityDraft(d => ({ ...d, name: e.target.value }))} placeholder="Ex: Jogo de encaixe, treino de marcha..." autoFocus />
+                      <Select label="Resultado" value={newActivityDraft.outcome} onChange={e => setNewActivityDraft(d => ({ ...d, outcome: e.target.value }))}>
+                        <option value="achieved">Objetivo Alcançado</option>
+                        <option value="partial">Parcialmente Alcançado</option>
+                        <option value="not_achieved">Não Alcançado</option>
+                      </Select>
+                    </div>
+                    <Textarea label="Descrição" value={newActivityDraft.description} onChange={e => setNewActivityDraft(d => ({ ...d, description: e.target.value }))} placeholder="Como a atividade foi realizada..." rows={2} />
+                    <div className="flex gap-2 justify-end">
+                      <Button variant="ghost" onClick={() => setNewActivityDraft(null)}>Cancelar</Button>
+                      <Button variant="primary" onClick={confirmNewActivity}>Adicionar</Button>
+                    </div>
+                  </div>
+                ) : (
+                  <button onClick={() => setNewActivityDraft({ name: '', description: '', outcome: 'achieved' })} className="flex items-center gap-1.5 text-sm text-brand-blue hover:underline mt-1">
+                    <FiPlus size={14} /> Adicionar atividade
+                  </button>
+                ))}
               </div>
-            ))}
+            </section>
 
-            {!readOnly && (newActivityDraft ? (
-              <div className="rounded-xl border-2 border-brand-blue border-dashed p-4 space-y-3">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <Input label="Nome da Atividade *" value={newActivityDraft.name} onChange={e => setNewActivityDraft(d => ({ ...d, name: e.target.value }))} placeholder="Ex: Jogo de encaixe, treino de marcha..." autoFocus />
-                  <Select label="Resultado" value={newActivityDraft.outcome} onChange={e => setNewActivityDraft(d => ({ ...d, outcome: e.target.value }))}>
-                    <option value="achieved">Objetivo Alcançado</option>
-                    <option value="partial">Parcialmente Alcançado</option>
-                    <option value="not_achieved">Não Alcançado</option>
-                  </Select>
-                </div>
-                <Textarea label="Descrição" value={newActivityDraft.description} onChange={e => setNewActivityDraft(d => ({ ...d, description: e.target.value }))} placeholder="Como a atividade foi realizada..." rows={2} />
-                <div className="flex gap-2 justify-end">
-                  <Button variant="ghost" onClick={() => setNewActivityDraft(null)}>Cancelar</Button>
-                  <Button variant="primary" onClick={confirmNewActivity}>Adicionar</Button>
-                </div>
-              </div>
-            ) : (
-              <button onClick={() => setNewActivityDraft({ name: '', description: '', outcome: 'achieved' })} className="flex items-center gap-1.5 text-sm text-brand-blue hover:underline mt-1">
-                <FiPlus size={14} /> Adicionar atividade
-              </button>
-            ))}
-          </div>
-        </section>
-
-        {/* Evolução */}
-        <section>
-          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3 pb-2 border-b border-gray-100">
-            Evolução e Observações
-          </h3>
-          <div className="space-y-3">
-            <Textarea
-              label={realizadaRequired ? 'Relato da Sessão / Evolução *' : 'Relato da Sessão / Evolução'}
-              value={form.evolutionNotes}
-              onChange={e => set('evolutionNotes', e.target.value)}
-              error={errors.evolutionNotes}
-              placeholder="Evolução clínica, comparação com sessões anteriores..."
-              rows={3}
-              disabled={readOnly}
-            />
-            <Textarea
-              label={realizadaRequired ? 'Objetivo da Próxima Sessão *' : 'Objetivo da Próxima Sessão'}
-              value={form.nextObjectives}
-              onChange={e => set('nextObjectives', e.target.value)}
-              error={errors.nextObjectives}
-              placeholder="Metas e foco para a próxima sessão..."
-              rows={2}
-              disabled={readOnly}
-            />
-            {!readOnly && form.patientId && form.eventType !== 'INTERVIEW' && (
-              <label className="flex items-center gap-2 cursor-pointer select-none -mt-1">
-                <input
-                  type="checkbox"
-                  checked={replicateNextObjective}
-                  onChange={e => setReplicateNextObjective(e.target.checked)}
-                  className="w-3.5 h-3.5 rounded border-gray-300 accent-brand-blue"
+            {/* Evolução */}
+            <section>
+              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3 pb-2 border-b border-gray-100">
+                Evolução e Observações
+              </h3>
+              <div className="space-y-3">
+                <Textarea
+                  label={realizadaRequired ? 'Relato da Sessão / Evolução *' : 'Relato da Sessão / Evolução'}
+                  value={form.evolutionNotes}
+                  onChange={e => set('evolutionNotes', e.target.value)}
+                  error={errors.evolutionNotes}
+                  placeholder="Evolução clínica, comparação com sessões anteriores..."
+                  rows={3}
+                  disabled={readOnly}
                 />
-                <span className="text-xs text-gray-500">Replicar como objetivo da próxima sessão agendada deste paciente</span>
-              </label>
-            )}
-            <Textarea label="Orientações Passadas ao Responsável" value={form.guardianFeedback} onChange={e => set('guardianFeedback', e.target.value)} placeholder="O que foi comunicado ao responsável ao final da sessão..." rows={2} disabled={readOnly} />
-          </div>
-        </section>
+                <Textarea
+                  label={realizadaRequired ? 'Objetivo da Próxima Sessão *' : 'Objetivo da Próxima Sessão'}
+                  value={form.nextObjectives}
+                  onChange={e => set('nextObjectives', e.target.value)}
+                  error={errors.nextObjectives}
+                  placeholder="Metas e foco para a próxima sessão..."
+                  rows={2}
+                  disabled={readOnly}
+                />
+                {!readOnly && form.patientId && form.eventType !== 'INTERVIEW' && (
+                  <label className="flex items-center gap-2 cursor-pointer select-none -mt-1">
+                    <input
+                      type="checkbox"
+                      checked={replicateNextObjective}
+                      onChange={e => setReplicateNextObjective(e.target.checked)}
+                      className="w-3.5 h-3.5 rounded border-gray-300 accent-brand-blue"
+                    />
+                    <span className="text-xs text-gray-500">Replicar como objetivo da próxima sessão agendada deste paciente</span>
+                  </label>
+                )}
+                <Textarea label="Orientações Passadas ao Responsável" value={form.guardianFeedback} onChange={e => set('guardianFeedback', e.target.value)} placeholder="O que foi comunicado ao responsável ao final da sessão..." rows={2} disabled={readOnly} />
+              </div>
+            </section>
+          </>
+        )}
 
         {/* Seção NF — visível apenas para admin em modo edição */}
         {isEdit && form.eventType !== 'INTERVIEW' && isAdmin && (

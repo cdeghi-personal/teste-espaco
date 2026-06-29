@@ -67,6 +67,7 @@ export default function ConsultationStatusPage() {
                       {s.automatic && <span className="px-1.5 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-700">Automático</span>}
                       {s.consumesPrepaidSession && <span className="px-1.5 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700">Consome pré-paga</span>}
                       {s.requiresObjectiveNote && <span className="px-1.5 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-700">Exige observação</span>}
+                      {s.adminCanEdit === false && <span className="px-1.5 py-0.5 rounded text-xs font-medium bg-red-100 text-red-700">Admin bloqueado</span>}
                     </div>
                     <div className="text-xs text-gray-400 mt-0.5">{count} atendimento(s) (últimos 30 dias)</div>
                   </div>

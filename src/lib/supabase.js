@@ -147,6 +147,7 @@ export function mapConsultation(row) {
     appointmentTypeId: row.appointment_type_id,
     time: row.time || '',
     roomId: row.room_id || null,
+    notes: row.notes || '',
     mainObjective: row.main_objective || '',
     evolutionNotes: row.evolution_notes || '',
     nextObjectives: row.next_objectives || '',
@@ -264,7 +265,7 @@ export function mapCalendarBlockSeries(row) {
 }
 
 export function mapConsultationStatus(row) {
-  return { id: row.id, name: row.name, color: row.color, active: row.active, automatic: row.automatic || false, consumesPrepaidSession: row.consumes_prepaid_session || false, requiresObjectiveNote: row.requires_objective_note || false }
+  return { id: row.id, name: row.name, color: row.color, active: row.active, automatic: row.automatic || false, consumesPrepaidSession: row.consumes_prepaid_session || false, requiresObjectiveNote: row.requires_objective_note || false, adminCanEdit: row.admin_can_edit !== false }
 }
 
 export function mapAppointmentType(row) {

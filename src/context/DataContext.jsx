@@ -61,7 +61,7 @@ const CONSULTATION_SELECT = `
   nf_number, nf_issue_date, previous_status_before_invoice,
   series_id, series_original_date, is_series_exception,
   event_type, interview_format, meeting_platform, meeting_link, interviewee_name,
-  main_objective, evolution_notes, next_objectives, guardian_feedback,
+  notes, main_objective, evolution_notes, next_objectives, guardian_feedback,
   session_quality, created_at,
   consultation_activities(id, name, description, outcome, sort_order),
   consultation_therapists(id, therapist_id, specialty, is_primary),
@@ -713,6 +713,7 @@ export function DataProvider({ children }) {
         meeting_platform: rest.meetingPlatform || null,
         meeting_link: rest.meetingLink || null,
         interviewee_name: rest.intervieweeName || null,
+        notes: rest.notes || null,
         main_objective: rest.mainObjective || null,
         evolution_notes: rest.evolutionNotes || null,
         next_objectives: rest.nextObjectives || null,
@@ -828,6 +829,7 @@ export function DataProvider({ children }) {
     if (rest.sessionNumber !== undefined) update.session_number = rest.sessionNumber
     if (rest.consultationStatusId !== undefined) update.consultation_status_id = rest.consultationStatusId || null
     if (rest.appointmentTypeId !== undefined) update.appointment_type_id = rest.appointmentTypeId || null
+    if (rest.notes !== undefined) update.notes = rest.notes || null
     if (rest.mainObjective !== undefined) update.main_objective = rest.mainObjective
     if (rest.evolutionNotes !== undefined) update.evolution_notes = rest.evolutionNotes
     if (rest.nextObjectives !== undefined) update.next_objectives = rest.nextObjectives
@@ -1131,7 +1133,7 @@ export function DataProvider({ children }) {
   async function addConsultationStatus(data) {
     const { data: inserted, error } = await supabase
       .from('consultation_statuses')
-      .insert({ name: data.name, color: data.color || 'bg-gray-100 text-gray-700', active: true, automatic: data.automatic || false, consumes_prepaid_session: data.consumesPrepaidSession || false, requires_objective_note: data.requiresObjectiveNote || false })
+      .insert({ name: data.name, color: data.color || 'bg-gray-100 text-gray-700', active: true, automatic: data.automatic || false, consumes_prepaid_session: data.consumesPrepaidSession || false, requires_objective_note: data.requiresObjectiveNote || false, admin_can_edit: data.adminCanEdit !== false })
       .select().single()
     if (error) return dbError(error, toast)
     const item = mapConsultationStatus(inserted)
@@ -1147,6 +1149,7 @@ export function DataProvider({ children }) {
     if (data.automatic !== undefined) update.automatic = data.automatic
     if (data.consumesPrepaidSession !== undefined) update.consumes_prepaid_session = data.consumesPrepaidSession
     if (data.requiresObjectiveNote !== undefined) update.requires_objective_note = data.requiresObjectiveNote
+    if (data.adminCanEdit !== undefined) update.admin_can_edit = data.adminCanEdit
     await supabase.from('consultation_statuses').update(update).eq('id', id)
     setConsultationStatuses(prev => prev.map(s => s.id === id ? { ...s, ...data } : s))
   }

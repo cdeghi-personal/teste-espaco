@@ -117,11 +117,13 @@ export default function PatientsPage() {
           >
             <FiEyeOff size={16} />
           </button>
-          <Button variant="primary" onClick={() => { setEditPatient(null); setShowModal(true) }}>
-            <FiPlus size={16} />
-            <span className="hidden sm:inline">Novo Paciente</span>
-            <span className="sm:hidden">Novo</span>
-          </Button>
+          {isAdmin && (
+            <Button variant="primary" onClick={() => { setEditPatient(null); setShowModal(true) }}>
+              <FiPlus size={16} />
+              <span className="hidden sm:inline">Novo Paciente</span>
+              <span className="sm:hidden">Novo</span>
+            </Button>
+          )}
         </div>
       </div>
 
@@ -169,7 +171,7 @@ export default function PatientsPage() {
             icon={FiUser}
             title={showDeleted ? 'Nenhum paciente inativo' : 'Nenhum paciente encontrado'}
             description={showDeleted ? '' : 'Tente ajustar os filtros ou cadastre um novo paciente.'}
-            action={!showDeleted && (
+            action={!showDeleted && isAdmin && (
               <Button variant="primary" onClick={() => setShowModal(true)}>
                 <FiPlus size={14} /> Cadastrar Paciente
               </Button>
@@ -222,9 +224,11 @@ export default function PatientsPage() {
                           <button onClick={() => { setViewPatient(p); logAudit('VIEW', 'patients', p.id, p.fullName) }} className="p-2 rounded-lg text-gray-400">
                             <FiEye size={15} />
                           </button>
-                          <button onClick={() => { setEditPatient(p); setShowModal(true); logAudit('VIEW', 'patients', p.id, p.fullName) }} className="p-2 rounded-lg text-gray-400">
-                            <FiEdit2 size={15} />
-                          </button>
+                          {(isAdmin || user?.id === p.therapistId) && (
+                            <button onClick={() => { setEditPatient(p); setShowModal(true); logAudit('VIEW', 'patients', p.id, p.fullName) }} className="p-2 rounded-lg text-gray-400">
+                              <FiEdit2 size={15} />
+                            </button>
+                          )}
                           {isAdmin && (
                             <button onClick={() => handleDelete(p.id, p.fullName)} className="p-2 rounded-lg text-gray-400">
                               <FiTrash2 size={15} />
@@ -311,9 +315,11 @@ export default function PatientsPage() {
                               <button onClick={() => { setViewPatient(p); logAudit('VIEW', 'patients', p.id, p.fullName) }} className="p-1.5 rounded-lg text-gray-400 hover:text-brand-blue hover:bg-blue-50 transition-colors">
                                 <FiEye size={15} />
                               </button>
-                              <button onClick={() => { setEditPatient(p); setShowModal(true); logAudit('VIEW', 'patients', p.id, p.fullName) }} className="p-1.5 rounded-lg text-gray-400 hover:text-brand-blue hover:bg-blue-50 transition-colors">
-                                <FiEdit2 size={15} />
-                              </button>
+                              {(isAdmin || user?.id === p.therapistId) && (
+                                <button onClick={() => { setEditPatient(p); setShowModal(true); logAudit('VIEW', 'patients', p.id, p.fullName) }} className="p-1.5 rounded-lg text-gray-400 hover:text-brand-blue hover:bg-blue-50 transition-colors">
+                                  <FiEdit2 size={15} />
+                                </button>
+                              )}
                               {isAdmin && (
                                 <button onClick={() => handleDelete(p.id, p.fullName)} className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors">
                                   <FiTrash2 size={15} />

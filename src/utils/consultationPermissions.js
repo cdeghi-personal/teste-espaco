@@ -28,13 +28,12 @@ export function canEditConsultationDetails(user, consultation) {
   return isConsultationPrimaryTherapist(user, consultation)
 }
 
-// Admin pode editar qualquer consulta cujo status NÃO seja "realizada"
+// Admin pode editar se o status tiver adminCanEdit !== false (parametrizável no cadastro de Status)
 // Terapeutas seguem a regra de primário
 export function canEditConsultation(user, consultation, consultationStatuses) {
   if (user?.role === 'admin') {
     const status = (consultationStatuses || []).find(s => s.id === consultation?.consultationStatusId)
-    const isRealizada = status?.name?.toLowerCase().includes('realizada') ?? false
-    return !isRealizada
+    return status?.adminCanEdit !== false // default true quando status não encontrado
   }
   return canEditConsultationDetails(user, consultation)
 }

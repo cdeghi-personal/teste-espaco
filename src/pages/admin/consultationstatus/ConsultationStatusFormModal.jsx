@@ -15,7 +15,7 @@ const COLOR_OPTIONS = [
   { value: 'bg-purple-100 text-purple-700', label: 'Roxo' },
 ]
 
-const EMPTY = { name: '', color: 'bg-green-100 text-green-700', active: true, automatic: false, consumesPrepaidSession: false, requiresObjectiveNote: false }
+const EMPTY = { name: '', color: 'bg-green-100 text-green-700', active: true, automatic: false, consumesPrepaidSession: false, requiresObjectiveNote: false, adminCanEdit: true }
 
 export default function ConsultationStatusFormModal({ onClose, initial = {} }) {
   const { addConsultationStatus, updateConsultationStatus } = useData()
@@ -104,8 +104,21 @@ export default function ConsultationStatusFormModal({ onClose, initial = {} }) {
             className="w-4 h-4 rounded accent-brand-blue"
           />
           <div>
-            <label htmlFor="cs-requires-note" className="text-sm font-medium text-gray-700">Exige observação no objetivo da sessão</label>
-            <p className="text-xs text-gray-400 mt-0.5">Ao atribuir este status, o campo "Objetivo da Sessão" passa a ser obrigatório</p>
+            <label htmlFor="cs-requires-note" className="text-sm font-medium text-gray-700">Exige observação</label>
+            <p className="text-xs text-gray-400 mt-0.5">Ao atribuir este status, apenas o campo "Observação do Atendimento" é exibido e obrigatório; os campos clínicos ficam ocultos</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-3 p-3 bg-amber-50 rounded-xl border border-amber-100">
+          <input
+            id="cs-admin-can-edit"
+            type="checkbox"
+            checked={form.adminCanEdit}
+            onChange={e => set('adminCanEdit', e.target.checked)}
+            className="w-4 h-4 rounded accent-brand-blue"
+          />
+          <div>
+            <label htmlFor="cs-admin-can-edit" className="text-sm font-medium text-gray-700">Permite consulta e edição pelo Administrador</label>
+            <p className="text-xs text-gray-400 mt-0.5">Desmarcado: admin não pode abrir nem editar atendimentos com este status (sigilo clínico reforçado)</p>
           </div>
         </div>
         {isEdit && (

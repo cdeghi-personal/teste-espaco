@@ -41,6 +41,7 @@ export default function PatientDetailPage() {
     )
   }
 
+  const canEditPatient = isAdmin || user?.id === patient.therapistId
   const linkedGuardians = getGuardiansForPatient(id)
   const patientStatus = patientStatuses.find(s => s.id === (patient.statusId || patient.status))
   const primaryTherapist = therapists.find(t => t.id === patient.therapistId)
@@ -94,9 +95,11 @@ export default function PatientDetailPage() {
                 {patient.specialties?.map(s => <Badge key={s.key} specialty={s.key} />)}
               </div>
             </div>
-            <Button variant="outline" onClick={() => setShowEdit(true)} className="shrink-0">
-              <FiEdit2 size={14} /> Editar
-            </Button>
+            {canEditPatient && (
+              <Button variant="outline" onClick={() => setShowEdit(true)} className="shrink-0">
+                <FiEdit2 size={14} /> Editar
+              </Button>
+            )}
           </div>
         </div>
       </div>
@@ -188,6 +191,25 @@ export default function PatientDetailPage() {
                   </div>
                 </div>
               )}
+              {patient.externalTherapists?.length > 0 && (
+                <div className="text-sm">
+                  <span className="text-gray-500 block mb-2">Terapeutas / Médicos Externos</span>
+                  <div className="space-y-2">
+                    {patient.externalTherapists.map(t => (
+                      <div key={t.id} className="flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 text-xs font-bold shrink-0">
+                          {t.name.charAt(0)}
+                        </div>
+                        <div className="flex-1">
+                          <span className="font-medium text-gray-700 text-xs">{t.name}</span>
+                          {t.specialty && <span className="text-gray-400 text-xs ml-1">· {t.specialty}</span>}
+                          {t.phone && <span className="text-gray-400 text-xs ml-1">· {t.phone}</span>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
               {patient.specialties?.length > 0 && (
                 <div className="text-sm">
                   <span className="text-gray-500 block mb-2">Especialidades em Atendimento</span>
@@ -263,6 +285,41 @@ export default function PatientDetailPage() {
                   </div>
                 ))}
               </div>
+            </div>
+          )}
+
+          {/* Dados Escolares */}
+          {(patient.schoolName || patient.schoolCoordinator || patient.schoolPhone) && (
+            <div className="bg-white rounded-2xl border border-gray-100 p-5 space-y-3">
+              <h3 className="font-semibold text-gray-900 text-sm">Dados Escolares</h3>
+              {[
+                { label: 'Escola', value: patient.schoolName },
+                { label: 'Coordenador', value: patient.schoolCoordinator },
+                { label: 'Telefone da Escola', value: patient.schoolPhone },
+              ].filter(r => r.value).map(({ label, value }) => (
+                <div key={label} className="flex justify-between text-sm">
+                  <span className="text-gray-500">{label}</span>
+                  <span className="font-medium text-gray-900 text-right">{value}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Médico Responsável */}
+          {(patient.doctorName || patient.doctorInsurance || patient.doctorSpecialty || patient.doctorPhone) && (
+            <div className="bg-white rounded-2xl border border-gray-100 p-5 space-y-3">
+              <h3 className="font-semibold text-gray-900 text-sm">Médico Responsável</h3>
+              {[
+                { label: 'Nome', value: patient.doctorName },
+                { label: 'Convênio', value: patient.doctorInsurance },
+                { label: 'Especialidade', value: patient.doctorSpecialty },
+                { label: 'Telefone', value: patient.doctorPhone },
+              ].filter(r => r.value).map(({ label, value }) => (
+                <div key={label} className="flex justify-between text-sm">
+                  <span className="text-gray-500">{label}</span>
+                  <span className="font-medium text-gray-900 text-right">{value}</span>
+                </div>
+              ))}
             </div>
           )}
 
