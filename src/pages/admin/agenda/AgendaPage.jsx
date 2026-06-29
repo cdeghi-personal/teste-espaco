@@ -14,7 +14,7 @@ import CalendarBlockFormModal from './CalendarBlockFormModal'
 import CalendarBlockHistoryModal from './CalendarBlockHistoryModal'
 import { formatMonthYear } from '../../../utils/dateUtils'
 import { detectConflicts, getCalendarBlockConflicts, buildConflictTooltip } from '../../../utils/conflictUtils'
-import { canViewConsultationDetails, canEditConsultationDetails } from '../../../utils/consultationPermissions'
+import { canViewConsultationDetails, canEditConsultationDetails, canEditConsultation } from '../../../utils/consultationPermissions'
 
 function textColorForBg(hex) {
   if (!hex) return 'white'
@@ -92,7 +92,7 @@ function BlockCard({ block, therapist, onEdit, onView, isAdmin, userId, conflict
 }
 
 export default function AgendaPage() {
-  const { consultations, patients, rooms, therapists, calendarBlocks, logAudit, deleteConsultation, deleteConsultationSeries } = useData()
+  const { consultations, patients, rooms, therapists, consultationStatuses, calendarBlocks, logAudit, deleteConsultation, deleteConsultationSeries } = useData()
   const { user } = useAuth()
   const { show } = useToast()
   const isAdmin = user?.role === 'admin'
@@ -508,7 +508,7 @@ export default function AgendaPage() {
                       {/* Editar: apenas terapeuta principal. Excluir: admin ou terapeuta principal */}
                       {(user?.id === item.therapistId || user?.role === 'admin') && (
                         <div className="absolute top-1 right-1 hidden group-hover:flex gap-0.5">
-                          {user?.id === item.therapistId && (
+                          {canEditConsultation(user, item, consultationStatuses) && (
                             <button
                               onClick={() => { setEditItem(item); setShowModal(true); if (!isPrivate) logAudit('VIEW', 'consultations', item.id, getPatient(item.patientId)?.fullName || item.id) }}
                               className="w-5 h-5 rounded flex items-center justify-center bg-black/20 hover:bg-black/40 transition-colors"
@@ -643,7 +643,7 @@ export default function AgendaPage() {
                       {/* Editar: apenas terapeuta principal. Excluir: admin ou terapeuta principal */}
                       {(user?.id === item.therapistId || user?.role === 'admin') && (
                         <div className="absolute top-1 right-1 hidden group-hover:flex gap-0.5">
-                          {user?.id === item.therapistId && (
+                          {canEditConsultation(user, item, consultationStatuses) && (
                             <button
                               onClick={() => { setEditItem(item); setShowModal(true); if (!isPrivate) logAudit('VIEW', 'consultations', item.id, getPatient(item.patientId)?.fullName || item.id) }}
                               className="w-5 h-5 rounded flex items-center justify-center bg-black/20 hover:bg-black/40 transition-colors"
@@ -833,7 +833,7 @@ export default function AgendaPage() {
                       {/* Editar: apenas terapeuta principal. Excluir: admin ou terapeuta principal */}
                       {(user?.id === item.therapistId || user?.role === 'admin') && (
                         <div className="flex gap-1 shrink-0">
-                          {user?.id === item.therapistId && (
+                          {canEditConsultation(user, item, consultationStatuses) && (
                             <button onClick={e => { e.stopPropagation(); setEditItem(item); setShowModal(true); if (!isPrivate) logAudit('VIEW', 'consultations', item.id, patient?.fullName || item.id) }} className="p-2 rounded-lg text-gray-400 hover:text-brand-blue hover:bg-blue-50">
                               <FiEdit2 size={15} />
                             </button>
@@ -936,7 +936,7 @@ export default function AgendaPage() {
           initial={viewItem}
           readOnly
           onEditRequest={
-            canEditConsultationDetails(user, viewItem)
+            canEditConsultation(user, viewItem, consultationStatuses)
               ? () => { setViewItem(null); setEditItem(viewItem); setShowModal(true) }
               : null
           }

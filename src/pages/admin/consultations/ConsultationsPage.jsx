@@ -30,7 +30,7 @@ import ConsultationFormModal from './ConsultationFormModal'
 import SeriesFormModal from './SeriesFormModal'
 import { formatDateShort } from '../../../utils/dateUtils'
 import { detectConflicts, buildConflictTooltip } from '../../../utils/conflictUtils'
-import { canViewConsultationDetails, canEditConsultationDetails } from '../../../utils/consultationPermissions'
+import { canViewConsultationDetails, canEditConsultationDetails, canEditConsultation } from '../../../utils/consultationPermissions'
 
 export default function ConsultationsPage() {
   const { consultations, patients, therapists, rooms, specialtiesData, consultationStatuses, appointmentTypes, calendarBlocks, deleteConsultation, deleteConsultationSeries, logAudit } = useData()
@@ -365,8 +365,8 @@ export default function ConsultationsPage() {
                       <FiEye size={15} />
                     </button>
                   )}
-                  {/* Lápis: apenas terapeuta principal */}
-                  {canEditConsultationDetails(user, c) && (
+                  {/* Lápis: terapeuta principal OU admin (se status não for realizada) */}
+                  {canEditConsultation(user, c, consultationStatuses) && (
                     <button
                       onClick={() => { setEditConsultation(c); setShowModal(true); logAudit('VIEW', 'consultations', c.id, patients.find(p => p.id === c.patientId)?.fullName || c.id) }}
                       className="p-1.5 rounded-lg text-gray-400 hover:text-brand-blue hover:bg-blue-50 transition-colors"

@@ -13,7 +13,7 @@ import Badge from '../../../components/ui/Badge'
 import ConsultationFormModal from '../consultations/ConsultationFormModal'
 import SeriesFormModal from '../consultations/SeriesFormModal'
 import { formatDateBR, formatDateShort, isoToday } from '../../../utils/dateUtils'
-import { canViewConsultationDetails, canEditConsultationDetails } from '../../../utils/consultationPermissions'
+import { canViewConsultationDetails, canEditConsultationDetails, canEditConsultation } from '../../../utils/consultationPermissions'
 
 const CONDUCT_STATUS = {
   nao_iniciada: { label: 'Não Iniciada',  color: 'bg-gray-100 text-gray-600' },
@@ -928,8 +928,8 @@ export default function MedicalRecordsPage() {
                                   <FiEye size={13} />
                                 </button>
                               )}
-                              {/* Lápis: apenas terapeuta principal */}
-                              {canEditConsultationDetails(user, c) && (
+                              {/* Lápis: terapeuta principal OU admin (se status não for realizada) */}
+                              {canEditConsultation(user, c, consultationStatuses) && (
                                 <button
                                   onClick={() => { setEditConsultation(c); setShowConsultationModal(true) }}
                                   className="p-1 rounded-lg text-gray-400 hover:text-brand-blue hover:bg-blue-50 transition-colors"
