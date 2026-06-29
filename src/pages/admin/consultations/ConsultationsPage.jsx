@@ -30,6 +30,7 @@ import ConsultationFormModal from './ConsultationFormModal'
 import SeriesFormModal from './SeriesFormModal'
 import { formatDateShort } from '../../../utils/dateUtils'
 import { detectConflicts, buildConflictTooltip } from '../../../utils/conflictUtils'
+import { canViewConsultationDetails, canEditConsultationDetails } from '../../../utils/consultationPermissions'
 
 export default function ConsultationsPage() {
   const { consultations, patients, therapists, rooms, specialtiesData, consultationStatuses, appointmentTypes, calendarBlocks, deleteConsultation, deleteConsultationSeries, logAudit } = useData()
@@ -355,32 +356,42 @@ export default function ConsultationsPage() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => { setViewConsultation(c); logAudit('VIEW', 'consultations', c.id, patients.find(p => p.id === c.patientId)?.fullName || c.id) }}
-                    className="p-1.5 rounded-lg text-gray-400 hover:text-brand-blue hover:bg-blue-50 transition-colors"
-                  >
-                    <FiEye size={15} />
-                  </button>
-                  {(user?.role === 'admin' || user?.id === c.therapistId) && (<>
-                  <button
-                    onClick={() => { setEditConsultation(c); setShowModal(true); logAudit('VIEW', 'consultations', c.id, patients.find(p => p.id === c.patientId)?.fullName || c.id) }}
-                    className="p-1.5 rounded-lg text-gray-400 hover:text-brand-blue hover:bg-blue-50 transition-colors"
-                  >
-                    <FiEdit2 size={15} />
-                  </button>
-                  <button
-                    onClick={() => handleDelete(c)}
-                    className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
-                  >
-                    <FiTrash2 size={15} />
-                  </button>
-                  </>)}
-                  <button
-                    onClick={() => setExpanded(isExpanded ? null : c.id)}
-                    className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-50 transition-colors"
-                  >
-                    {isExpanded ? <FiChevronUp size={16} /> : <FiChevronDown size={16} />}
-                  </button>
+                  {/* Olho: apenas participantes (principal ou adicional) */}
+                  {canViewConsultationDetails(user, c) && (
+                    <button
+                      onClick={() => { setViewConsultation(c); logAudit('VIEW', 'consultations', c.id, patients.find(p => p.id === c.patientId)?.fullName || c.id) }}
+                      className="p-1.5 rounded-lg text-gray-400 hover:text-brand-blue hover:bg-blue-50 transition-colors"
+                    >
+                      <FiEye size={15} />
+                    </button>
+                  )}
+                  {/* Lápis: apenas terapeuta principal */}
+                  {canEditConsultationDetails(user, c) && (
+                    <button
+                      onClick={() => { setEditConsultation(c); setShowModal(true); logAudit('VIEW', 'consultations', c.id, patients.find(p => p.id === c.patientId)?.fullName || c.id) }}
+                      className="p-1.5 rounded-lg text-gray-400 hover:text-brand-blue hover:bg-blue-50 transition-colors"
+                    >
+                      <FiEdit2 size={15} />
+                    </button>
+                  )}
+                  {/* Lixeira: admin ou terapeuta principal */}
+                  {(isAdmin || user?.id === c.therapistId) && (
+                    <button
+                      onClick={() => handleDelete(c)}
+                      className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                    >
+                      <FiTrash2 size={15} />
+                    </button>
+                  )}
+                  {/* Expandir: apenas participantes podem ver detalhe clínico */}
+                  {canViewConsultationDetails(user, c) && (
+                    <button
+                      onClick={() => setExpanded(isExpanded ? null : c.id)}
+                      className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-50 transition-colors"
+                    >
+                      {isExpanded ? <FiChevronUp size={16} /> : <FiChevronDown size={16} />}
+                    </button>
+                  )}
                 </div>
               </div>
 

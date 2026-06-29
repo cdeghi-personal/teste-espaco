@@ -10,7 +10,7 @@ const mainNavItems = [
   { to: ROUTES.DASHBOARD, icon: FiGrid, label: 'Dashboard', end: true },
   { to: ROUTES.AGENDA, icon: FiCalendar, label: 'Agenda' },
   { to: ROUTES.PATIENTS, icon: FiUsers, label: 'Pacientes' },
-  { to: ROUTES.GUARDIANS, icon: FiUserCheck, label: 'Responsáveis' },
+  { to: ROUTES.GUARDIANS, icon: FiUserCheck, label: 'Responsáveis', adminOnly: true },
   { to: ROUTES.CONSULTATIONS, icon: FiClipboard, label: 'Atendimentos' },
   { to: ROUTES.MEDICAL_RECORDS, icon: FiBookOpen, label: 'Prontuário' },
 ]
@@ -95,7 +95,7 @@ export default function AdminSidebar({ open, onClose }) {
       </div>
 
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto md:overflow-y-auto">
-        {mainNavItems.map(item => <NavItem key={item.to} {...item} onClick={onClose} />)}
+        {mainNavItems.filter(item => !item.adminOnly || isAdmin).map(item => <NavItem key={item.to} {...item} onClick={onClose} />)}
 
         {isAdmin && (
           <NavItem

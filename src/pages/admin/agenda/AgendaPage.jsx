@@ -5,6 +5,7 @@ import { addDays, startOfWeek, format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { useData } from '../../../context/DataContext'
 import { useAuth } from '../../../context/AuthContext'
+import { useToast } from '../../../components/ui/Toast'
 import Button from '../../../components/ui/Button'
 import Modal from '../../../components/ui/Modal'
 import ConsultationFormModal from '../consultations/ConsultationFormModal'
@@ -13,6 +14,7 @@ import CalendarBlockFormModal from './CalendarBlockFormModal'
 import CalendarBlockHistoryModal from './CalendarBlockHistoryModal'
 import { formatMonthYear } from '../../../utils/dateUtils'
 import { detectConflicts, getCalendarBlockConflicts, buildConflictTooltip } from '../../../utils/conflictUtils'
+import { canViewConsultationDetails, canEditConsultationDetails } from '../../../utils/consultationPermissions'
 
 function textColorForBg(hex) {
   if (!hex) return 'white'
@@ -92,6 +94,7 @@ function BlockCard({ block, therapist, onEdit, onView, isAdmin, userId, conflict
 export default function AgendaPage() {
   const { consultations, patients, rooms, therapists, calendarBlocks, logAudit, deleteConsultation, deleteConsultationSeries } = useData()
   const { user } = useAuth()
+  const { show } = useToast()
   const isAdmin = user?.role === 'admin'
   const [weekRef, setWeekRef] = useState(new Date())
   const [search, setSearch] = useState('')
@@ -224,7 +227,8 @@ export default function AgendaPage() {
       if (user?.role === 'admin') return true
       if (user?.id) {
         if (b.therapistId === user.id) return true
-        if (user?.belongsToTeam) return true
+        // Quando "Minha Agenda" está ligada, mostrar apenas bloqueios próprios
+        if (!myAgenda && user?.belongsToTeam) return true
       }
       return false
     }).sort((a, b) => (a.startTime || '').localeCompare(b.startTime || ''))
@@ -240,7 +244,8 @@ export default function AgendaPage() {
       if (user?.role === 'admin') return true
       if (user?.id) {
         if (b.therapistId === user.id) return true
-        if (user?.belongsToTeam) return true
+        // Quando "Minha Agenda" está ligada, mostrar apenas bloqueios próprios
+        if (!myAgenda && user?.belongsToTeam) return true
       }
       return false
     }).sort((a, b) => a.date.localeCompare(b.date) || (a.startTime || '').localeCompare(b.startTime || ''))
@@ -431,13 +436,18 @@ export default function AgendaPage() {
                   const isInterview = item.eventType === 'INTERVIEW'
                   const isRemote = isInterview && item.interviewFormat === 'REMOTE'
                   const cardName = isPrivate ? 'Consulta Particular' : (isInterview && item.intervieweeName ? item.intervieweeName : shortName(patient?.fullName))
-                  const canEdit = !isPrivate && (user?.role === 'admin' || user?.id === item.therapistId) || isPrivate && user?.role === 'admin'
                   return (
                     <div
                       key={item.id}
                       className="rounded-lg px-2 py-1.5 text-xs cursor-pointer group relative transition-opacity hover:opacity-90"
                       style={style}
-                      onDoubleClick={() => setViewItem(item)}
+                      onDoubleClick={() => {
+                        if (!canViewConsultationDetails(user, item)) {
+                          show('Você não tem permissão para visualizar os detalhes deste atendimento.', 'error')
+                          return
+                        }
+                        setViewItem(item)
+                      }}
                     >
                       <div className="flex items-baseline gap-1 min-w-0">
                         <span className="font-bold shrink-0">{fmtTime(item.time)}</span>
@@ -495,30 +505,17 @@ export default function AgendaPage() {
                           </div>
                         </div>
                       )}
-                      {!isPrivate && (user?.role === 'admin' || user?.id === item.therapistId) && (
+                      {/* Editar: apenas terapeuta principal. Excluir: admin ou terapeuta principal */}
+                      {(user?.id === item.therapistId || user?.role === 'admin') && (
                         <div className="absolute top-1 right-1 hidden group-hover:flex gap-0.5">
-                          <button
-                            onClick={() => { setEditItem(item); setShowModal(true); logAudit('VIEW', 'consultations', item.id, getPatient(item.patientId)?.fullName || item.id) }}
-                            className="w-5 h-5 rounded flex items-center justify-center bg-black/20 hover:bg-black/40 transition-colors"
-                          >
-                            <FiEdit2 size={10} />
-                          </button>
-                          <button
-                            onClick={e => { e.stopPropagation(); handleDelete(item) }}
-                            className="w-5 h-5 rounded flex items-center justify-center bg-black/20 hover:bg-red-500/70 transition-colors"
-                          >
-                            <FiTrash2 size={9} />
-                          </button>
-                        </div>
-                      )}
-                      {isPrivate && user?.role === 'admin' && (
-                        <div className="absolute top-1 right-1 hidden group-hover:flex gap-0.5">
-                          <button
-                            onClick={() => { setEditItem(item); setShowModal(true) }}
-                            className="w-5 h-5 rounded flex items-center justify-center bg-black/20 hover:bg-black/40 transition-colors"
-                          >
-                            <FiEdit2 size={10} />
-                          </button>
+                          {user?.id === item.therapistId && (
+                            <button
+                              onClick={() => { setEditItem(item); setShowModal(true); if (!isPrivate) logAudit('VIEW', 'consultations', item.id, getPatient(item.patientId)?.fullName || item.id) }}
+                              className="w-5 h-5 rounded flex items-center justify-center bg-black/20 hover:bg-black/40 transition-colors"
+                            >
+                              <FiEdit2 size={10} />
+                            </button>
+                          )}
                           <button
                             onClick={e => { e.stopPropagation(); handleDelete(item) }}
                             className="w-5 h-5 rounded flex items-center justify-center bg-black/20 hover:bg-red-500/70 transition-colors"
@@ -579,7 +576,13 @@ export default function AgendaPage() {
                       key={item.id}
                       className="rounded-lg px-2 py-1.5 text-xs cursor-pointer group relative transition-opacity hover:opacity-90"
                       style={style}
-                      onDoubleClick={() => setViewItem(item)}
+                      onDoubleClick={() => {
+                        if (!canViewConsultationDetails(user, item)) {
+                          show('Você não tem permissão para visualizar os detalhes deste atendimento.', 'error')
+                          return
+                        }
+                        setViewItem(item)
+                      }}
                     >
                       <div className="flex items-baseline gap-1 min-w-0">
                         <span className="font-bold shrink-0">{fmtTime(item.time)} · {dayLabel}</span>
@@ -637,30 +640,17 @@ export default function AgendaPage() {
                           </div>
                         </div>
                       )}
-                      {!isPrivate && (user?.role === 'admin' || user?.id === item.therapistId) && (
+                      {/* Editar: apenas terapeuta principal. Excluir: admin ou terapeuta principal */}
+                      {(user?.id === item.therapistId || user?.role === 'admin') && (
                         <div className="absolute top-1 right-1 hidden group-hover:flex gap-0.5">
-                          <button
-                            onClick={() => { setEditItem(item); setShowModal(true); logAudit('VIEW', 'consultations', item.id, getPatient(item.patientId)?.fullName || item.id) }}
-                            className="w-5 h-5 rounded flex items-center justify-center bg-black/20 hover:bg-black/40 transition-colors"
-                          >
-                            <FiEdit2 size={10} />
-                          </button>
-                          <button
-                            onClick={e => { e.stopPropagation(); handleDelete(item) }}
-                            className="w-5 h-5 rounded flex items-center justify-center bg-black/20 hover:bg-red-500/70 transition-colors"
-                          >
-                            <FiTrash2 size={9} />
-                          </button>
-                        </div>
-                      )}
-                      {isPrivate && user?.role === 'admin' && (
-                        <div className="absolute top-1 right-1 hidden group-hover:flex gap-0.5">
-                          <button
-                            onClick={() => { setEditItem(item); setShowModal(true) }}
-                            className="w-5 h-5 rounded flex items-center justify-center bg-black/20 hover:bg-black/40 transition-colors"
-                          >
-                            <FiEdit2 size={10} />
-                          </button>
+                          {user?.id === item.therapistId && (
+                            <button
+                              onClick={() => { setEditItem(item); setShowModal(true); if (!isPrivate) logAudit('VIEW', 'consultations', item.id, getPatient(item.patientId)?.fullName || item.id) }}
+                              className="w-5 h-5 rounded flex items-center justify-center bg-black/20 hover:bg-black/40 transition-colors"
+                            >
+                              <FiEdit2 size={10} />
+                            </button>
+                          )}
                           <button
                             onClick={e => { e.stopPropagation(); handleDelete(item) }}
                             className="w-5 h-5 rounded flex items-center justify-center bg-black/20 hover:bg-red-500/70 transition-colors"
@@ -775,7 +765,13 @@ export default function AgendaPage() {
                     ? (item.date === format(saturday, 'yyyy-MM-dd') ? 'Sáb' : 'Dom')
                     : null
                   return (
-                    <div key={item.id} className="flex items-center gap-3 p-4 cursor-pointer" onClick={() => setViewItem(item)}>
+                    <div key={item.id} className="flex items-center gap-3 p-4 cursor-pointer" onClick={() => {
+                      if (!canViewConsultationDetails(user, item)) {
+                        show('Você não tem permissão para visualizar os detalhes deste atendimento.', 'error')
+                        return
+                      }
+                      setViewItem(item)
+                    }}>
                       <div className="w-1 self-stretch rounded-full shrink-0" style={{ backgroundColor: style.backgroundColor }} />
                       <div className="flex-1 min-w-0">
                         <div className="font-semibold text-sm text-gray-900">
@@ -834,21 +830,14 @@ export default function AgendaPage() {
                           </div>
                         )}
                       </div>
-                      {!isPrivate && (user?.role === 'admin' || user?.id === item.therapistId) && (
+                      {/* Editar: apenas terapeuta principal. Excluir: admin ou terapeuta principal */}
+                      {(user?.id === item.therapistId || user?.role === 'admin') && (
                         <div className="flex gap-1 shrink-0">
-                          <button onClick={e => { e.stopPropagation(); setEditItem(item); setShowModal(true); logAudit('VIEW', 'consultations', item.id, patient?.fullName || item.id) }} className="p-2 rounded-lg text-gray-400 hover:text-brand-blue hover:bg-blue-50">
-                            <FiEdit2 size={15} />
-                          </button>
-                          <button onClick={e => { e.stopPropagation(); handleDelete(item) }} className="p-2 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50">
-                            <FiTrash2 size={15} />
-                          </button>
-                        </div>
-                      )}
-                      {isPrivate && user?.role === 'admin' && (
-                        <div className="flex gap-1 shrink-0">
-                          <button onClick={e => { e.stopPropagation(); setEditItem(item); setShowModal(true) }} className="p-2 rounded-lg text-gray-400 hover:text-brand-blue hover:bg-blue-50">
-                            <FiEdit2 size={15} />
-                          </button>
+                          {user?.id === item.therapistId && (
+                            <button onClick={e => { e.stopPropagation(); setEditItem(item); setShowModal(true); if (!isPrivate) logAudit('VIEW', 'consultations', item.id, patient?.fullName || item.id) }} className="p-2 rounded-lg text-gray-400 hover:text-brand-blue hover:bg-blue-50">
+                              <FiEdit2 size={15} />
+                            </button>
+                          )}
                           <button onClick={e => { e.stopPropagation(); handleDelete(item) }} className="p-2 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50">
                             <FiTrash2 size={15} />
                           </button>
@@ -947,9 +936,7 @@ export default function AgendaPage() {
           initial={viewItem}
           readOnly
           onEditRequest={
-            (!isTeamTherapist(viewItem.therapistId)
-              ? user?.role === 'admin'
-              : user?.role === 'admin' || user?.id === viewItem.therapistId)
+            canEditConsultationDetails(user, viewItem)
               ? () => { setViewItem(null); setEditItem(viewItem); setShowModal(true) }
               : null
           }

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { FiPlus, FiTrash2, FiEdit2, FiCheck, FiX, FiSearch, FiChevronLeft, FiChevronRight, FiCalendar, FiFileText, FiRepeat } from 'react-icons/fi'
+import { FiPlus, FiTrash2, FiEdit2, FiEye, FiCheck, FiX, FiSearch, FiChevronLeft, FiChevronRight, FiCalendar, FiFileText, FiRepeat } from 'react-icons/fi'
 import HelpButton from '../../../components/ui/HelpButton'
 import { useData } from '../../../context/DataContext'
 import { useAuth } from '../../../context/AuthContext'
@@ -13,6 +13,7 @@ import Badge from '../../../components/ui/Badge'
 import ConsultationFormModal from '../consultations/ConsultationFormModal'
 import SeriesFormModal from '../consultations/SeriesFormModal'
 import { formatDateBR, formatDateShort, isoToday } from '../../../utils/dateUtils'
+import { canViewConsultationDetails, canEditConsultationDetails } from '../../../utils/consultationPermissions'
 
 const CONDUCT_STATUS = {
   nao_iniciada: { label: 'Não Iniciada',  color: 'bg-gray-100 text-gray-600' },
@@ -232,7 +233,8 @@ export default function MedicalRecordsPage() {
     companySettings,
   } = useData()
   const { user } = useAuth()
-  const isAdminOrTeam = user?.role === 'admin' || user?.belongsToTeam
+  const isAdmin = user?.role === 'admin'
+  const isAdminOrTeam = isAdmin || user?.belongsToTeam
 
   function handleDeleteConsultation(c) {
     if (c.seriesId && user?.role === 'admin') {
@@ -267,6 +269,7 @@ export default function MedicalRecordsPage() {
   const [showConsultationModal, setShowConsultationModal] = useState(false)
   const [showSeriesModal, setShowSeriesModal] = useState(false)
   const [editConsultation, setEditConsultation] = useState(null)
+  const [viewConsultation, setViewConsultation] = useState(null)
   const [seriesDeleteConfirm, setSeriesDeleteConfirm] = useState(null) // { id, seriesId, date }
   const [selectedConsultIds, setSelectedConsultIds] = useState(new Set())
   const selectAllRef = useRef(null)
@@ -914,26 +917,38 @@ export default function MedicalRecordsPage() {
                                 {room.name}
                               </span>
                             )}
-                            {(user?.role === 'admin' || user?.id === c.therapistId) && (
                             <div className="ml-auto flex gap-0.5 shrink-0">
-                              <button
-                                onClick={() => { setEditConsultation(c); setShowConsultationModal(true) }}
-                                className="p-1 rounded-lg text-gray-400 hover:text-brand-blue hover:bg-blue-50 transition-colors"
-                              >
-                                <FiEdit2 size={13} />
-                              </button>
-                              <button
-                                onClick={() => handleDeleteConsultation(c)}
-                                className="p-1 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
-                              >
-                                <FiTrash2 size={13} />
-                              </button>
+                              {/* Olho: apenas participantes (principal ou adicional) */}
+                              {canViewConsultationDetails(user, c) && (
+                                <button
+                                  onClick={() => setViewConsultation(c)}
+                                  title="Visualizar detalhes"
+                                  className="p-1 rounded-lg text-gray-400 hover:text-brand-blue hover:bg-blue-50 transition-colors"
+                                >
+                                  <FiEye size={13} />
+                                </button>
+                              )}
+                              {/* Lápis: apenas terapeuta principal */}
+                              {canEditConsultationDetails(user, c) && (
+                                <button
+                                  onClick={() => { setEditConsultation(c); setShowConsultationModal(true) }}
+                                  className="p-1 rounded-lg text-gray-400 hover:text-brand-blue hover:bg-blue-50 transition-colors"
+                                >
+                                  <FiEdit2 size={13} />
+                                </button>
+                              )}
+                              {/* Lixeira: admin ou terapeuta principal */}
+                              {(isAdmin || user?.id === c.therapistId) && (
+                                <button
+                                  onClick={() => handleDeleteConsultation(c)}
+                                  className="p-1 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+                                >
+                                  <FiTrash2 size={13} />
+                                </button>
+                              )}
                             </div>
-                            )}
                           </div>
-                          {c.mainObjective && (
-                            <p className="text-xs text-gray-600 mt-1.5 line-clamp-2">{c.mainObjective}</p>
-                          )}
+                          {/* mainObjective removido do histórico — detalhe clínico sigiloso */}
                         </div>
                       )
                     })}
@@ -960,6 +975,13 @@ export default function MedicalRecordsPage() {
         <ConsultationFormModal
           onClose={() => setShowConsultationModal(false)}
           initial={editConsultation || (selectedPatientId ? { patientId: selectedPatientId } : {})}
+        />
+      )}
+      {viewConsultation && (
+        <ConsultationFormModal
+          onClose={() => setViewConsultation(null)}
+          initial={viewConsultation}
+          readOnly
         />
       )}
       {showSeriesModal && (

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Navigate } from 'react-router-dom'
 import { FiPlus, FiSearch, FiEdit2, FiTrash2, FiUserCheck, FiPhone, FiMail, FiEyeOff, FiEye, FiRotateCcw } from 'react-icons/fi'
 import HelpButton from '../../../components/ui/HelpButton'
 import { useData } from '../../../context/DataContext'
@@ -6,10 +7,14 @@ import { useAuth } from '../../../context/AuthContext'
 import Button from '../../../components/ui/Button'
 import EmptyState from '../../../components/ui/EmptyState'
 import GuardianFormModal from './GuardianFormModal'
+import { ROUTES } from '../../../constants/routes'
 
 export default function GuardiansPage() {
   const { guardians, patients, deleteGuardian, restoreGuardian, logAudit } = useData()
   const { user } = useAuth()
+
+  // Responsáveis: acesso restrito a admin (puro ou híbrido)
+  if (user?.role !== 'admin') return <Navigate to={ROUTES.DASHBOARD} replace />
   const [search, setSearch] = useState('')
   const [showInactive, setShowInactive] = useState(false)
   const [sortBy, setSortBy] = useState('name')
