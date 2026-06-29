@@ -119,8 +119,18 @@ export function DataProvider({ children }) {
         const PAGE = 1000
         let allData = []
         let offset = 0
-        let selectStr = CONSULTATION_SELECT
-        let fellback = false
+        // Candidatos de SELECT em ordem de preferência (do mais completo ao mais simples)
+        const SELECT_CANDIDATES = [
+          CONSULTATION_SELECT,
+          // Fallback 1: sem consultation_conflicts (tabela pode não existir)
+          CONSULTATION_SELECT.replace(/,\s*consultation_conflicts[^(]*\([^)]*\)/, ''),
+          // Fallback 2: sem notes + sem consultation_conflicts (coluna notes pode não existir ainda)
+          CONSULTATION_SELECT
+            .replace(/,\s*consultation_conflicts[^(]*\([^)]*\)/, '')
+            .replace(/\bnotes,\s*/, ''),
+        ]
+        let selectStr = SELECT_CANDIDATES[0]
+        let candidateIdx = 0
 
         while (true) {
           const res = await supabase
@@ -131,10 +141,9 @@ export function DataProvider({ children }) {
             .order('date', { ascending: false })
             .range(offset, offset + PAGE - 1)
 
-          if (res.error && !fellback) {
-            // consultation_conflicts não existe ou erro no embed — tenta sem ela
-            selectStr = CONSULTATION_SELECT.replace(/,\s*consultation_conflicts[^(]*\([^)]*\)/, '')
-            fellback = true
+          if (res.error && candidateIdx < SELECT_CANDIDATES.length - 1) {
+            candidateIdx++
+            selectStr = SELECT_CANDIDATES[candidateIdx]
             allData = []
             offset = 0
             continue
