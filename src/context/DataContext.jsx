@@ -2156,16 +2156,18 @@ export function DataProvider({ children }) {
   }
 
   // Constrói o resource_name padronizado para atendimentos no log de auditoria.
-  // Formato: <Terapeuta> | <DD/MM/YYYY> | <HH:MM> | <Tipo> | <Status>
+  // Formato: <Paciente> | <Terapeuta> | <DD/MM/YYYY> | <HH:MM> | <Tipo> | <Status>
   function buildConsultationResourceName(c) {
+    const patient = patients.find(p => p.id === c.patientId)
     const therapist = therapists.find(t => t.id === c.therapistId)
     const status = consultationStatuses.find(s => s.id === c.consultationStatusId)
+    const patientStr = patient?.fullName || (c.intervieweeName ? c.intervieweeName.split(/[,(]/)[0].trim() : '—')
+    const therapistStr = therapist?.name || '—'
     const dateStr = c.date ? c.date.split('-').reverse().join('/') : '—'
     const timeStr = c.time ? c.time.slice(0, 5) : '—'
     const typeStr = c.eventType === 'INTERVIEW' ? 'Entrevista' : 'Atendimento'
-    const therapistStr = therapist?.name || '—'
     const statusStr = status?.name || '—'
-    return `${therapistStr} | ${dateStr} | ${timeStr} | ${typeStr} | ${statusStr}`
+    return `${patientStr} | ${therapistStr} | ${dateStr} | ${timeStr} | ${typeStr} | ${statusStr}`
   }
 
   // ─── Patient Cleanup ────────────────────────────────────────────────────────

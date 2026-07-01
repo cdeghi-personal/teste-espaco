@@ -1,7 +1,7 @@
 -- 107_audit_consultation_new_format.sql
 -- Altera o formato de resource_name para consultations no log de auditoria.
--- Novo formato: <Terapeuta> | <DD/MM/YYYY> | <HH:MM> | <Tipo> | <Status>
--- Exemplo: Fabiana Sarilho | 14/07/2026 | 09:00 | Atendimento | Realizada
+-- Novo formato: <Paciente> | <Terapeuta> | <DD/MM/YYYY> | <HH:MM> | <Tipo> | <Status>
+-- Exemplo: Helena Souza | Fabiana Sarilho | 14/07/2026 | 09:00 | Atendimento | Realizada
 -- Aplica-se a INSERT, UPDATE e DELETE (triggers).
 -- VIEW é tratado pelo frontend via buildConsultationResourceName (DataContext).
 
@@ -22,6 +22,7 @@ DECLARE
   v_rec             RECORD;
   v_mr_label        TEXT := '';
   -- consultation fields
+  v_patient_name    TEXT := '';
   v_therapist_name  TEXT := '';
   v_status_name     TEXT := '';
   v_date_str        TEXT := '';
@@ -82,6 +83,13 @@ BEGIN
   -- ── Resource name por tabela ────────────────────────────────
   IF TG_TABLE_NAME = 'consultations' THEN
     BEGIN
+      -- paciente
+      BEGIN
+        IF v_rec.patient_id IS NOT NULL THEN
+          SELECT full_name INTO v_patient_name FROM patients WHERE id = v_rec.patient_id;
+        END IF;
+      EXCEPTION WHEN OTHERS THEN v_patient_name := ''; END;
+
       -- terapeuta responsável
       BEGIN
         SELECT name INTO v_therapist_name FROM therapists WHERE id = v_rec.therapist_id;
@@ -109,11 +117,12 @@ BEGIN
 
       -- monta resource_name no formato padronizado
       v_resource_name :=
+        COALESCE(NULLIF(v_patient_name,   ''), '—') || ' | ' ||
         COALESCE(NULLIF(v_therapist_name, ''), '—') || ' | ' ||
         v_date_str                                   || ' | ' ||
         v_time_str                                   || ' | ' ||
         v_type_str                                   || ' | ' ||
-        COALESCE(NULLIF(v_status_name, ''), '—');
+        COALESCE(NULLIF(v_status_name,    ''), '—');
 
     EXCEPTION WHEN OTHERS THEN
       BEGIN
