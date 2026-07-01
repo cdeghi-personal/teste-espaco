@@ -92,7 +92,7 @@ function BlockCard({ block, therapist, onEdit, onView, isAdmin, userId, conflict
 }
 
 export default function AgendaPage() {
-  const { consultations, patients, rooms, therapists, consultationStatuses, calendarBlocks, logAudit, deleteConsultation, deleteConsultationSeries } = useData()
+  const { consultations, patients, rooms, therapists, consultationStatuses, calendarBlocks, logAudit, buildConsultationResourceName, deleteConsultation, deleteConsultationSeries } = useData()
   const { user } = useAuth()
   const { show } = useToast()
   const isAdmin = user?.role === 'admin'
@@ -510,7 +510,7 @@ export default function AgendaPage() {
                         <div className="absolute top-1 right-1 hidden group-hover:flex gap-0.5">
                           {canEditConsultation(user, item, consultationStatuses) && (
                             <button
-                              onClick={() => { setEditItem(item); setShowModal(true); if (!isPrivate) logAudit('VIEW', 'consultations', item.id, getPatient(item.patientId)?.fullName || item.id) }}
+                              onClick={() => { setEditItem(item); setShowModal(true); if (!isPrivate) logAudit('VIEW', 'consultations', item.id, buildConsultationResourceName(item)) }}
                               className="w-5 h-5 rounded flex items-center justify-center bg-black/20 hover:bg-black/40 transition-colors"
                             >
                               <FiEdit2 size={10} />
@@ -645,7 +645,7 @@ export default function AgendaPage() {
                         <div className="absolute top-1 right-1 hidden group-hover:flex gap-0.5">
                           {canEditConsultation(user, item, consultationStatuses) && (
                             <button
-                              onClick={() => { setEditItem(item); setShowModal(true); if (!isPrivate) logAudit('VIEW', 'consultations', item.id, getPatient(item.patientId)?.fullName || item.id) }}
+                              onClick={() => { setEditItem(item); setShowModal(true); if (!isPrivate) logAudit('VIEW', 'consultations', item.id, buildConsultationResourceName(item)) }}
                               className="w-5 h-5 rounded flex items-center justify-center bg-black/20 hover:bg-black/40 transition-colors"
                             >
                               <FiEdit2 size={10} />
@@ -834,7 +834,7 @@ export default function AgendaPage() {
                       {(user?.id === item.therapistId || user?.role === 'admin') && (
                         <div className="flex gap-1 shrink-0">
                           {canEditConsultation(user, item, consultationStatuses) && (
-                            <button onClick={e => { e.stopPropagation(); setEditItem(item); setShowModal(true); if (!isPrivate) logAudit('VIEW', 'consultations', item.id, patient?.fullName || item.id) }} className="p-2 rounded-lg text-gray-400 hover:text-brand-blue hover:bg-blue-50">
+                            <button onClick={e => { e.stopPropagation(); setEditItem(item); setShowModal(true); if (!isPrivate) logAudit('VIEW', 'consultations', item.id, buildConsultationResourceName(item)) }} className="p-2 rounded-lg text-gray-400 hover:text-brand-blue hover:bg-blue-50">
                               <FiEdit2 size={15} />
                             </button>
                           )}

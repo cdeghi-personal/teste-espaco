@@ -2155,6 +2155,19 @@ export function DataProvider({ children }) {
     }
   }
 
+  // Constrói o resource_name padronizado para atendimentos no log de auditoria.
+  // Formato: <Terapeuta> | <DD/MM/YYYY> | <HH:MM> | <Tipo> | <Status>
+  function buildConsultationResourceName(c) {
+    const therapist = therapists.find(t => t.id === c.therapistId)
+    const status = consultationStatuses.find(s => s.id === c.consultationStatusId)
+    const dateStr = c.date ? c.date.split('-').reverse().join('/') : '—'
+    const timeStr = c.time ? c.time.slice(0, 5) : '—'
+    const typeStr = c.eventType === 'INTERVIEW' ? 'Entrevista' : 'Atendimento'
+    const therapistStr = therapist?.name || '—'
+    const statusStr = status?.name || '—'
+    return `${therapistStr} | ${dateStr} | ${timeStr} | ${typeStr} | ${statusStr}`
+  }
+
   // ─── Patient Cleanup ────────────────────────────────────────────────────────
 
   async function getPatientCleanupSummary(patientId) {
@@ -2198,7 +2211,7 @@ export function DataProvider({ children }) {
     getExams, addExam, updateExam, deleteExam,
     getMedications, addMedication, updateMedication, deleteMedication,
     getConducts, addConduct, updateConduct, deleteConduct,
-    logAudit,
+    logAudit, buildConsultationResourceName,
     companySettings, updateCompanySettings,
     addPrepaidPackage, getPrepaidData, addLedgerAdjustment,
     batchFaturarConsultations, addPaymentDemonstrativo, getPaymentDemonstrativos,

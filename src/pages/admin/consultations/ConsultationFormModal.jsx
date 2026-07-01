@@ -202,6 +202,24 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
     proceedSave([])
   }
 
+  // Aplica limpeza de campos para manter consistência entre modo clínico e administrativo.
+  // Regra 1 (requiresNote=true): limpa todos os campos clínicos, mantém apenas notes.
+  // Regra 2 (requiresNote=false): limpa notes, mantém campos clínicos.
+  function applyFieldCleanup(formData) {
+    const status = consultationStatuses.find(s => s.id === formData.consultationStatusId)
+    if (status?.requiresObjectiveNote === true) {
+      return {
+        ...formData,
+        mainObjective: '',
+        activities: [],
+        evolutionNotes: '',
+        nextObjectives: '',
+        guardianFeedback: '',
+      }
+    }
+    return { ...formData, notes: '' }
+  }
+
   async function proceedSave(conflicts) {
     const canShowSeriesDialog = hasSeries && isAdmin
     if (canShowSeriesDialog) {
@@ -219,14 +237,16 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
       }
       // Notes-only change: save directly without marking as exception
       setSaving(true)
-      if (isEdit) await updateConsultation(initial.id, { ...form, conflicts })
-      else await addConsultation({ ...form, conflicts })
+      const cleanForm = applyFieldCleanup(form)
+      if (isEdit) await updateConsultation(initial.id, { ...cleanForm, conflicts })
+      else await addConsultation({ ...cleanForm, conflicts })
       await doReplicateObjective()
       setSaving(false)
       onClose()
       return
     }
-    const saveData = hasSeries ? { ...form, isSeriesException: true } : form
+    const baseData = hasSeries ? { ...form, isSeriesException: true } : form
+    const saveData = applyFieldCleanup(baseData)
     setSaving(true)
     if (isEdit) await updateConsultation(initial.id, { ...saveData, conflicts })
     else await addConsultation({ ...saveData, conflicts })
@@ -242,8 +262,9 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
   }
 
   async function doSave(scope) {
-    const saveData = { ...form }
-    if (scope === 'single') saveData.isSeriesException = true
+    const baseData = { ...form }
+    if (scope === 'single') baseData.isSeriesException = true
+    const saveData = applyFieldCleanup(baseData)
     const conflicts = pendingConflicts
     setSaving(true)
     if (isEdit) {

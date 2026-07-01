@@ -33,7 +33,7 @@ import { detectConflicts, buildConflictTooltip } from '../../../utils/conflictUt
 import { canViewConsultationDetails, canEditConsultationDetails, canEditConsultation } from '../../../utils/consultationPermissions'
 
 export default function ConsultationsPage() {
-  const { consultations, patients, therapists, rooms, specialtiesData, consultationStatuses, appointmentTypes, calendarBlocks, deleteConsultation, deleteConsultationSeries, logAudit } = useData()
+  const { consultations, patients, therapists, rooms, specialtiesData, consultationStatuses, appointmentTypes, calendarBlocks, deleteConsultation, deleteConsultationSeries, logAudit, buildConsultationResourceName } = useData()
   const { user } = useAuth()
   const [search, setSearch] = useState('')
   const [filterSpecialty, setFilterSpecialty] = useState('')
@@ -359,7 +359,7 @@ export default function ConsultationsPage() {
                   {/* Olho: apenas participantes (principal ou adicional) */}
                   {canViewConsultationDetails(user, c) && (
                     <button
-                      onClick={() => { setViewConsultation(c); logAudit('VIEW', 'consultations', c.id, patients.find(p => p.id === c.patientId)?.fullName || c.id) }}
+                      onClick={() => { setViewConsultation(c); logAudit('VIEW', 'consultations', c.id, buildConsultationResourceName(c)) }}
                       className="p-1.5 rounded-lg text-gray-400 hover:text-brand-blue hover:bg-blue-50 transition-colors"
                     >
                       <FiEye size={15} />
@@ -368,7 +368,7 @@ export default function ConsultationsPage() {
                   {/* Lápis: terapeuta principal OU admin (se status não for realizada) */}
                   {canEditConsultation(user, c, consultationStatuses) && (
                     <button
-                      onClick={() => { setEditConsultation(c); setShowModal(true); logAudit('VIEW', 'consultations', c.id, patients.find(p => p.id === c.patientId)?.fullName || c.id) }}
+                      onClick={() => { setEditConsultation(c); setShowModal(true); logAudit('VIEW', 'consultations', c.id, buildConsultationResourceName(c)) }}
                       className="p-1.5 rounded-lg text-gray-400 hover:text-brand-blue hover:bg-blue-50 transition-colors"
                     >
                       <FiEdit2 size={15} />
