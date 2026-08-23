@@ -15,7 +15,7 @@ const COLOR_OPTIONS = [
   { value: 'bg-purple-100 text-purple-700', label: 'Roxo' },
 ]
 
-const EMPTY = { name: '', color: 'bg-green-100 text-green-700', active: true, automatic: false, consumesPrepaidSession: false, requiresObjectiveNote: false, adminCanEdit: true }
+const EMPTY = { name: '', color: 'bg-green-100 text-green-700', active: true, automatic: false, consumesPrepaidSession: false, showsObservation: false, requiresObservation: true, adminCanEdit: true }
 
 export default function ConsultationStatusFormModal({ onClose, initial = {} }) {
   const { addConsultationStatus, updateConsultationStatus } = useData()
@@ -97,17 +97,32 @@ export default function ConsultationStatusFormModal({ onClose, initial = {} }) {
         </div>
         <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
           <input
-            id="cs-requires-note"
+            id="cs-shows-observation"
             type="checkbox"
-            checked={form.requiresObjectiveNote}
-            onChange={e => set('requiresObjectiveNote', e.target.checked)}
+            checked={form.showsObservation}
+            onChange={e => set('showsObservation', e.target.checked)}
             className="w-4 h-4 rounded accent-brand-blue"
           />
           <div>
-            <label htmlFor="cs-requires-note" className="text-sm font-medium text-gray-700">Exige observação</label>
-            <p className="text-xs text-gray-400 mt-0.5">Ao atribuir este status, apenas o campo "Observação do Atendimento" é exibido e obrigatório; os campos clínicos ficam ocultos</p>
+            <label htmlFor="cs-shows-observation" className="text-sm font-medium text-gray-700">Exibe Observação</label>
+            <p className="text-xs text-gray-400 mt-0.5">Ao atribuir este status, exibe apenas o campo "Observação do Atendimento"; os campos clínicos (Objetivo, Relato, Próxima Sessão) ficam ocultos</p>
           </div>
         </div>
+        {form.showsObservation && (
+          <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
+            <input
+              id="cs-requires-observation"
+              type="checkbox"
+              checked={form.requiresObservation}
+              onChange={e => set('requiresObservation', e.target.checked)}
+              className="w-4 h-4 rounded accent-brand-blue"
+            />
+            <div>
+              <label htmlFor="cs-requires-observation" className="text-sm font-medium text-gray-700">Obrigatoriedade da Observação</label>
+              <p className="text-xs text-gray-400 mt-0.5">Marcado: "Observação do Atendimento" é obrigatória. Desmarcado: fica opcional</p>
+            </div>
+          </div>
+        )}
         <div className="flex items-center gap-3 p-3 bg-amber-50 rounded-xl border border-amber-100">
           <input
             id="cs-admin-can-edit"

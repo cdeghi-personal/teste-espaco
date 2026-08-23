@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { FiFileText, FiUser, FiUsers, FiCalendar, FiChevronDown, FiExternalLink, FiX, FiDownload, FiChevronRight } from 'react-icons/fi'
 import HelpButton from '../../../components/ui/HelpButton'
 import Modal from '../../../components/ui/Modal'
+import PdfPreviewModal from '../../../components/ui/PdfPreviewModal'
 import { useData } from '../../../context/DataContext'
 import { useAuth } from '../../../context/AuthContext'
 import { useToast } from '../../../components/ui/Toast'
@@ -14,61 +15,15 @@ import { formatMesLabel } from '../../../utils/pdfShared'
 const fmtDate = iso => iso ? new Date(iso.length === 10 ? iso + 'T00:00:00' : iso).toLocaleDateString('pt-BR') : '—'
 const fmtCurrency = v => `R$ ${Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
-function DemonstrativoPreviewModal({ previewData, patient, onClose, onDraft, onFaturar, draftLoading }) {
-  const { blob, filename } = previewData
-  const [url, setUrl] = useState('')
-
-  useEffect(() => {
-    if (!blob) return
-    const u = URL.createObjectURL(blob)
-    setUrl(u)
-    return () => URL.revokeObjectURL(u)
-  }, [blob])
-
-  return (
-    <Modal
-      title={`Pré-visualização — ${patient?.fullName || 'Demonstrativo'}`}
-      onClose={onClose}
-      size="xl"
-      footer={
-        <div className="flex items-center gap-2 w-full">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2 rounded-xl border border-gray-200 text-gray-600 text-sm font-medium hover:bg-gray-50 transition-colors"
-          >
-            Fechar
-          </button>
-          <div className="flex-1" />
-          <button
-            type="button"
-            onClick={onDraft}
-            disabled={draftLoading}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl border border-gray-300 text-gray-700 text-sm font-medium hover:bg-gray-50 transition-colors disabled:opacity-60"
-          >
-            <FiFileText size={14} />
-            {draftLoading ? 'Gerando...' : 'Gerar DRAFT'}
-          </button>
-          <button
-            type="button"
-            onClick={onFaturar}
-            disabled={draftLoading}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-brand-blue text-white text-sm font-semibold hover:bg-brand-blue-dark transition-colors disabled:opacity-60"
-          >
-            <FiDownload size={14} />
-            Faturar
-          </button>
-        </div>
-      }
-    >
-      {url
-        ? <iframe src={url} className="w-full border-0 rounded-xl" style={{ height: '70vh' }} title={filename} />
-        : <div className="flex items-center justify-center" style={{ height: '70vh' }}>
-            <span className="text-gray-400 text-sm">Carregando pré-visualização...</span>
-          </div>
-      }
-    </Modal>
-  )
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
 }
 
 function HistoricoSection({ patientId, refreshKey, getPaymentDemonstrativos }) {
@@ -212,6 +167,8 @@ export default function ReportsPage() {
   const [faturandoLoading, setFaturandoLoading] = useState(false)
   const [draftLoading, setDraftLoading] = useState(false)
   const [historyRefreshKey, setHistoryRefreshKey] = useState(0)
+  // Preview mode — Consultas por Terapeuta
+  const [therapistPreviewData, setTherapistPreviewData] = useState(null) // { blob, filename }
 
   const activePatients = useMemo(
     () => (patients || []).filter(p => !p.deleted).sort((a, b) => a.fullName.localeCompare(b.fullName)),
@@ -346,13 +303,13 @@ export default function ReportsPage() {
     }
   }
 
-  async function generateTherapistPDF(consults) {
+  async function openTherapistPreview(consults) {
     setLoading(true)
     try {
       const filter = buildFilter()
       const specialtiesArr = specialtiesData || Object.entries(SPECIALTIES).map(([key, v]) => ({ key, label: v.label }))
       const sorted = [...consults].sort((a, b) => (a.date > b.date ? 1 : -1))
-      await generateConsultasTerapeutaPDF({
+      const result = await generateConsultasTerapeutaPDF({
         therapist: selectedTherapist,
         consultations: sorted,
         patients: activePatients,
@@ -361,13 +318,19 @@ export default function ReportsPage() {
         specialtiesData: specialtiesArr,
         filter,
         companySettings,
+        returnBlob: true,
       })
+      setTherapistPreviewData(result)
     } catch (err) {
       setError('Erro ao gerar o PDF. Tente novamente.')
       console.error(err)
     } finally {
       setLoading(false)
     }
+  }
+
+  function handleDownloadTherapistPdf() {
+    if (therapistPreviewData) downloadBlob(therapistPreviewData.blob, therapistPreviewData.filename)
   }
 
   async function handleGenerate() {
@@ -397,7 +360,7 @@ export default function ReportsPage() {
       })
       const items = buildUnconfiguredItems(augmented, activePatients, specialtiesArr)
       if (items.length > 0) { setUnconfiguredWarning({ items, pendingConsults: augmented }); return }
-      await generateTherapistPDF(augmented)
+      await openTherapistPreview(augmented)
     }
   }
 
@@ -566,7 +529,7 @@ export default function ReportsPage() {
             {isAdmin && (
               <button
                 type="button"
-                onClick={() => { setReportType('patient'); setSelectedPatientId(''); setPatientSearch(''); setPreviewBlobData(null); setPendingConsultations([]) }}
+                onClick={() => { setReportType('patient'); setSelectedPatientId(''); setPatientSearch(''); setPreviewBlobData(null); setPendingConsultations([]); setTherapistPreviewData(null) }}
                 className={`flex items-center gap-3 px-4 py-3 rounded-xl border-2 text-sm font-medium transition-all ${
                   reportType === 'patient'
                     ? 'border-brand-blue bg-blue-50 text-brand-blue'
@@ -579,7 +542,7 @@ export default function ReportsPage() {
             )}
             <button
               type="button"
-              onClick={() => { setReportType('therapist'); setSelectedTherapistId(isAdmin ? '' : (user?.id || '')); setTherapistSearch(''); setPreviewBlobData(null); setPendingConsultations([]) }}
+              onClick={() => { setReportType('therapist'); setSelectedTherapistId(isAdmin ? '' : (user?.id || '')); setTherapistSearch(''); setPreviewBlobData(null); setPendingConsultations([]); setTherapistPreviewData(null) }}
               className={`flex items-center gap-3 px-4 py-3 rounded-xl border-2 text-sm font-medium transition-all ${
                 reportType === 'therapist'
                   ? 'border-brand-blue bg-blue-50 text-brand-blue'
@@ -841,7 +804,7 @@ export default function ReportsPage() {
                   if (reportType === 'patient' && isAdmin) {
                     openPreview(consults)
                   } else {
-                    generateTherapistPDF(consults)
+                    openTherapistPreview(consults)
                   }
                 }}
                 disabled={loading}
@@ -854,7 +817,7 @@ export default function ReportsPage() {
         )}
 
         {/* Botão gerar */}
-        {!unconfiguredWarning && !previewBlobData && !showNfModal && (
+        {!unconfiguredWarning && !previewBlobData && !therapistPreviewData && !showNfModal && (
           <button
             type="button"
             onClick={handleGenerate}
@@ -931,19 +894,40 @@ export default function ReportsPage() {
       </div>
     )}
 
-    {/* Preview modal do Demonstrativo de Pagamento */}
+    {/* Preview modal do Demonstrativo de Pagamento (paciente) — Fechar / DRAFT / Faturar */}
     {previewBlobData && (
-      <DemonstrativoPreviewModal
-        previewData={previewBlobData}
-        patient={selectedPatient}
+      <PdfPreviewModal
+        title={`Pré-visualização — ${selectedPatient?.fullName || 'Demonstrativo'}`}
+        blob={previewBlobData.blob}
+        filename={previewBlobData.filename}
         onClose={() => setPreviewBlobData(null)}
-        onDraft={handleDraft}
-        onFaturar={() => {
-          setPreviewTotalAmount(previewBlobData.totalAmount || 0)
-          setPreviewBlobData(null)
-          setShowNfModal(true)
-        }}
-        draftLoading={draftLoading}
+        actions={[
+          {
+            label: 'Gerar DRAFT', loadingLabel: 'Gerando...', icon: FiFileText,
+            onClick: handleDraft, loading: draftLoading, variant: 'outline',
+          },
+          {
+            label: 'Faturar', icon: FiDownload, variant: 'primary',
+            onClick: () => {
+              setPreviewTotalAmount(previewBlobData.totalAmount || 0)
+              setPreviewBlobData(null)
+              setShowNfModal(true)
+            },
+          },
+        ]}
+      />
+    )}
+
+    {/* Preview modal de Consultas por Terapeuta — apenas Fechar / Gerar PDF */}
+    {therapistPreviewData && (
+      <PdfPreviewModal
+        title={`Pré-visualização — ${selectedTherapist?.name || 'Consultas por Terapeuta'}`}
+        blob={therapistPreviewData.blob}
+        filename={therapistPreviewData.filename}
+        onClose={() => setTherapistPreviewData(null)}
+        actions={[
+          { label: 'Gerar PDF', icon: FiDownload, variant: 'primary', onClick: handleDownloadTherapistPdf },
+        ]}
       />
     )}
     </>

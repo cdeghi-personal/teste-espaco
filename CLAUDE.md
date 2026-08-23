@@ -20,6 +20,7 @@ Sistema de gestão para uma clínica de terapias infantis multidisciplinares cha
 - **date-fns** para manipulação de datas
 - **@supabase/supabase-js**
 - **jspdf** + **jspdf-autotable** — geração de PDFs
+- **pdfjs-dist** — renderização de PDF em `<canvas>` para pré-visualização (`PdfPreviewModal`), carregado via dynamic import (não faz parte do bundle principal)
 
 ## Estrutura de pastas relevante
 
@@ -186,6 +187,13 @@ supabase/
   102_therapeutic_project.sql          # Adiciona therapeutic_project_description + therapeutic_project_notes TEXT em medical_records
   103_remove_school_address.sql        # Remove colunas school_address, school_neighborhood, school_city, school_state, school_zip de patients
   104_fix_consultations_admin_rls.sql  # Fix: recria policy admin de consultations com subquery inline (is_admin() SECURITY DEFINER falhava no RETURNING de bulk INSERT, causando série criada com 0 atendimentos)
+  105_consultation_status_admin_can_edit.sql # Coluna admin_can_edit em consultation_statuses — sigilo clínico por status (admin bloqueado de ver/editar quando false)
+  106_consultation_notes.sql           # Coluna notes em consultations e consultation_series — "Observação do Atendimento"
+  107_audit_consultation_new_format.sql # fn_audit_log: consultations → "Paciente | Terapeuta | DD/MM/YYYY | HH:MM | Tipo | Status"
+  108_anamnesis.sql                    # Colunas anamnesis_description, anamnesis_notes em medical_records — seção Anamnese/HPMA do prontuário
+  109_payment_method_display_order.sql # Coluna display_order (INTEGER) em payment_methods + índice único parcial (valores não-nulos)
+  110_consultation_status_observation_flags.sql # RENOMEIA requires_objective_note → shows_observation; adiciona requires_observation (default true) — separa "exibe observação" de "observação obrigatória"
+  111_room_allows_multiple_patients.sql # Coluna allows_multiple_patients em rooms — sala não gera ROOM_OVERLAP quando true
   functions/
     invite-therapist/index.ts    # Edge Function — envia convite por e-mail ao criar terapeuta
     suggest-convenio/index.ts    # Edge Function — gera sugestões de texto para relatório de convênio via OpenAI gpt-4o-mini
@@ -219,15 +227,15 @@ Encontrar em: Supabase Dashboard → Project Settings → API.
 | `consultations` | Consultas/evolução — hard delete; tem `appointment_type_id`, `time` (HH:MM), `room_id`, `nf_number`, `nf_issue_date`, `previous_status_before_invoice`, `series_id`, `series_original_date`, `is_series_exception`, `event_type` (SESSION/INTERVIEW), `interview_format` (PRESENTIAL/REMOTE), `meeting_platform`, `meeting_link`, `interviewee_name` |
 | `consultation_activities` | Atividades dentro de uma consulta |
 | `specialties` | Tabela de config — toggle `active` |
-| `payment_methods` | Tabela de config — toggle `active` |
+| `payment_methods` | Tabela de config — toggle `active`; `display_order` (INTEGER opcional, único quando preenchido) — ordem manual de exibição |
 | `diagnoses` | Tabela de config — toggle `active` |
 | `patient_statuses` | Tabela de config — toggle `active` |
-| `rooms` | Salas — toggle `active` |
+| `rooms` | Salas — toggle `active`; `allows_multiple_patients` (boolean, default false) — quando true, a sala não gera conflito `ROOM_OVERLAP` mesmo com atendimentos sobrepostos |
 | `therapist_specialties` | Relação N:N terapeuta ↔ especialidade + nº do conselho regional + flag `can_be_rt` |
 | `patient_external_therapists` | Terapeutas externos vinculados ao paciente (nome, especialidade, telefone) |
-| `consultation_statuses` | Status do atendimento — toggle `active`, cor configurável, flag `automatic` |
+| `consultation_statuses` | Status do atendimento — toggle `active`, cor configurável, flag `automatic`, `admin_can_edit`; `shows_observation` (renomeada de `requires_objective_note` na migration 110) — oculta campos clínicos e mostra só "Observação do Atendimento"; `requires_observation` (default true) — só tem efeito quando `shows_observation=true`, define se a observação é obrigatória ou opcional |
 | `appointment_types` | Tipos de atendimento (Sessão Individual, Grupo etc.) — toggle `active` |
-| `medical_records` | Prontuário do paciente — 1:1, criado automaticamente ao abrir; campos `therapeutic_project_description` e `therapeutic_project_notes` TEXT (Projeto Terapêutico) |
+| `medical_records` | Prontuário do paciente — 1:1, criado automaticamente ao abrir; campos `therapeutic_project_description` e `therapeutic_project_notes` TEXT (Projeto Terapêutico); campos `anamnesis_description` e `anamnesis_notes` TEXT (Anamnese/HPMA, migration 108) |
 | `medical_record_exams` | Exames complementares do paciente — N por prontuário |
 | `medical_record_medications` | Medicamentos do paciente — N por prontuário |
 | `medical_record_conducts` | Conduta & objetivo terapêutico — N por prontuário, vinculado ao terapeuta/especialidade |
@@ -255,10 +263,11 @@ Todos em `src/lib/supabase.js`. Convertem snake_case do banco para camelCase do 
 - `mapPatient` — `specialties` agora é `[{ key, patientValue, therapistValue }]` (não mais string[])
 - `mapTherapist` — `therapistSpecialties` agora é `[{ specialty, credential, canBeRt }]`
 - `mapGuardian` (inclui `neighborhood`), `mapTherapist`, `mapAppointment` (inclui `startTime`, `endTime` calculado via duration), `mapConsultation` (inclui `time`, `roomId`)
-- `mapSpecialty`, `mapPaymentMethod`, `mapDiagnosis`, `mapPatientStatus`, `mapRoom`
+- `mapSpecialty`, `mapPaymentMethod` (inclui `displayOrder`), `mapDiagnosis`, `mapPatientStatus`, `mapRoom` (inclui `allowsMultiplePatients`)
 - `mapConsultation` também inclui `nfNumber`, `nfIssueDate`, `previousStatusBeforeInvoice`, `seriesId`, `seriesOriginalDate`, `isSeriesException`, `consultationTherapists[{id, therapistId, specialty, isPrimary}]`, `eventType`, `interviewFormat`, `meetingPlatform`, `meetingLink`, `intervieweeName`
 - `mapConsultationSeries` — mapper para `consultation_series`; inclui `eventType`, `interviewFormat`, `meetingPlatform`, `meetingLink`, `intervieweeName`
-- `mapConsultationStatus` (inclui `automatic`), `mapAppointmentType`, `mapExam`, `mapMedication`, `mapConduct`
+- `mapConsultationStatus` (inclui `automatic`, `showsObservation`, `requiresObservation` — migration 110), `mapAppointmentType`, `mapExam`, `mapMedication`, `mapConduct`
+- `sortPaymentMethods(list)` (`src/utils/paymentMethodUtils.js`) — ordenação centralizada de formas de pagamento: `displayOrder` crescente (desempate alfabético), depois as sem `displayOrder` em ordem alfabética; aplicada em `fetchAll`/`addPaymentMethod`/`updatePaymentMethod` no DataContext, então `paymentMethods` do `useData()` já vem sempre ordenado
 - `mapCalendarBlock` — mapper para `calendar_blocks` (camelCase; inclui `seriesId`, `blockType`, `startTime`, `endTime`, `cancelled`, `cancelledAt`, `cancelledBy`)
 - `mapCalendarBlockSeries` — mapper para `calendar_block_series`
 - `mapConsultation` inclui também `conflicts[{id, conflictType, relatedConsultationId, therapistId, roomId, calendarBlockId, conflictDate, startTime, endTime, description, resolved}]` — filtrados por `!resolved` no mapper
@@ -494,7 +503,9 @@ Authentication → URL Configuration:
 
 ## Prontuário Clínico (MedicalRecordsPage — `/admin/prontuario`)
 
-5 seções colapsáveis: Exames Complementares, Medicamentos, **Projeto Terapêutico**, Conduta & Objetivo Terapêutico, Histórico de Atendimentos.
+6 seções colapsáveis: **Anamnese / HPMA**, Exames Complementares, Medicamentos, **Projeto Terapêutico**, Conduta & Objetivo Terapêutico, Histórico de Atendimentos.
+
+**Anamnese / HPMA:** primeira seção, antes de Exames Complementares. Dois campos texto livres — Anamnese/HPMA e Observações. Único por prontuário (colunas `anamnesis_description` e `anamnesis_notes` em `medical_records`, migration 108). Mesmo padrão de permissão, carregamento, salvamento e PDF do Projeto Terapêutico (ver abaixo). `getOrCreateMedicalRecord` retorna também `{ anamnesisDescription, anamnesisNotes }`. DataContext expõe `updateAnamnesis(medicalRecordId, { description, notes })`. Incluído no PDF do prontuário (entre Responsáveis e Exames Complementares) somente quando ao menos um campo estiver preenchido — nunca gera seção vazia.
 
 **Projeto Terapêutico:** seção entre Medicamentos e Conduta. Dois campos texto livres — Descrição do Projeto e Observações. Único por prontuário (colunas `therapeutic_project_description` e `therapeutic_project_notes` em `medical_records`). Editável por admin e terapeutas da equipe. `getOrCreateMedicalRecord` retorna `{ id, therapeuticProjectDescription, therapeuticProjectNotes }` (objeto, não string). DataContext expõe `updateTherapeuticProject(medicalRecordId, { description, notes })`. Incluído no PDF do prontuário quando preenchido.
 
@@ -508,10 +519,13 @@ Authentication → URL Configuration:
 ## Relatórios PDF (`/admin/relatorios`)
 
 - **Acesso:** todos os autenticados. Terapeutas veem apenas "Consultas por Terapeuta", com campo Terapeuta pré-preenchido (read-only) com seu próprio nome (`user.id`).
-- **Demonstrativo de Pagamento (admin only):** ao clicar "Gerar PDF", o sistema gera o PDF e exibe em um modal com `<iframe>` (mesmo padrão do Relatório de Convênio). Rodapé do modal tem 3 botões:
+- **Pré-visualização (`PdfPreviewModal`, `src/components/ui/PdfPreviewModal.jsx`):** componente reutilizável entre os dois relatórios — modal `size="preview"` (~90% da tela, altura 90vh) que renderiza o PDF em `<canvas>` via `pdfjs-dist` (dynamic import + worker via `new URL(...)`), em vez de `<iframe>` apontando pro visualizador nativo do navegador. Não há barra lateral de miniaturas porque não há nenhuma UI nativa envolvida — decisão tomada porque parâmetros de URL como `#toolbar=0&navpanes=0` não são confiáveis nos visualizadores PDF atuais. Rodapé sempre com "Fechar" + prop `actions[]` (`{ label, icon, onClick, variant, loading, disabled }`) parametrizando os botões específicos de cada fluxo.
+- **Demonstrativo de Pagamento (admin only):** ao clicar "Gerar PDF", abre `PdfPreviewModal` com `actions = [Gerar DRAFT, Faturar]`:
   - **Fechar:** fecha o modal; "Gerar PDF" reaparece no formulário
   - **Gerar DRAFT:** baixa o PDF com marca d'água "RASCUNHO" diagonal (sem salvar histórico nem alterar status); modal permanece aberto
   - **Faturar:** fecha o modal e exibe o formulário inline de NF (número + data emissão, ambos opcionais) → ao confirmar: salva em `payment_demonstratives` (com `totalAmount` em `form_data`) → atualiza status para "Faturado" via `batchFaturarConsultations` → gera e baixa PDF definitivo com banner verde de NF
+- **Consultas por Terapeuta:** também abre `PdfPreviewModal`, mas com `actions = [Gerar PDF]` apenas — sem DRAFT, Faturar, NF ou qualquer ação que grave faturamento; "Gerar PDF" baixa o blob já gerado (sem regenerar).
+- **Layout do PDF (ambos os relatórios):** tabela colunada (`autoTable`) — Data/Hora | Status | Tipo | Terapeuta(paciente)/Paciente(terapeuta) | Especialidade | Modalidade | Valor. **Não exibe mais "Objetivo da Sessão"** (campo clínico sigiloso removido do PDF). **"Observação"** aparece como linha complementar (colSpan, itálico, fundo âmbar) logo abaixo do atendimento **somente quando** o status tem `showsObservation && requiresObservation` **e** `consultations.notes` está preenchido — não reserva coluna/espaço permanente quando não se aplica (`needsObservationRow`/`observationRowCell` em `generateReportPDF.js`, compartilhadas pelos dois geradores).
 - **Sequência de operações definitivas (quasi-transactional):** salva histórico PRIMEIRO; se falhar, nada mais é executado; se `batchFaturarConsultations` falhar após salvar, alerta que o status deve ser corrigido manualmente
 - **Histórico de Demonstrativos Faturados:** seção abaixo do formulário (admin, quando paciente selecionado) mostra registros de `payment_demonstratives` ordenados por data; clicar no `>` abre modal de detalhes com período, NF, total e data de geração. Atualizado automaticamente após cada faturamento via `historyRefreshKey`.
 - **`batchFaturarConsultations(ids, statusId, { nfNumber, nfDate } = {})`** no DataContext: lê `previous_status_before_invoice` existente de cada consulta (Promise.all), salva onde ainda null, depois atualiza `consultation_status_id` + `nf_number` + `nf_issue_date`; SEM chamar `handlePrepaidConsumption` — ledger pré-pago não é afetado
@@ -522,7 +536,7 @@ Authentication → URL Configuration:
 - **`effectiveSpecialty`:** campo virtual adicionado em `ReportsPage` antes de gerar o PDF — `c.effectiveSpecialty = participation?.specialty || c.specialty`. Usado por `resolvePatientValue`, `resolveTherapistValue` e `findPatientSpecialtyConfig` em `generateReportPDF.js`.
 - Ambos exibem total de atendimentos + total do período no rodapé
 - Filtros: tipo de relatório, paciente/terapeuta (searchable), período (mês ou De/Até), status (múltipla seleção — inclui automáticos)
-- Funções: `generateConsultasPacientePDF({ ..., draftMode, nfNumber, nfDate, returnBlob })` — quando `returnBlob=true` retorna `{ blob, filename, totalAmount }` em vez de fazer `doc.save()`; `generateConsultasTerapeutaPDF()` em `src/utils/generateReportPDF.js`
+- Funções: `generateConsultasPacientePDF({ ..., draftMode, nfNumber, nfDate, returnBlob })` — quando `returnBlob=true` retorna `{ blob, filename, totalAmount }` em vez de fazer `doc.save()`; `generateConsultasTerapeutaPDF({ ..., returnBlob })` — mesmo padrão, retorna `{ blob, filename }` — em `src/utils/generateReportPDF.js`
 - Card de acesso rápido ao "Relatório de Convênio" na parte superior da página
 - **Filtro de terapeutas não-equipe:** `filterConsultations` exclui consultas cujo terapeuta primário tenha `belongsToTeam === false` (checagem explícita, não afeta registros onde o campo é null/undefined).
 - **`buildUnconfiguredItems`:** verifica valor não configurado tanto para a especialidade primária quanto para cada especialidade secundária em `c.consultationTherapists.filter(t => !t.isPrimary)` — espelha a expansão que o gerador de PDF faz.
@@ -694,7 +708,25 @@ Não é mais editável. Texto padrão fixo definido em `DESEMPENHO_FIXO` em `gen
 - Flag `automatic = true` → não aparece no Select do `ConsultationFormModal`, mas **aparece** nos filtros de relatório e no prontuário
 - Ações em lote do prontuário mostram **todos os status ativos** (incluindo automáticos)
 - Flag `consumes_prepaid_session = true` → ao salvar/atualizar consulta com este status, debita automaticamente 1 sessão do pacote pré-pago do paciente (se especialidade for `PREPAID_PACKAGE`); exibido como chip verde "Consome pré-paga" na listagem de status
-- Flag `requires_objective_note = true` → torna o campo "Objetivo da Sessão" obrigatório ao criar/editar consulta com este status; exibe card âmbar de alerta acima do campo no `ConsultationFormModal`; **bloqueia ação em lote** no prontuário (usuário deve editar individualmente)
+
+### Flags de Observação (`shows_observation` / `requires_observation` — migration 110)
+
+Substituem a antiga flag única `requires_objective_note` (migration 71). Duas flags distintas, exibidas no `ConsultationStatusFormModal` como **"Exibe Observação"** e **"Obrigatoriedade da Observação"** (a segunda só aparece/tem efeito quando a primeira está marcada):
+
+- **`shows_observation = true`** — ao atribuir este status no `ConsultationFormModal`, oculta todos os campos clínicos (Objetivo Principal, Atividades, Relato/Evolução, Objetivo da Próxima Sessão, Orientações ao Responsável) e exibe apenas o campo **"Observação do Atendimento"** (`consultations.notes` / `consultation_series.notes`, migration 106).
+- **`requires_observation`** — só importa quando `shows_observation = true`. `true` (default no banco) → "Observação do Atendimento" é obrigatória. `false` → opcional.
+- Chips na listagem (`ConsultationStatusPage`): "Exibe observação" + "Observação obrigatória"/"Observação opcional" (só quando `shows_observation`).
+- **Ação em lote no prontuário:** bloqueia atribuição em massa apenas quando `shows_observation && requires_observation` (observação individual seria obrigatória); quando `shows_observation && !requires_observation`, o lote é permitido normalmente.
+- **PDFs de relatório** (Demonstrativo de Pagamento paciente/terapeuta): exibem a Observação do Atendimento como linha complementar apenas quando `shows_observation && requires_observation && notes` preenchido — ver seção "Relatórios PDF".
+
+### Obrigatoriedade dos campos clínicos (`ConsultationFormModal`)
+
+Quando o status selecionado **não** tem `shows_observation = true` (fluxo clínico normal) e o atendimento é `event_type = 'SESSION'`:
+- **"Objetivo Principal da Sessão"** e **"Relato da Sessão / Evolução"** são **sempre obrigatórios** (validação + `*` no label) — não depende mais do nome do status conter "realizada".
+- **"Objetivo da Próxima Sessão"** é **sempre opcional**.
+- Entrevistas (`event_type = 'INTERVIEW'`) não são bloqueadas por essa exigência.
+- **Atenção:** status usados para agendamento futuro (ex.: "Agendada") que não tenham `shows_observation` marcado passam a exigir Objetivo/Relato já no momento de agendar. Se isso não for desejado operacionalmente, configure esses status como "Exibe Observação = true" (com "Obrigatoriedade" ligada ou desligada, conforme o caso).
+- **Regra do Objetivo da Próxima Sessão:** ao salvar, se preenchido, `doReplicateObjective` propaga o texto como `mainObjective` do próximo atendimento agendado do mesmo paciente+terapeuta; se vazio, não altera nada (nunca sobrescreve com string vazia, nunca bloqueia o salvamento).
 
 ## Gestão Financeira / Pacotes Pré-pagos
 
@@ -941,15 +973,16 @@ Não é mais editável. Texto padrão fixo definido em `DESEMPENHO_FIXO` em `gen
 | `THERAPIST_UNAVAILABLE_PARTIAL` | Terapeuta tem bloqueio flex (FLEX) que se sobrepõe |
 
 - Conflitos cobrem o terapeuta primário **e** todos os secundários (`consultationTherapists`).
-- Conflito de sala apenas quando a sala está definida em ambos os atendimentos.
+- Conflito de sala apenas quando a sala está definida em ambos os atendimentos **e** a sala não tem `allowsMultiplePatients = true` (migration 111) — salas de múltiplos pacientes nunca geram `ROOM_OVERLAP`, mas conflito de terapeuta e bloqueios continuam sendo avaliados normalmente.
 
 ### `conflictUtils.js` (`src/utils/conflictUtils.js`)
 
 - `CONFLICT_DURATION` — constante 50 (minutos)
 - `CONFLICT_LABELS` — mapa tipo → label legível em PT-BR
-- `detectConflicts(input, allConsultations, calendarBlocks = [])` — retorna array de conflitos para um único atendimento; entrevistas REMOTE isentas de `ROOM_OVERLAP` e `THERAPIST_UNAVAILABLE_PARTIAL`
-- `detectSeriesConflicts(seriesInput, dates, allConsultations, calendarBlocks = [])` — retorna `[{ date, conflicts[] }]` filtrado para datas com conflito; passa `eventType` e `interviewFormat` para cada chamada interna de `detectConflicts`
-- `getCalendarBlockConflicts(block, consultations)` — retorna consultas em conflito com um bloqueio específico
+- `detectConflicts(input, allConsultations, calendarBlocks = [], rooms = [])` — retorna array de conflitos para um único atendimento; entrevistas REMOTE isentas de `ROOM_OVERLAP` e `THERAPIST_UNAVAILABLE_PARTIAL`; `rooms` usado para checar `allowsMultiplePatients` da sala do atendimento antes de gerar `ROOM_OVERLAP`
+- `detectSeriesConflicts(seriesInput, dates, allConsultations, calendarBlocks = [], rooms = [])` — retorna `[{ date, conflicts[] }]` filtrado para datas com conflito; passa `eventType`, `interviewFormat` e `rooms` para cada chamada interna de `detectConflicts`
+- `getCalendarBlockConflicts(block, consultations)` — retorna consultas em conflito com um bloqueio específico (não gera `ROOM_OVERLAP`, não usa `rooms`)
+- Todo call-site de `detectConflicts`/`detectSeriesConflicts` (`ConsultationFormModal`, `SeriesFormModal`, `ConsultationsPage`, `AgendaPage`, `DataContext.rebuildRelatedConflicts`) passa `rooms` do `useData()`/state do provider — garante que a regra de sala múltipla vale em avulso, série, edição de ocorrência e reconstrução de conflitos relacionados.
 - `buildConflictTooltip(conflicts, { therapists, rooms, patients, consultations, calendarBlocks })` — produz frases ricas em PT-BR com data DD/MM/YYYY, intervalo de horário, tipo do evento (Atendimento / Entrevista Presencial / Entrevista Remota), nome do paciente ou entrevistado, terapeuta; ex.: "⚠ Ana Paula já possui Atendimento de Helena em 22/05/2026 das 08:30 às 09:20."
 
 ### DataContext — novos valores e funções
@@ -1032,6 +1065,16 @@ Constantes: `PATIENT_SELECT` (inclui `patient_specialties(specialty, patient_val
 - `SpecialtyFormModal` gera o `key` automaticamente a partir do `label`
 - `key` aceita apenas letras maiúsculas, números e `_`
 
+## Formas de Pagamento (`/admin/formapagamento`)
+
+- Campo **Ordem** (`display_order`, migration 109) — numérico inteiro opcional; único quando preenchido (índice único parcial `WHERE display_order IS NOT NULL`, valores nulos podem se repetir). Validado no frontend (`PaymentMethodFormModal`: inteiro, checagem de duplicidade local) e garantido no banco; erro de unicidade (`23505`) é traduzido para mensagem em português (`paymentMethodOrderError` no DataContext) em vez do erro técnico do Postgres.
+- **Ordenação:** `sortPaymentMethods` (`src/utils/paymentMethodUtils.js`) — registros com Ordem primeiro (crescente, desempate por nome), depois os sem Ordem (alfabético). Aplicada centralizadamente no DataContext (`fetchAll`, `addPaymentMethod`, `updatePaymentMethod`), então **todo** consumidor de `paymentMethods` via `useData()` já recebe a lista ordenada (cadastro/edição de paciente, Busca Avançada, listagem de Formas de Pagamento) sem precisar reordenar.
+- Chip "Ordem N" exibido na listagem (`PaymentMethodsPage`) quando preenchido.
+
+## Salas (`/admin/salas`)
+
+- Flag **"Permite múltiplos pacientes simultaneamente"** (`allows_multiple_patients`, migration 111) — checkbox no `RoomFormModal`; chip azul "Múltiplos pacientes" na listagem quando ativo. Ver seção "Detecção e Sinalização de Conflitos de Agenda" para o efeito na detecção de `ROOM_OVERLAP`.
+
 ## Deploy
 
 - **Vercel** — conectado ao GitHub (branch `main`), deploy automático no push
@@ -1045,3 +1088,12 @@ Constantes: `PATIENT_SELECT` (inclui `patient_specialties(specialty, patient_val
 ## Política de Senha Forte (ResetPasswordPage)
 
 Regras validadas em tempo real: mínimo 8 chars, maiúscula, minúscula, número, caractere especial. Botão desabilitado até todas passarem.
+
+## Dívida Técnica Conhecida — Duplicações entre Avulso e Série
+
+Identificadas durante a implementação das migrations 108-111 (anamnese, ordem de forma de pagamento, flags de observação, sala múltipla) — documentadas, não refatoradas:
+
+- `ConsultationFormModal.validate()` e `SeriesFormModal.validate()` implementam regras de terapeutas secundários (duplicata, sem múltiplos PREPAID_PACKAGE) em paralelo e de forma independente — risco de divergência se uma regra mudar em só um dos dois.
+- O bloco de aviso de "Modalidade de Pagamento" (azul/âmbar, saldo pré-pago) é praticamente idêntico entre `ConsultationFormModal.jsx` e `SeriesFormModal.jsx` — copiado, não compartilhado.
+- `applyFieldCleanup` (limpeza de campos clínicos vs. Observação conforme `shows_observation`) só existe em `ConsultationFormModal`; não há equivalente centralizado caso outro fluxo precise da mesma regra.
+- `detectConflicts`/`detectSeriesConflicts` já são um bom exemplo de compartilhamento (ver `conflictUtils.js`) — usar como referência para uma futura extração de um hook `useConsultationFormShared({ patientId, specialty, therapistId })` cobrindo os pontos acima.

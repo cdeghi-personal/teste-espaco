@@ -63,7 +63,10 @@ export default function PaymentMethodsPage() {
                     <FiCreditCard size={14} className="text-brand-blue" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="font-medium text-sm text-gray-900">{pm.name}</div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-medium text-sm text-gray-900">{pm.name}</span>
+                      {pm.displayOrder != null && <span className="px-1.5 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600">Ordem {pm.displayOrder}</span>}
+                    </div>
                     {count > 0 && <div className="text-xs text-gray-400 mt-0.5">{count} paciente(s)</div>}
                   </div>
                   <span className={`shrink-0 px-2 py-0.5 rounded-full text-xs font-medium ${isInactive ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>

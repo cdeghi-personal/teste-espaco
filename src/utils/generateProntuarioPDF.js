@@ -12,7 +12,7 @@ function age(dob) {
 }
 
 export async function generateProntuarioPDF({
-  patient, guardians, exams, medications, therapeuticProject = null, conducts,
+  patient, guardians, exams, medications, therapeuticProject = null, anamnesis = null, conducts,
   consultations, therapists, consultationStatuses,
   appointmentTypes, rooms, specialtiesData,
   companySettings = null,
@@ -66,6 +66,37 @@ export async function generateProntuarioPDF({
       columnStyles: { 0: { cellWidth: 45 }, 1: { cellWidth: 25 }, 2: { cellWidth: 28 }, 3: { cellWidth: 45 }, 4: { cellWidth: 25 } },
     })
     y = doc.lastAutoTable.finalY + 6
+  }
+
+  // ── Anamnese / HPMA ──
+  if (anamnesis?.description || anamnesis?.notes) {
+    y = sectionBlock(doc, 'Anamnese / HPMA', y)
+    const pageRight = pageW - margin
+    if (anamnesis.description) {
+      doc.setFontSize(8)
+      doc.setFont('helvetica', 'bold')
+      doc.setTextColor(80, 80, 80)
+      doc.text('Anamnese / HPMA', margin, y)
+      y += 4
+      doc.setFont('helvetica', 'normal')
+      doc.setTextColor(30, 30, 30)
+      const descLines = doc.splitTextToSize(anamnesis.description, pageRight - margin)
+      doc.text(descLines, margin, y)
+      y += descLines.length * 4.5 + 3
+    }
+    if (anamnesis.notes) {
+      doc.setFontSize(8)
+      doc.setFont('helvetica', 'bold')
+      doc.setTextColor(80, 80, 80)
+      doc.text('Observações', margin, y)
+      y += 4
+      doc.setFont('helvetica', 'normal')
+      doc.setTextColor(30, 30, 30)
+      const notesLines = doc.splitTextToSize(anamnesis.notes, pageRight - margin)
+      doc.text(notesLines, margin, y)
+      y += notesLines.length * 4.5 + 3
+    }
+    y += 3
   }
 
   // ── Exames Complementares ──

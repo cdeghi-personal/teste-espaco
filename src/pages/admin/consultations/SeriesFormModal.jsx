@@ -193,7 +193,8 @@ export default function SeriesFormModal({ onClose }) {
         },
         previewDates,
         consultations,
-        calendarBlocks
+        calendarBlocks,
+        rooms
       )
       if (detected.length > 0) {
         setSeriesConflicts(detected)

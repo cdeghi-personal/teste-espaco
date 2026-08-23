@@ -39,7 +39,7 @@ function hasTimeOverlap(startA, endA, startB, endB) {
  * @param {array}  calendarBlocks - bloqueios de agenda do DataContext
  * @returns {array} conflitos detectados
  */
-export function detectConflicts(input, allConsultations, calendarBlocks = []) {
+export function detectConflicts(input, allConsultations, calendarBlocks = [], rooms = []) {
   const { id, date, time, therapistId, roomId, consultationTherapists = [], eventType, interviewFormat } = input
   if (!date || !time) return []
   const isRemoteInterview = eventType === 'INTERVIEW' && interviewFormat === 'REMOTE'
@@ -92,8 +92,9 @@ export function detectConflicts(input, allConsultations, calendarBlocks = []) {
       }
     }
 
-    // Conflito de sala (entrevistas remotas não ocupam sala)
-    if (!isRemoteInterview && roomId && c.roomId && roomId === c.roomId) {
+    // Conflito de sala (entrevistas remotas não ocupam sala; salas com allowsMultiplePatients não geram conflito)
+    const roomConfig = roomId ? rooms.find(r => r.id === roomId) : null
+    if (!isRemoteInterview && roomId && c.roomId && roomId === c.roomId && !roomConfig?.allowsMultiplePatients) {
       const cf = {
         conflictType: CONFLICT_TYPES.ROOM_OVERLAP,
         relatedConsultationId: c.id,
@@ -151,7 +152,7 @@ export function detectConflicts(input, allConsultations, calendarBlocks = []) {
  * Detecta conflitos para cada data de uma série.
  * @returns {array} [{date, conflicts[]}] — só datas com conflito
  */
-export function detectSeriesConflicts(seriesInput, dates, allConsultations, calendarBlocks = []) {
+export function detectSeriesConflicts(seriesInput, dates, allConsultations, calendarBlocks = [], rooms = []) {
   return dates
     .map(date => ({
       date,
@@ -167,7 +168,8 @@ export function detectSeriesConflicts(seriesInput, dates, allConsultations, cale
           consultationTherapists: seriesInput.consultationTherapists || [],
         },
         allConsultations,
-        calendarBlocks
+        calendarBlocks,
+        rooms
       ),
     }))
     .filter(({ conflicts }) => conflicts.length > 0)

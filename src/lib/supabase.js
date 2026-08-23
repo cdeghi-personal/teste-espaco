@@ -265,7 +265,7 @@ export function mapCalendarBlockSeries(row) {
 }
 
 export function mapConsultationStatus(row) {
-  return { id: row.id, name: row.name, color: row.color, active: row.active, automatic: row.automatic || false, consumesPrepaidSession: row.consumes_prepaid_session || false, requiresObjectiveNote: row.requires_objective_note || false, adminCanEdit: row.admin_can_edit !== false }
+  return { id: row.id, name: row.name, color: row.color, active: row.active, automatic: row.automatic || false, consumesPrepaidSession: row.consumes_prepaid_session || false, showsObservation: row.shows_observation || false, requiresObservation: row.requires_observation !== false, adminCanEdit: row.admin_can_edit !== false }
 }
 
 export function mapAppointmentType(row) {
@@ -317,7 +317,7 @@ export function mapSpecialty(row) {
 }
 
 export function mapPaymentMethod(row) {
-  return { id: row.id, name: row.name, active: row.active }
+  return { id: row.id, name: row.name, active: row.active, displayOrder: row.display_order ?? null }
 }
 
 export function mapDiagnosis(row) {
@@ -329,7 +329,7 @@ export function mapPatientStatus(row) {
 }
 
 export function mapRoom(row) {
-  return { id: row.id, name: row.name, description: row.description || '', color: row.color || '', active: row.active }
+  return { id: row.id, name: row.name, description: row.description || '', color: row.color || '', active: row.active, allowsMultiplePatients: row.allows_multiple_patients || false }
 }
 
 

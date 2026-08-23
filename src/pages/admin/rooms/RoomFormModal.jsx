@@ -4,7 +4,7 @@ import Button from '../../../components/ui/Button'
 import Input from '../../../components/ui/Input'
 import { useData } from '../../../context/DataContext'
 
-const EMPTY = { name: '', description: '', color: '#6b7280', active: true }
+const EMPTY = { name: '', description: '', color: '#6b7280', active: true, allowsMultiplePatients: false }
 
 function ColorPicker({ value, onChange }) {
   return (
@@ -74,6 +74,19 @@ export default function RoomFormModal({ onClose, initial = {} }) {
           placeholder="Capacidade, equipamentos, etc."
         />
         <ColorPicker value={form.color} onChange={v => set('color', v)} />
+        <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
+          <input
+            id="room-multi"
+            type="checkbox"
+            checked={form.allowsMultiplePatients}
+            onChange={e => set('allowsMultiplePatients', e.target.checked)}
+            className="w-4 h-4 rounded accent-brand-blue"
+          />
+          <div>
+            <label htmlFor="room-multi" className="text-sm font-medium text-gray-700">Permite múltiplos pacientes simultaneamente</label>
+            <p className="text-xs text-gray-400 mt-0.5">Vários atendimentos podem usar esta sala no mesmo horário sem gerar alerta de conflito de sala</p>
+          </div>
+        </div>
         <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
           <input
             id="room-active"

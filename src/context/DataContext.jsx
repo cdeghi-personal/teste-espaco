@@ -11,6 +11,7 @@ import {
 import { useToast } from '../components/ui/Toast'
 import { generateSeriesDates } from '../utils/dateUtils'
 import { detectConflicts } from '../utils/conflictUtils'
+import { sortPaymentMethods } from '../utils/paymentMethodUtils'
 
 function dbError(error, toast) {
   const msg = error?.message || 'Erro ao salvar. Tente novamente.'
@@ -176,7 +177,7 @@ export function DataProvider({ children }) {
     setConsultations((consultationsRes.data || []).map(mapConsultation))
     setTherapists((therapistsRes.data || []).map(mapTherapist))
     setSpecialtiesData((specialtiesRes.data || []).map(mapSpecialty))
-    setPaymentMethods((paymentRes.data || []).map(mapPaymentMethod))
+    setPaymentMethods(sortPaymentMethods((paymentRes.data || []).map(mapPaymentMethod)))
     setDiagnoses((diagnosesRes.data || []).map(mapDiagnosis))
     setPatientStatuses((statusesRes.data || []).map(mapPatientStatus))
     setRooms((roomsRes.data || []).map(mapRoom))
@@ -242,7 +243,8 @@ export function DataProvider({ children }) {
       const relatedConflicts = detectConflicts(
         { id: relatedC.id, date: relatedC.date, time: relatedC.time, therapistId: relatedC.therapistId, roomId: relatedC.roomId, consultationTherapists: relatedC.consultationTherapists || [] },
         updatedConsultations,
-        effectiveBlocks
+        effectiveBlocks,
+        rooms
       )
       await persistConflicts(relatedId, relatedConflicts)
       setConsultations(prev => prev.map(c => c.id === relatedId ? { ...c, conflicts: relatedConflicts } : c))
@@ -1052,14 +1054,21 @@ export function DataProvider({ children }) {
 
   // ─── Payment Methods ─────────────────────────────────────────────────────────
 
+  function paymentMethodOrderError(error) {
+    if (error?.code === '23505') {
+      return { error: 'Já existe uma forma de pagamento com esta ordem. Escolha outro número.' }
+    }
+    return dbError(error, toast)
+  }
+
   async function addPaymentMethod(data) {
     const { data: inserted, error } = await supabase
       .from('payment_methods')
-      .insert({ name: data.name, active: true })
+      .insert({ name: data.name, active: true, display_order: data.displayOrder ?? null })
       .select().single()
-    if (error) return dbError(error, toast)
+    if (error) return paymentMethodOrderError(error)
     const item = mapPaymentMethod(inserted)
-    setPaymentMethods(prev => [...prev, item])
+    setPaymentMethods(prev => sortPaymentMethods([...prev, item]))
     return item
   }
 
@@ -1067,8 +1076,12 @@ export function DataProvider({ children }) {
     const update = {}
     if (data.name !== undefined) update.name = data.name
     if (data.active !== undefined) update.active = data.active
-    await supabase.from('payment_methods').update(update).eq('id', id)
-    setPaymentMethods(prev => prev.map(pm => pm.id === id ? { ...pm, ...data } : pm))
+    if (data.displayOrder !== undefined) update.display_order = data.displayOrder
+    if (Object.keys(update).length) {
+      const { error } = await supabase.from('payment_methods').update(update).eq('id', id)
+      if (error) return paymentMethodOrderError(error)
+    }
+    setPaymentMethods(prev => sortPaymentMethods(prev.map(pm => pm.id === id ? { ...pm, ...data } : pm)))
   }
 
   // ─── Diagnoses ───────────────────────────────────────────────────────────────
@@ -1119,7 +1132,7 @@ export function DataProvider({ children }) {
   async function addRoom(data) {
     const { data: inserted, error } = await supabase
       .from('rooms')
-      .insert({ name: data.name, description: data.description || null, color: data.color || null, active: true })
+      .insert({ name: data.name, description: data.description || null, color: data.color || null, active: true, allows_multiple_patients: data.allowsMultiplePatients || false })
       .select().single()
     if (error) return dbError(error, toast)
     const item = mapRoom(inserted)
@@ -1133,6 +1146,7 @@ export function DataProvider({ children }) {
     if (data.description !== undefined) update.description = data.description || null
     if (data.color !== undefined) update.color = data.color || null
     if (data.active !== undefined) update.active = data.active
+    if (data.allowsMultiplePatients !== undefined) update.allows_multiple_patients = data.allowsMultiplePatients
     await supabase.from('rooms').update(update).eq('id', id)
     setRooms(prev => prev.map(r => r.id === id ? { ...r, ...data } : r))
   }
@@ -1142,7 +1156,7 @@ export function DataProvider({ children }) {
   async function addConsultationStatus(data) {
     const { data: inserted, error } = await supabase
       .from('consultation_statuses')
-      .insert({ name: data.name, color: data.color || 'bg-gray-100 text-gray-700', active: true, automatic: data.automatic || false, consumes_prepaid_session: data.consumesPrepaidSession || false, requires_objective_note: data.requiresObjectiveNote || false, admin_can_edit: data.adminCanEdit !== false })
+      .insert({ name: data.name, color: data.color || 'bg-gray-100 text-gray-700', active: true, automatic: data.automatic || false, consumes_prepaid_session: data.consumesPrepaidSession || false, shows_observation: data.showsObservation || false, requires_observation: data.requiresObservation !== false, admin_can_edit: data.adminCanEdit !== false })
       .select().single()
     if (error) return dbError(error, toast)
     const item = mapConsultationStatus(inserted)
@@ -1157,7 +1171,8 @@ export function DataProvider({ children }) {
     if (data.active !== undefined) update.active = data.active
     if (data.automatic !== undefined) update.automatic = data.automatic
     if (data.consumesPrepaidSession !== undefined) update.consumes_prepaid_session = data.consumesPrepaidSession
-    if (data.requiresObjectiveNote !== undefined) update.requires_objective_note = data.requiresObjectiveNote
+    if (data.showsObservation !== undefined) update.shows_observation = data.showsObservation
+    if (data.requiresObservation !== undefined) update.requires_observation = data.requiresObservation
     if (data.adminCanEdit !== undefined) update.admin_can_edit = data.adminCanEdit
     await supabase.from('consultation_statuses').update(update).eq('id', id)
     setConsultationStatuses(prev => prev.map(s => s.id === id ? { ...s, ...data } : s))
@@ -1187,7 +1202,7 @@ export function DataProvider({ children }) {
   // ─── Medical Records ──────────────────────────────────────────────────────────
 
   async function getOrCreateMedicalRecord(patientId, authUserId) {
-    const fields = 'id, therapeutic_project_description, therapeutic_project_notes'
+    const fields = 'id, therapeutic_project_description, therapeutic_project_notes, anamnesis_description, anamnesis_notes'
     const { data: existing } = await supabase
       .from('medical_records')
       .select(fields)
@@ -1197,6 +1212,8 @@ export function DataProvider({ children }) {
       id: existing.id,
       therapeuticProjectDescription: existing.therapeutic_project_description || '',
       therapeuticProjectNotes: existing.therapeutic_project_notes || '',
+      anamnesisDescription: existing.anamnesis_description || '',
+      anamnesisNotes: existing.anamnesis_notes || '',
     }
 
     const { data: created, error } = await supabase
@@ -1208,6 +1225,8 @@ export function DataProvider({ children }) {
       id: created.id,
       therapeuticProjectDescription: created.therapeutic_project_description || '',
       therapeuticProjectNotes: created.therapeutic_project_notes || '',
+      anamnesisDescription: created.anamnesis_description || '',
+      anamnesisNotes: created.anamnesis_notes || '',
     }
   }
 
@@ -1217,6 +1236,18 @@ export function DataProvider({ children }) {
       .update({
         therapeutic_project_description: description || null,
         therapeutic_project_notes: notes || null,
+      })
+      .eq('id', medicalRecordId)
+    if (error) return dbError(error, toast)
+    return { description, notes }
+  }
+
+  async function updateAnamnesis(medicalRecordId, { description, notes }) {
+    const { error } = await supabase
+      .from('medical_records')
+      .update({
+        anamnesis_description: description || null,
+        anamnesis_notes: notes || null,
       })
       .eq('id', medicalRecordId)
     if (error) return dbError(error, toast)
@@ -2209,7 +2240,7 @@ export function DataProvider({ children }) {
     appointmentTypes, addAppointmentType, updateAppointmentType,
     ageRanges, addAgeRange, updateAgeRange, deleteAgeRange,
     // Medical Records
-    getOrCreateMedicalRecord, updateTherapeuticProject,
+    getOrCreateMedicalRecord, updateTherapeuticProject, updateAnamnesis,
     getExams, addExam, updateExam, deleteExam,
     getMedications, addMedication, updateMedication, deleteMedication,
     getConducts, addConduct, updateConduct, deleteConduct,

@@ -115,13 +115,14 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
     if (!form.consultationStatusId) e.consultationStatusId = 'Selecione o status'
     if (!form.appointmentTypeId && form.eventType !== 'INTERVIEW') e.appointmentTypeId = 'Selecione o tipo'
     const selectedStatus = consultationStatuses.find(s => s.id === form.consultationStatusId)
-    const _requiresNote = selectedStatus?.requiresObjectiveNote === true
-    if (_requiresNote) {
-      if (!form.notes?.trim()) e.notes = 'Informe a observação do atendimento'
-    } else if (selectedStatus?.name?.toLowerCase().includes('realizada')) {
+    const _showsObservation = selectedStatus?.showsObservation === true
+    if (_showsObservation) {
+      const _requiresObservation = selectedStatus?.requiresObservation !== false
+      if (_requiresObservation && !form.notes?.trim()) e.notes = 'Informe a observação do atendimento'
+    } else if (form.eventType !== 'INTERVIEW') {
       if (!form.mainObjective.trim()) e.mainObjective = 'Informe o objetivo da sessão'
       if (!form.evolutionNotes.trim()) e.evolutionNotes = 'Informe o relato da sessão / evolução'
-      if (!form.nextObjectives.trim()) e.nextObjectives = 'Informe o objetivo da próxima sessão'
+      // "Objetivo da Próxima Sessão" é sempre opcional
     }
     // Validações de terapeutas secundários
     const secIds = form.secondaryTherapists.map(t => t.therapistId).filter(Boolean)
@@ -194,7 +195,7 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
   function handleSave() {
     const e = validate()
     if (Object.keys(e).length) { setErrors(e); return }
-    const conflicts = detectConflicts(buildConflictInput(), consultations, calendarBlocks)
+    const conflicts = detectConflicts(buildConflictInput(), consultations, calendarBlocks, rooms)
     if (conflicts.length > 0) {
       setConflictsToConfirm(conflicts)
       return
@@ -207,7 +208,7 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
   // Regra 2 (requiresNote=false): limpa notes, mantém campos clínicos.
   function applyFieldCleanup(formData) {
     const status = consultationStatuses.find(s => s.id === formData.consultationStatusId)
-    if (status?.requiresObjectiveNote === true) {
+    if (status?.showsObservation === true) {
       return {
         ...formData,
         mainObjective: '',
@@ -302,9 +303,9 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
 
   const title = readOnly ? 'Visualizar Atendimento' : isEdit ? 'Editar Registro de Atendimento' : 'Novo Registro de Atendimento'
   const selectedStatus = consultationStatuses.find(s => s.id === form.consultationStatusId)
-  const realizadaRequired = selectedStatus?.name?.toLowerCase().includes('realizada')
-  const requiresNote = selectedStatus?.requiresObjectiveNote === true
-  const mainObjectiveRequired = realizadaRequired || requiresNote
+  const requiresNote = selectedStatus?.showsObservation === true
+  const requiresObservation = requiresNote && selectedStatus?.requiresObservation !== false
+  const clinicalFieldsRequired = !requiresNote && form.eventType !== 'INTERVIEW'
   const willConsume = selectedStatus?.consumesPrepaidSession === true
   const showPrepaidAlert = prepaidBalance !== null && willConsume && prepaidBalance <= 0
   const selectedPatient = form.patientId ? patients.find(p => p.id === form.patientId) : null
@@ -652,7 +653,7 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
               Observação do Atendimento
             </h3>
             <Textarea
-              label={requiresNote && !readOnly ? 'Observação do Atendimento *' : 'Observação do Atendimento'}
+              label={requiresObservation && !readOnly ? 'Observação do Atendimento *' : 'Observação do Atendimento'}
               value={form.notes || ''}
               onChange={e => set('notes', e.target.value)}
               error={errors.notes}
@@ -666,7 +667,7 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
             {/* Objetivo principal */}
             <section>
               <Textarea
-                label={realizadaRequired ? 'Objetivo Principal da Sessão *' : 'Objetivo Principal da Sessão'}
+                label={clinicalFieldsRequired ? 'Objetivo Principal da Sessão *' : 'Objetivo Principal da Sessão'}
                 value={form.mainObjective}
                 onChange={e => set('mainObjective', e.target.value)}
                 error={errors.mainObjective}
@@ -734,7 +735,7 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
               </h3>
               <div className="space-y-3">
                 <Textarea
-                  label={realizadaRequired ? 'Relato da Sessão / Evolução *' : 'Relato da Sessão / Evolução'}
+                  label={clinicalFieldsRequired ? 'Relato da Sessão / Evolução *' : 'Relato da Sessão / Evolução'}
                   value={form.evolutionNotes}
                   onChange={e => set('evolutionNotes', e.target.value)}
                   error={errors.evolutionNotes}
@@ -743,7 +744,7 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
                   disabled={readOnly}
                 />
                 <Textarea
-                  label={realizadaRequired ? 'Objetivo da Próxima Sessão *' : 'Objetivo da Próxima Sessão'}
+                  label="Objetivo da Próxima Sessão"
                   value={form.nextObjectives}
                   onChange={e => set('nextObjectives', e.target.value)}
                   error={errors.nextObjectives}

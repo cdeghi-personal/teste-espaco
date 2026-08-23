@@ -83,11 +83,11 @@ export default function ConsultationsPage() {
     const activeCBlocks = (calendarBlocks || []).filter(b => !b.cancelled && b.active !== false)
     const map = {}
     for (const c of visibleConsultations) {
-      const cfs = detectConflicts(c, consultations, activeCBlocks)
+      const cfs = detectConflicts(c, consultations, activeCBlocks, rooms)
       if (cfs.length > 0) map[c.id] = cfs
     }
     return map
-  }, [visibleConsultations, consultations, calendarBlocks]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [visibleConsultations, consultations, calendarBlocks, rooms]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const filtered = visibleConsultations
     .filter(c => {

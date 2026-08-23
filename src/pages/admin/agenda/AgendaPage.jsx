@@ -149,7 +149,7 @@ export default function AgendaPage() {
     // Conflitos de atendimentos na semana visível
     const weekConss = consultations.filter(c => weekIsos.includes(c.date))
     for (const c of weekConss) {
-      const cfs = detectConflicts(c, consultations, activeCBlocks)
+      const cfs = detectConflicts(c, consultations, activeCBlocks, rooms)
       if (cfs.length > 0) {
         map[c.id] = cfs
         console.log('[CONFLICT_RENDER_DEBUG]', { eventType: 'consultation', eventId: c.id, conflicts: cfs, hasConflict: true })
@@ -166,7 +166,7 @@ export default function AgendaPage() {
       }
     }
     return map
-  }, [consultations, calendarBlocks, weekRef]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [consultations, calendarBlocks, weekRef, rooms]) // eslint-disable-line react-hooks/exhaustive-deps
 
   function prevWeek() { const d = new Date(weekRef); d.setDate(d.getDate() - 7); setWeekRef(d) }
   function nextWeek() { const d = new Date(weekRef); d.setDate(d.getDate() + 7); setWeekRef(d) }

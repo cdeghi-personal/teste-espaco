@@ -166,123 +166,20 @@ function renderTotals(doc, y, pageW, margin, totalCount, totalPostSessao, monthl
   }
 }
 
-// ─── Card renderer: cada atendimento como bloco 2 colunas ─────
-function drawAttendanceCard(doc, data, y, pageH, margin, pageW) {
-  const {
-    date, time, statusName, typeName,
-    therapistName, specLabel, credential,
-    modalityLabel, valueDisplay, objective,
-    isValueUnconfigured,
-  } = data
+// ─── Observação do Atendimento: linha complementar condicional ────────────────
+// Só aparece quando o status do atendimento tem showsObservation + requiresObservation
+// e existe conteúdo em c.notes — evita reservar espaço/coluna permanentemente vazios.
+function needsObservationRow(c, consultationStatuses) {
+  const status = (consultationStatuses || []).find(s => s.id === c.consultationStatusId)
+  return !!(status?.showsObservation && status?.requiresObservation && c.notes?.trim())
+}
 
-  const contentW = pageW - margin * 2
-  const leftW = Math.round(contentW * 0.55)
-  const rightW = contentW - leftW
-  const divX = margin + leftW
-
-  const CARD_PAD = 3.5
-  const FIELD_H = 9
-  const F_LBL = 2.5
-  const F_VAL = 7
-  const ROW_SEP = 1
-  const CARD_GAP = 3.5
-  const RIGHT_LH = 4.3
-
-  const leftH = CARD_PAD + 3 * FIELD_H + 2 * ROW_SEP + CARD_PAD
-
-  const rightTextW = rightW - CARD_PAD * 2
-  const objLines = doc.splitTextToSize(objective || '—', rightTextW)
-  const rightH = CARD_PAD + F_LBL + 2 + objLines.length * RIGHT_LH + CARD_PAD
-
-  const cardH = Math.max(leftH, rightH)
-
-  if (y + cardH > pageH - 18) {
-    doc.addPage()
-    y = 18
-  }
-
-  doc.setFillColor(250, 251, 253)
-  doc.roundedRect(margin, y, contentW, cardH, 1.5, 1.5, 'F')
-  doc.setFillColor(244, 246, 253)
-  doc.rect(divX + 0.3, y + 0.3, rightW - 0.3, cardH - 0.6, 'F')
-
-  doc.setDrawColor(208, 213, 227)
-  doc.setLineWidth(0.3)
-  doc.roundedRect(margin, y, contentW, cardH, 1.5, 1.5, 'S')
-  doc.line(divX, y, divX, y + cardH)
-
-  const rows = [
-    [
-      { label: 'DATA', value: time ? `${date}  ${time}` : date },
-      { label: 'STATUS', value: statusName },
-      { label: 'TIPO', value: typeName },
-    ],
-    [
-      { label: 'TERAPEUTA', value: therapistName },
-      { label: 'ESPECIALIDADE', value: specLabel },
-      { label: 'CONSELHO', value: credential },
-    ],
-    [
-      { label: 'MODALIDADE', value: modalityLabel, isWarning: isValueUnconfigured },
-      { label: 'VALOR', value: valueDisplay, isWarning: isValueUnconfigured },
-    ],
-  ]
-
-  let ly = y + CARD_PAD
-  rows.forEach((row, ri) => {
-    if (ri > 0) {
-      doc.setDrawColor(213, 218, 230)
-      doc.setLineWidth(0.15)
-      doc.line(margin + 1, ly, divX - 1, ly)
-      ly += ROW_SEP
-    }
-
-    const nFields = row.length
-    const fieldW = leftW / nFields
-
-    row.forEach((field, fi) => {
-      if (fi > 0) {
-        doc.setDrawColor(220, 224, 235)
-        doc.setLineWidth(0.12)
-        doc.line(margin + fi * fieldW, ly, margin + fi * fieldW, ly + FIELD_H - 1)
-      }
-
-      const fx = margin + fi * fieldW + CARD_PAD
-      const maxFW = fieldW - CARD_PAD * 1.8
-
-      doc.setFontSize(5)
-      doc.setFont('helvetica', 'normal')
-      doc.setTextColor(148, 153, 170)
-      doc.text(field.label, fx, ly + F_LBL)
-
-      doc.setFontSize(7)
-      doc.setFont('helvetica', 'bold')
-      doc.setTextColor(...(field.isWarning ? PDF_RED : PDF_DARK))
-      doc.text(doc.splitTextToSize(field.value, maxFW)[0] || field.value, fx, ly + F_VAL)
-      doc.setTextColor(...PDF_DARK)
-    })
-
-    ly += FIELD_H
-  })
-
-  const rtx = divX + CARD_PAD
-  let ry = y + CARD_PAD
-
-  doc.setFontSize(5)
-  doc.setFont('helvetica', 'bold')
-  doc.setTextColor(...PDF_BLUE)
-  doc.text('OBJETIVO DA SESSÃO', rtx, ry + F_LBL)
-  ry += F_LBL + 2
-
-  doc.setFontSize(7)
-  doc.setFont('helvetica', 'normal')
-  doc.setTextColor(...PDF_DARK)
-  objLines.forEach(line => {
-    doc.text(line, rtx, ry + RIGHT_LH - 0.5)
-    ry += RIGHT_LH
-  })
-
-  return y + cardH + CARD_GAP
+function observationRowCell(c, colSpan) {
+  return [{
+    content: `Observação: ${c.notes.trim()}`,
+    colSpan,
+    styles: { fontStyle: 'italic', textColor: PDF_GRAY, fillColor: [255, 251, 235], fontSize: 7 },
+  }]
 }
 
 // ─── Relatório 1: Demonstrativo de Pagamento ──────────────────
@@ -358,8 +255,6 @@ export async function generateConsultasPacientePDF({
     doc.text('Nenhum atendimento encontrado no período selecionado.', margin, y + 4)
     y += 12
   } else {
-    const pageH = doc.internal.pageSize.height
-
     // Expand secondary therapist participants as separate billing entries
     const expandedConsultations = []
     for (const c of consultations) {
@@ -371,11 +266,11 @@ export async function generateConsultasPacientePDF({
       }
     }
 
+    const body = []
     for (const c of expandedConsultations) {
       const therapist = therapists.find(t => t.id === c.therapistId)
       const effSpec = c.effectiveSpecialty || c.specialty
       const spec = specialtiesData.find(s => s.key === effSpec)
-      const credential = therapist?.therapistSpecialties?.find(s => s.specialty === effSpec)?.credential || '—'
       const status = consultationStatuses.find(s => s.id === c.consultationStatusId)
       const type = appointmentTypes.find(t => t.id === c.appointmentTypeId)
 
@@ -384,20 +279,38 @@ export async function generateConsultasPacientePDF({
       if (paymentType === 'POST_PER_SESSION' || paymentType === 'PAY_PER_SESSION') totalPostSessao += amount
       else if (paymentType === 'PREPAID_PACKAGE') totalPrepago += amount
 
-      y = drawAttendanceCard(doc, {
-        date: fmtDatePDF(c.date),
-        time: c.time ? c.time.slice(0, 5) : '',
-        statusName: status?.name || '—',
-        typeName: type?.name || '—',
-        therapistName: therapist?.name || '—',
-        specLabel: spec?.label || effSpec || '—',
-        credential,
-        modalityLabel: isUnconfigured ? 'Não configurada' : (PAYMENT_TYPE_LABELS[paymentType] || paymentType),
+      body.push([
+        c.time ? `${fmtDatePDF(c.date)} ${c.time.slice(0, 5)}` : fmtDatePDF(c.date),
+        status?.name || '—',
+        type?.name || '—',
+        therapist?.name || '—',
+        spec?.label || effSpec || '—',
+        isUnconfigured ? 'Não configurada' : (PAYMENT_TYPE_LABELS[paymentType] || paymentType),
         valueDisplay,
-        objective: c.mainObjective || '—',
-        isValueUnconfigured: isUnconfigured,
-      }, y, pageH, margin, pageW)
+      ])
+      if (needsObservationRow(c, consultationStatuses)) body.push(observationRowCell(c, 7))
     }
+
+    autoTable(doc, {
+      startY: y, margin: { left: margin, right: margin },
+      head: [['Data/Hora', 'Status', 'Tipo', 'Terapeuta', 'Especialidade', 'Modalidade', 'Valor (R$)']],
+      body,
+      styles: { fontSize: 7.5, cellPadding: 2 },
+      headStyles: { fillColor: PDF_BLUE, textColor: 255, fontStyle: 'bold', fontSize: 7.5 },
+      alternateRowStyles: { fillColor: PDF_LIGHT },
+      columnStyles: {
+        0: { cellWidth: 26 }, 1: { cellWidth: 24 }, 2: { cellWidth: 22 },
+        3: { cellWidth: 34 }, 4: { cellWidth: 26 }, 5: { cellWidth: 24 },
+        6: { cellWidth: 'auto', halign: 'right' },
+      },
+      didParseCell: (data) => {
+        if (data.section === 'body' && data.column.index === 6 && data.cell.text[0] === 'Não configurado') {
+          data.cell.styles.textColor = PDF_RED
+          data.cell.styles.fontStyle = 'bold'
+        }
+      },
+    })
+    y = doc.lastAutoTable.finalY + 4
 
     renderTotals(doc, y, pageW, margin, expandedConsultations.length, totalPostSessao, monthlyTracked, totalPrepago, hasUnconfigured)
   }
@@ -438,6 +351,7 @@ export async function generateConsultasTerapeutaPDF({
   therapist, consultations, patients,
   consultationStatuses, appointmentTypes, specialtiesData,
   filter, companySettings = null,
+  returnBlob = false,
 }) {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
   const pageW = doc.internal.pageSize.width
@@ -475,7 +389,8 @@ export async function generateConsultasTerapeutaPDF({
     let hasUnconfigured = false
     const monthlyTracked = new Map()
 
-    const body = consultations.map(c => {
+    const body = []
+    for (const c of consultations) {
       const patient = patients.find(p => p.id === c.patientId)
       const effSpec = c.effectiveSpecialty || c.specialty
       const spec = specialtiesData.find(s => s.key === effSpec)
@@ -487,17 +402,18 @@ export async function generateConsultasTerapeutaPDF({
       if (paymentType === 'POST_PER_SESSION' || paymentType === 'PAY_PER_SESSION') totalPostSessao += amount
       else if (paymentType === 'PREPAID_PACKAGE') totalPrepago += amount
 
-      return [
+      body.push([
         fmtDatePDF(c.date), c.time ? c.time.slice(0, 5) : '—',
         patient?.fullName || '—', spec?.label || effSpec || '—',
         status?.name || '—', type?.name || '—',
-        display, c.mainObjective || '—',
-      ]
-    })
+        display,
+      ])
+      if (needsObservationRow(c, consultationStatuses)) body.push(observationRowCell(c, 7))
+    }
 
     autoTable(doc, {
       startY: y, margin: { left: margin, right: margin },
-      head: [['Data', 'Hora', 'Paciente', 'Especialidade', 'Status', 'Tipo', 'Valor (R$)', 'Objetivo da Sessão']],
+      head: [['Data', 'Hora', 'Paciente', 'Especialidade', 'Status', 'Tipo', 'Valor (R$)']],
       body,
       styles: { fontSize: 7, cellPadding: 2 },
       headStyles: { fillColor: PDF_BLUE, textColor: 255, fontStyle: 'bold', fontSize: 7.5 },
@@ -505,7 +421,7 @@ export async function generateConsultasTerapeutaPDF({
       columnStyles: {
         0: { cellWidth: 16 }, 1: { cellWidth: 12 }, 2: { cellWidth: 35 },
         3: { cellWidth: 26 }, 4: { cellWidth: 22 }, 5: { cellWidth: 22 },
-        6: { cellWidth: 20, halign: 'right' }, 7: { cellWidth: 'auto' },
+        6: { cellWidth: 'auto', halign: 'right' },
       },
       didParseCell: (data) => {
         if (data.section === 'body' && data.column.index === 6 && data.cell.text[0] === 'Não configurado') {
@@ -520,5 +436,11 @@ export async function generateConsultasTerapeutaPDF({
 
   addAllPageFooters(doc)
   const fileName = `consultas_terapeuta_${therapist.name.replace(/\s+/g, '_').toLowerCase()}_${period.replace(/\//g, '-').replace(/\s/g, '_')}.pdf`
+
+  if (returnBlob) {
+    const blob = doc.output('blob')
+    return { blob, filename: fileName }
+  }
+
   doc.save(fileName)
 }

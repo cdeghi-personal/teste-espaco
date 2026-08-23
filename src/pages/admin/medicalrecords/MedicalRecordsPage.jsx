@@ -224,7 +224,7 @@ export default function MedicalRecordsPage() {
   const {
     patients, therapists, rooms, specialtiesData, consultations, consultationStatuses, appointmentTypes,
     updateConsultation, deleteConsultation, deleteConsultationSeries,
-    getOrCreateMedicalRecord, updateTherapeuticProject,
+    getOrCreateMedicalRecord, updateTherapeuticProject, updateAnamnesis,
     getExams, addExam, updateExam, deleteExam,
     getMedications, addMedication, updateMedication, deleteMedication,
     getConducts, addConduct, updateConduct, deleteConduct,
@@ -255,6 +255,9 @@ export default function MedicalRecordsPage() {
   const [therapeuticProject, setTherapeuticProject] = useState({ description: '', notes: '' })
   const [projectEditing, setProjectEditing] = useState(false)
   const [projectDraft, setProjectDraft] = useState({ description: '', notes: '' })
+  const [anamnesis, setAnamnesis] = useState({ description: '', notes: '' })
+  const [anamnesisEditing, setAnamnesisEditing] = useState(false)
+  const [anamnesisDraft, setAnamnesisDraft] = useState({ description: '', notes: '' })
 
   // Draft state for new-item forms
   const [examDraft, setExamDraft] = useState(null)
@@ -341,6 +344,10 @@ export default function MedicalRecordsPage() {
     setTherapeuticProject(proj)
     setProjectDraft(proj)
     setProjectEditing(false)
+    const anam = { description: mrResult.anamnesisDescription || '', notes: mrResult.anamnesisNotes || '' }
+    setAnamnesis(anam)
+    setAnamnesisDraft(anam)
+    setAnamnesisEditing(false)
     const [e, m, c] = await Promise.all([getExams(mrId), getMedications(mrId), getConducts(mrId)])
     setExams(e || [])
     setMedications(m || [])
@@ -365,6 +372,9 @@ export default function MedicalRecordsPage() {
       setTherapeuticProject({ description: '', notes: '' })
       setProjectDraft({ description: '', notes: '' })
       setProjectEditing(false)
+      setAnamnesis({ description: '', notes: '' })
+      setAnamnesisDraft({ description: '', notes: '' })
+      setAnamnesisEditing(false)
     }
   }
 
@@ -392,6 +402,15 @@ export default function MedicalRecordsPage() {
     if (result && !result.error) {
       setTherapeuticProject({ ...projectDraft })
       setProjectEditing(false)
+    }
+  }
+
+  // ─── Anamnese / HPMA ────────────────────────────────────────
+  async function saveAnamnesis() {
+    const result = await updateAnamnesis(medicalRecordId, anamnesisDraft)
+    if (result && !result.error) {
+      setAnamnesis({ ...anamnesisDraft })
+      setAnamnesisEditing(false)
     }
   }
 
@@ -471,6 +490,7 @@ export default function MedicalRecordsPage() {
         exams,
         medications,
         therapeuticProject,
+        anamnesis,
         conducts,
         consultations: patientConsultations,
         therapists,
@@ -486,8 +506,8 @@ export default function MedicalRecordsPage() {
   }
 
   async function batchSetStatus(status) {
-    if (status.requiresObjectiveNote) {
-      alert(`O status "${status.name}" exige uma observação no Objetivo da Sessão. Use a edição individual para atribuí-lo.`)
+    if (status.showsObservation && status.requiresObservation) {
+      alert(`O status "${status.name}" exige uma Observação do Atendimento obrigatória. Use a edição individual para atribuí-lo.`)
       return
     }
     const ids = [...selectedConsultIds]
@@ -507,6 +527,7 @@ export default function MedicalRecordsPage() {
           <p><strong>Selecionar paciente:</strong> use o campo de busca para encontrar o paciente. O prontuário é carregado automaticamente.</p>
           <p><strong>Exames Complementares:</strong> registre exames realizados com data, link/anexo e observações. Clique em <em>+ Adicionar exame</em>.</p>
           <p><strong>Medicamentos:</strong> registre medicamentos em uso ou interrompidos com data e observações.</p>
+          <p><strong>Anamnese / HPMA:</strong> campos de texto livre para descrever a anamnese / história pregressa da moléstia atual — Anamnese/HPMA e Observações. Único por prontuário; editável por admin e terapeutas da equipe.</p>
           <p><strong>Projeto Terapêutico:</strong> campos de texto livre para descrever o projeto terapêutico — Descrição do Projeto e Observações. Único por prontuário; editável por admin e terapeutas da equipe.</p>
           <p><strong>Conduta & Objetivo Terapêutico:</strong> registre a conduta de cada terapeuta com objetivos, datas e status de andamento.</p>
           <p><strong>Histórico de Atendimentos:</strong> navegue pelo histórico usando os filtros de período (Mês -2, Mês Anterior, Mês Corrente ou Período personalizado) e filtre por status. Clique no lápis (✏) para editar um atendimento.</p>
@@ -587,6 +608,63 @@ export default function MedicalRecordsPage() {
             <div className="text-center py-12 text-gray-400 text-sm">Carregando...</div>
           ) : (
             <div className="space-y-4">
+
+              {/* ── Anamnese / HPMA ── */}
+              {(user?.role === 'admin' || user?.belongsToTeam) && (
+                <Section title="Anamnese / HPMA" defaultOpen={false}>
+                  <div className="space-y-3">
+                    {anamnesisEditing ? (
+                      <>
+                        <Textarea
+                          label="Anamnese / HPMA"
+                          value={anamnesisDraft.description}
+                          onChange={e => setAnamnesisDraft(d => ({ ...d, description: e.target.value }))}
+                          rows={4}
+                          placeholder="Descreva a anamnese / história pregressa da moléstia atual…"
+                        />
+                        <Textarea
+                          label="Observações"
+                          value={anamnesisDraft.notes}
+                          onChange={e => setAnamnesisDraft(d => ({ ...d, notes: e.target.value }))}
+                          rows={3}
+                          placeholder="Observações adicionais…"
+                        />
+                        <div className="flex gap-2 justify-end">
+                          <Button variant="ghost" onClick={() => { setAnamnesisDraft({ ...anamnesis }); setAnamnesisEditing(false) }}>Cancelar</Button>
+                          <Button variant="primary" onClick={saveAnamnesis}>Salvar</Button>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        {anamnesis.description || anamnesis.notes ? (
+                          <div className="space-y-3">
+                            {anamnesis.description && (
+                              <div>
+                                <p className="text-xs font-medium text-gray-500 mb-1">Anamnese / HPMA</p>
+                                <p className="text-sm text-gray-800 whitespace-pre-wrap">{anamnesis.description}</p>
+                              </div>
+                            )}
+                            {anamnesis.notes && (
+                              <div>
+                                <p className="text-xs font-medium text-gray-500 mb-1">Observações</p>
+                                <p className="text-sm text-gray-800 whitespace-pre-wrap">{anamnesis.notes}</p>
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <p className="text-sm text-gray-400 text-center py-2">Nenhuma anamnese registrada.</p>
+                        )}
+                        <button
+                          onClick={() => { setAnamnesisDraft({ ...anamnesis }); setAnamnesisEditing(true) }}
+                          className="flex items-center gap-1.5 text-sm text-brand-blue hover:underline mt-1"
+                        >
+                          <FiEdit2 size={14} /> {anamnesis.description || anamnesis.notes ? 'Editar anamnese' : 'Adicionar anamnese'}
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </Section>
+              )}
 
               {/* ── Exames Complementares ── */}
               <Section title="Exames Complementares" count={exams.length} defaultOpen={false}>

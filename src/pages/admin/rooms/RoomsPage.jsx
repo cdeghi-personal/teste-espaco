@@ -64,7 +64,10 @@ export default function RoomsPage() {
                 <div key={r.id} className={`flex items-center gap-3 px-4 py-3 hover:bg-gray-50/50 transition-colors ${isInactive ? 'opacity-60' : ''}`}>
                   <div className="w-8 h-8 rounded-lg shrink-0 border border-gray-200" style={{ backgroundColor: r.color || '#e5e7eb' }} />
                   <div className="flex-1 min-w-0">
-                    <div className="font-medium text-sm text-gray-900">{r.name}</div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-medium text-sm text-gray-900">{r.name}</span>
+                      {r.allowsMultiplePatients && <span className="px-1.5 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">Múltiplos pacientes</span>}
+                    </div>
                     <div className="text-xs text-gray-500">
                       {r.description && <span className="truncate">{r.description}</span>}
                       {count > 0 && <span className={r.description ? 'ml-2 text-brand-blue font-medium' : 'text-brand-blue font-medium'}>{count} atendimento(s) nos últimos 30 dias</span>}
