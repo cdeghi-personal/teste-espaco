@@ -1,5 +1,32 @@
-import { useEffect, useRef, useState } from 'react'
+import { Component, useEffect, useRef, useState } from 'react'
 import Modal from './Modal'
+
+// Contém qualquer erro de renderização do visualizador de PDF (integração com
+// pdfjs-dist, biblioteca de terceiros) dentro da própria área de preview — sem isso,
+// um erro não tratado durante o render/unmount derruba a árvore inteira do React,
+// deixando a tela em branco em vez de voltar para a página anterior.
+class PdfViewerErrorBoundary extends Component {
+  constructor(props) {
+    super(props)
+    this.state = { hasError: false }
+  }
+  static getDerivedStateFromError() {
+    return { hasError: true }
+  }
+  componentDidCatch(err) {
+    console.error('[PdfPreviewModal]', err)
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="flex items-center justify-center min-h-[60vh] text-sm text-red-500 text-center px-6">
+          Não foi possível exibir a pré-visualização do PDF.
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
 
 // Renderiza o PDF em <canvas> (via pdfjs-dist, carregado sob demanda) em vez de um
 // <iframe> apontando para o visualizador nativo do navegador — isso evita depender
@@ -13,6 +40,7 @@ function PdfCanvasViewer({ blob }) {
   useEffect(() => {
     let cancelled = false
     let pdfDoc = null
+    let currentRenderTask = null
     setStatus('loading')
 
     async function render() {
@@ -20,6 +48,7 @@ function PdfCanvasViewer({ blob }) {
         const pdfjsLib = await import('pdfjs-dist')
         pdfjsLib.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url).toString()
         const arrayBuffer = await blob.arrayBuffer()
+        if (cancelled) return
         pdfDoc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
         const container = containerRef.current
         if (cancelled || !container) return
@@ -29,6 +58,7 @@ function PdfCanvasViewer({ blob }) {
         for (let pageNum = 1; pageNum <= pdfDoc.numPages; pageNum++) {
           if (cancelled) return
           const page = await pdfDoc.getPage(pageNum)
+          if (cancelled) return
           const unscaledViewport = page.getViewport({ scale: 1 })
           const scale = containerWidth / unscaledViewport.width
           const viewport = page.getViewport({ scale })
@@ -44,20 +74,33 @@ function PdfCanvasViewer({ blob }) {
 
           const ctx = canvas.getContext('2d')
           const transform = outputScale !== 1 ? [outputScale, 0, 0, outputScale, 0, 0] : undefined
-          await page.render({ canvasContext: ctx, viewport, transform }).promise
+          currentRenderTask = page.render({ canvasContext: ctx, viewport, transform })
+          await currentRenderTask.promise
+          currentRenderTask = null
           if (cancelled) return
         }
         if (!cancelled) setStatus('ready')
       } catch (err) {
-        console.error('[PdfCanvasViewer]', err)
-        if (!cancelled) setStatus('error')
+        // Cancelamentos disparados pelo unmount (RenderingCancelledException) são esperados — não são erro real
+        if (!cancelled) {
+          console.error('[PdfCanvasViewer]', err)
+          setStatus('error')
+        }
       }
     }
 
     render()
     return () => {
       cancelled = true
-      if (pdfDoc) pdfDoc.destroy()
+      // Nunca deixar a limpeza lançar de forma síncrona — isso derrubaria a árvore
+      // inteira do React (sem error boundary no app), causando tela em branco ao fechar.
+      try {
+        if (currentRenderTask) currentRenderTask.cancel()
+      } catch { /* ignore */ }
+      try {
+        const destroyResult = pdfDoc?.destroy()
+        if (destroyResult?.catch) destroyResult.catch(() => {})
+      } catch { /* ignore */ }
     }
   }, [blob])
 
@@ -119,7 +162,9 @@ export default function PdfPreviewModal({ title, blob, filename, onClose, action
         </div>
       }
     >
-      <PdfCanvasViewer blob={blob} key={filename} />
+      <PdfViewerErrorBoundary key={filename}>
+        <PdfCanvasViewer blob={blob} />
+      </PdfViewerErrorBoundary>
     </Modal>
   )
 }
