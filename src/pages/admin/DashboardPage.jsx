@@ -133,10 +133,10 @@ function TherapistPerformanceTable({ therapists, currentUserId, title, loading, 
             <thead>
               <tr className="bg-gray-50 text-gray-400 uppercase tracking-wide sticky top-0">
                 <th className="px-4 py-2 text-left font-semibold">Terapeuta</th>
-                <th className="px-3 py-2 text-center font-semibold">Total</th>
-                <th className="px-3 py-2 text-center font-semibold">Realizadas</th>
+                <th className="px-3 py-2 text-center font-semibold" title="Atendimentos do mês de referência até a data de corte (ontem, ou o último dia do mês se ainda dentro do prazo de carência do 3º dia útil)">Total</th>
+                <th className="px-3 py-2 text-center font-semibold" title="Atendimentos do mês, até a data de corte, com status diferente de 'aguarda desfecho' — a terapeuta já resolveu o registro, mesmo que para Cancelada/Faltou">Atendidos</th>
                 <th className="px-3 py-2 text-center font-semibold">Taxa</th>
-                <th className="px-3 py-2 text-center font-semibold hidden sm:table-cell" title="Atendimentos com status 'aguarda desfecho' e data já passada, dentro do mês de referência">Pend. (mês)</th>
+                <th className="px-3 py-2 text-center font-semibold hidden sm:table-cell" title="Atendimentos com status 'aguarda desfecho' e data já vencida (até a data de corte), dentro do mês de referência">Pend. (mês)</th>
                 <th className="px-4 py-2 text-center font-semibold hidden md:table-cell" title="Atendimentos com status 'aguarda desfecho' e data anterior ao mês de referência — atraso acumulado">Pend. (anteriores)</th>
               </tr>
             </thead>
@@ -184,7 +184,7 @@ function TherapistPerformanceTable({ therapists, currentUserId, title, loading, 
         </div>
       )}
       <div className="px-4 py-2 border-t border-gray-100 text-xs text-gray-400">
-        A Taxa representa atendimentos preenchidos sobre o total elegível no período. Considere também o volume de atendimentos (coluna Total).
+        Total e Atendidos são contados até a data de corte (ontem) dentro do mês de referência — por isso Total = Atendidos + Pend. (mês). Considere também o volume de atendimentos (coluna Total).
       </div>
     </div>
   )
@@ -285,7 +285,7 @@ function MyPerformanceCard({ me, referenceLabel, onRegularize }) {
             </div>
             <div>
               <div className="text-2xl font-bold text-gray-900">{completed}<span className="text-sm font-normal text-gray-500"> / {total}</span></div>
-              <div className="text-xs text-gray-500">Preenchidos</div>
+              <div className="text-xs text-gray-500">Atendidos</div>
             </div>
             <div>
               <div className="text-2xl font-bold text-gray-900">{totalPending}</div>
