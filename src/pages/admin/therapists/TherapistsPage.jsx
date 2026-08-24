@@ -49,8 +49,9 @@ export default function TherapistsPage() {
         <div className="flex items-center gap-2 shrink-0">
           <HelpButton title="Como usar Terapeutas">
             <p><strong>Cadastrar:</strong> clique em <em>Novo Terapeuta</em> e preencha nome, especialidades e e-mail. Ao salvar, um convite é enviado por e-mail para o terapeuta definir sua senha.</p>
+            <p><strong>E-mail é definitivo:</strong> confira com atenção antes de salvar — depois de criado, o e-mail do terapeuta não pode mais ser alterado pela tela de edição (evita duplicidade e login perdido).</p>
             <p><strong>Convite:</strong> o terapeuta recebe um e-mail com link para criar a senha. Após o primeiro acesso, ele já aparece como usuário ativo no sistema.</p>
-            <p><strong>Editar:</strong> clique no lápis (✏) para editar dados, especialidades e credenciais (nº do conselho regional).</p>
+            <p><strong>Editar:</strong> clique no lápis (✏) para editar dados, especialidades e credenciais (nº do conselho regional) — o e-mail fica bloqueado, veja acima.</p>
             <p><strong>Ativar/Desativar:</strong> use o botão de toggle para desativar terapeutas que saíram da clínica sem perder o histórico de atendimentos.</p>
             <p><strong>Visibilidade:</strong> terapeutas têm acesso somente leitura a esta seção; alterações são exclusivas de administradores.</p>
           </HelpButton>

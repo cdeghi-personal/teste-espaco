@@ -3,6 +3,8 @@ import { FiMapPin, FiPhone, FiMail, FiClock, FiSend, FiCheck } from 'react-icons
 import { SPECIALTIES } from '../../constants/specialties'
 import { supabase } from '../../lib/supabase'
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
 export default function ContactPage() {
   const [form, setForm] = useState({ name: '', phone: '', email: '', specialty: '', message: '', howFound: '', patientName: '', contactReason: '', referredBy: '' })
   const [sent, setSent] = useState(false)
@@ -24,12 +26,16 @@ export default function ContactPage() {
 
   async function handleSubmit(e) {
     e.preventDefault()
-    setLoading(true)
     setError('')
+    if (!EMAIL_REGEX.test(form.email.trim())) {
+      setError('Informe um e-mail válido.')
+      return
+    }
+    setLoading(true)
     const { error: err } = await supabase.from('contact_leads').insert({
       name:           form.name,
       phone:          form.phone,
-      email:          form.email || null,
+      email:          form.email.trim(),
       specialty:      form.specialty || null,
       how_found:      form.howFound || null,
       message:        form.message,
@@ -115,12 +121,13 @@ export default function ContactPage() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">E-mail</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">E-mail *</label>
                     <input
                       name="email"
                       type="email"
                       value={form.email}
                       onChange={handleChange}
+                      required
                       className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent outline-none"
                       placeholder="seu@email.com"
                     />

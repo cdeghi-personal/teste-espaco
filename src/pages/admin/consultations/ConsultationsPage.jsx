@@ -135,8 +135,8 @@ export default function ConsultationsPage() {
             <p><strong>Conflitos de agenda:</strong> ao criar ou editar, o sistema detecta sobreposições de terapeuta, sala ou bloqueios. O aviso em âmbar exibe os conflitos — você pode salvar mesmo assim ou cancelar para corrigir.</p>
             <p><strong>Filtros:</strong> use os filtros de especialidade, status, tipo (Atendimento / Entrevista) e terapeuta para localizar registros específicos.</p>
             <p><strong>Editar:</strong> clique no lápis (✏) ou olhinho (👁) na linha para editar ou visualizar. Terapeutas só podem editar ou excluir seus próprios atendimentos.</p>
-            <p><strong>Status "Realizada":</strong> ao selecionar esse status, os campos Objetivo da Sessão, Relato de Evolução e Objetivo da Próxima Sessão tornam-se obrigatórios.</p>
-            <p><strong>Status automáticos:</strong> configurados em Administração → Status Atendimento; aparecem nos filtros e no prontuário, mas não no formulário de registro.</p>
+            <p><strong>Objetivo/Relato obrigatórios:</strong> para status "normais" (sem a flag "Exibe Observação" nem "Atendimento ainda não aconteceu"), Objetivo da Sessão e Relato de Evolução são obrigatórios — Objetivo da Próxima Sessão é sempre opcional. Status marcados como "Atendimento ainda não aconteceu" (ex.: Agendada) dispensam essa exigência, já que o atendimento ainda não ocorreu.</p>
+            <p><strong>Status automáticos:</strong> configurados em Administração → Status Atendimento; aparecem nos filtros e no prontuário. No formulário de registro, só o administrador consegue selecioná-los ou editar um atendimento que já esteja com um deles — terapeutas não veem essa opção.</p>
           </HelpButton>
           {isAdmin && (
             <Button variant="secondary" onClick={() => setShowSeriesModal(true)}>

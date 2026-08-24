@@ -12,6 +12,7 @@ import { useAuth } from '../../context/AuthContext'
 import { useToast } from '../../components/ui/Toast'
 import Badge from '../../components/ui/Badge'
 import Spinner from '../../components/ui/Spinner'
+import HelpButton from '../../components/ui/HelpButton'
 import { formatDateShort } from '../../utils/dateUtils'
 import { supabase } from '../../lib/supabase'
 import { ROUTES } from '../../constants/routes'
@@ -756,22 +757,32 @@ export default function DashboardPage() {
             {now.toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
           </p>
         </div>
-        {isDualRole && (
-          <div className="flex items-center gap-1 bg-gray-100 rounded-xl p-1 shrink-0">
-            <button
-              onClick={() => setDashView('therapist')}
-              className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${dashView === 'therapist' ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
-            >
-              Meu Painel
-            </button>
-            <button
-              onClick={() => setDashView('admin')}
-              className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${dashView === 'admin' ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
-            >
-              Painel Admin
-            </button>
-          </div>
-        )}
+        <div className="flex items-center gap-2 shrink-0">
+          {isDualRole && (
+            <div className="flex items-center gap-1 bg-gray-100 rounded-xl p-1">
+              <button
+                onClick={() => setDashView('therapist')}
+                className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${dashView === 'therapist' ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
+              >
+                Meu Painel
+              </button>
+              <button
+                onClick={() => setDashView('admin')}
+                className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${dashView === 'admin' ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
+              >
+                Painel Admin
+              </button>
+            </div>
+          )}
+          <HelpButton title="Como usar o Dashboard">
+            <p><strong>Mês de referência (ranking, especialidades e "Meu desempenho"):</strong> regra do 3º dia útil — até o 3º dia útil do mês, esses painéis mostram o mês anterior; do 4º dia útil em diante, mostram o mês corrente. Os cards no topo (Sessões no mês, Taxa de realização etc.) continuam sempre no mês corrente, sem essa regra.</p>
+            <p><strong>Total / Atendidos / Taxa:</strong> Total conta os atendimentos do mês de referência até a data de corte (ontem). Atendidos são os que já têm qualquer status diferente de "aguarda desfecho" — ou seja, já foram processados pelo terapeuta, mesmo que o desfecho tenha sido Cancelada ou Falta. Taxa = Atendidos ÷ Total.</p>
+            <p><strong>Pend. (mês) / Pend. (anteriores):</strong> atendimentos ainda com status "aguarda desfecho" (ex.: Agendada) e data já vencida — separados entre os do mês de referência e os de meses anteriores (atraso acumulado). Total = Atendidos + Pend. (mês) sempre fecha.</p>
+            <p><strong>Desempate do ranking:</strong> quando a Taxa empata, vence quem tem mais Atendidos; persistindo, mais Total; por último, ordem alfabética.</p>
+            <p><strong>Meu desempenho:</strong> mostra sua posição no ranking e, se você ainda não está entre os 3 primeiros, quantos atendimentos faltam para entrar no pódio — com a posição exata que isso resultaria. Já no pódio, o incentivo passa a ser chegar a 100%. O botão "Regularizar pendências" rola até a tabela de pendências, mais abaixo.</p>
+            <p><strong>Atualização:</strong> os painéis recarregam automaticamente a cada 5 minutos, e também toda vez que você fecha o formulário de um atendimento (edição de pendência ou de qualquer outro).</p>
+          </HelpButton>
+        </div>
       </div>
 
       {/* ── Alert banners ────────────────────────────────────────────────── */}

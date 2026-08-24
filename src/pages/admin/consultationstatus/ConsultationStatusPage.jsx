@@ -4,6 +4,7 @@ import { useData } from '../../../context/DataContext'
 import { useAuth } from '../../../context/AuthContext'
 import Button from '../../../components/ui/Button'
 import EmptyState from '../../../components/ui/EmptyState'
+import HelpButton from '../../../components/ui/HelpButton'
 import ConsultationStatusFormModal from './ConsultationStatusFormModal'
 
 export default function ConsultationStatusPage() {
@@ -34,6 +35,16 @@ export default function ConsultationStatusPage() {
           <p className="text-xs text-gray-500 mt-0.5">{filtered.length} cadastrado(s)</p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          <HelpButton title="Como usar Status Atendimento">
+            <p><strong>O que é:</strong> cada status controla como o sistema trata um atendimento — obrigatoriedade de campos, financeiro, pendências e mais. Nenhuma regra depende do nome do status, só das flags abaixo.</p>
+            <p><strong>Automático:</strong> status atribuído pelo próprio sistema, não aparece para seleção manual de terapeuta (admin ainda consegue selecionar/editar, para correções pontuais).</p>
+            <p><strong>Consome sessão pré-paga:</strong> ao atribuir, debita 1 sessão do pacote pré-pago do paciente (quando a especialidade é pré-paga).</p>
+            <p><strong>Exibe Observação / Obrigatoriedade da Observação:</strong> quando "Exibe Observação" está marcado, o formulário do atendimento mostra só o campo "Observação" no lugar dos campos clínicos (Objetivo, Relato etc.); "Obrigatoriedade" decide se esse campo é obrigatório.</p>
+            <p><strong>Solicita definição de reposição:</strong> ao editar um atendimento e trocar para esse status, o formulário pergunta "Este atendimento terá reposição?" e permite agendar a reposição na hora.</p>
+            <p><strong>Padrão de Agendamento:</strong> status inicial usado <em>só</em> quando o sistema cria uma reposição — não é o status padrão de um atendimento novo comum. No máximo 1 status ativo pode ter essa flag.</p>
+            <p><strong>Atendimento ainda não aconteceu:</strong> dispensa Objetivo/Relato de serem obrigatórios (o atendimento ainda não ocorreu) e alimenta as colunas de Pendências do Dashboard quando a data já passou. Pode estar marcada em vários status ao mesmo tempo (ex.: Agendada, Confirmada) — é o status alfabeticamente primeiro entre esses que vira o padrão de um atendimento novo.</p>
+            <p><strong>Permite consulta e edição pelo Administrador:</strong> se desmarcado, nem o admin consegue abrir ou editar atendimentos com esse status (sigilo clínico reforçado).</p>
+          </HelpButton>
           <button
             onClick={() => setShowInactive(v => !v)}
             className={`px-3 py-2 rounded-xl text-xs font-medium border transition-all ${showInactive ? 'bg-red-50 text-red-700 border-red-200' : 'bg-white text-gray-600 border-gray-200'}`}

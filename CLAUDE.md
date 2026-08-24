@@ -915,7 +915,7 @@ Quando um atendimento em edição recebe um status configurado com `requests_rep
 
 ## CRM de Contatos (`/admin/contatos`)
 
-- `ContactPage` grava em `contact_leads` via Supabase anon
+- `ContactPage` grava em `contact_leads` via Supabase anon. Campos obrigatórios no formulário público: Nome, Telefone, **E-mail** (validado no cliente com regex simples de formato — `algo@algo.algo` — antes do insert; bloqueia o envio com mensagem "Informe um e-mail válido." se não passar) e Mensagem. Os demais campos (paciente, motivo, especialidade, como conheceu, indicado por) são opcionais.
 - Status: `novo` (vermelho), `em_contato` (amarelo), `agendado` (azul), `convertido` (verde), `sem_interesse` (cinza)
 - Dashboard: banner vermelho clicável quando há leads `novo`
 - Sidebar: badge vermelho com contagem de `novo`
