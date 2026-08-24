@@ -51,28 +51,31 @@ export function getPerformanceTier(rate, hasEligible = true) {
   return TIERS.find(t => rate >= t.min)
 }
 
-// Próxima meta (a primeira faixa acima da faixa atual) — null quando já em 100%.
-function nextGoalPercent(rate) {
-  if (rate >= 100) return null
-  if (rate >= 95) return 100
-  if (rate >= 85) return 95
-  return 85
-}
-
-// Calcula quantos preenchimentos faltam para a próxima meta, sem prometer o
-// impossível: se `pending` não for suficiente para alcançar matematicamente a
-// próxima faixa, não afirma que a meta é atingível — sinaliza `achievable: false`
-// e a UI deve usar uma mensagem genérica em vez do valor de meta.
-export function computeFillProjection({ completed, total, pending }) {
-  if (!total) return { rate: null, nextGoalPct: null, needed: 0, achievable: true }
+// Quantos preenchimentos faltam para entrar no pódio (3º lugar do ranking),
+// não para uma faixa arbitrária de 85/95% — a meta real é sempre 100%, o
+// pódio é só o próximo marco acionável no caminho até lá. Usa o mesmo
+// comparador do ranking (compareTherapistPerformance), então "entrar no
+// pódio" aqui significa exatamente a mesma coisa que aparecer entre os 3
+// primeiros na tabela. Sem prometer o impossível: se nem preenchendo todas
+// as pendências (`pending`) bastar, `achievable` fica false.
+export function computePodiumProjection({ completed, total, pending, thirdPlaceEntry }) {
+  if (!total) return { rate: null, needed: 0, achievable: true, onPodium: false, targetRate: null }
   const rate = Math.round((completed / total) * 100)
-  const nextGoalPct = nextGoalPercent(rate)
-  if (nextGoalPct == null || pending <= 0) {
-    return { rate, nextGoalPct: null, needed: 0, achievable: true }
+  if (!thirdPlaceEntry) return { rate, needed: 0, achievable: true, onPodium: true, targetRate: null }
+
+  if (compareTherapistPerformance({ rate, completed, total }, thirdPlaceEntry) <= 0) {
+    return { rate, needed: 0, achievable: true, onPodium: true, targetRate: null }
   }
-  const rawNeeded = Math.max(0, Math.ceil((nextGoalPct / 100) * total) - completed)
-  const needed = Math.min(rawNeeded, pending)
-  return { rate, nextGoalPct, needed, achievable: needed >= rawNeeded }
+
+  const maxFill = Math.max(0, pending || 0)
+  for (let x = 1; x <= maxFill; x++) {
+    const candidateCompleted = completed + x
+    const candidateRate = Math.round((candidateCompleted / total) * 100)
+    if (compareTherapistPerformance({ rate: candidateRate, completed: candidateCompleted, total }, thirdPlaceEntry) <= 0) {
+      return { rate, needed: x, achievable: true, onPodium: false, targetRate: candidateRate }
+    }
+  }
+  return { rate, needed: maxFill, achievable: false, onPodium: false, targetRate: null }
 }
 
 // Ordenação única do ranking: maior Taxa > maior preenchidos > maior Total > nome (pt-BR).

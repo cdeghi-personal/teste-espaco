@@ -17,7 +17,7 @@ import { supabase } from '../../lib/supabase'
 import { ROUTES } from '../../constants/routes'
 import ConsultationFormModal from './consultations/ConsultationFormModal'
 import {
-  getReferenceMonth, getPerformanceTier, computeFillProjection, compareTherapistPerformance,
+  getReferenceMonth, getPerformanceTier, computePodiumProjection, compareTherapistPerformance,
 } from '../../utils/dashboardMetrics'
 
 // ── helpers ──────────────────────────────────────────────────────────────────
@@ -245,7 +245,7 @@ function SpecialtyMonthlyPanel({ specialties, specialtiesData, title, loading, e
   )
 }
 
-function MyPerformanceCard({ me, referenceLabel, onRegularize }) {
+function MyPerformanceCard({ me, referenceLabel, onRegularize, thirdPlaceEntry }) {
   if (!me) {
     return (
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
@@ -259,7 +259,9 @@ function MyPerformanceCard({ me, referenceLabel, onRegularize }) {
   const totalPending = (pendingMonth || 0) + (pendingPrevious || 0)
   const tier = getPerformanceTier(total > 0 ? Math.round((completed / total) * 100) : 0, total > 0)
   // Projeção usa só as pendências DO MÊS — só elas afetam a Taxa deste período.
-  const { rate, nextGoalPct, needed, achievable } = computeFillProjection({ completed, total, pending: pendingMonth })
+  // A meta real é sempre 100%; o pódio (3º lugar do ranking) é só o próximo
+  // marco acionável no caminho até lá.
+  const { rate, needed, achievable, onPodium, targetRate } = computePodiumProjection({ completed, total, pending: pendingMonth, thirdPlaceEntry })
 
   return (
     <div className={`rounded-2xl border p-5 ${tier.colorClasses}`}>
@@ -299,11 +301,15 @@ function MyPerformanceCard({ me, referenceLabel, onRegularize }) {
 
           <p className="text-xs text-gray-700">{tier.message}</p>
 
-          {nextGoalPct != null && (
+          {pendingMonth > 0 && (
             <p className="text-xs text-gray-600 mt-1">
-              Meta: <strong>{nextGoalPct}%</strong>
-              {needed > 0 && achievable && <> — preencha <strong>{needed}</strong> evolução{needed > 1 ? 'ões' : ''} para alcançar {nextGoalPct}%.</>}
-              {needed > 0 && !achievable && <> — preencha suas <strong>{pendingMonth}</strong> pendência{pendingMonth > 1 ? 's' : ''} do mês para melhorar sua taxa.</>}
+              {onPodium ? (
+                <>Você está no pódio 🏆 — preencha suas <strong>{pendingMonth}</strong> pendência{pendingMonth > 1 ? 's' : ''} do mês para chegar a 100%.</>
+              ) : achievable ? (
+                <>Preencha <strong>{needed}</strong> atendimento{needed > 1 ? 's' : ''} para atingir {targetRate}% e entrar no pódio (3º lugar) — pode ser que você suba ainda mais, sem problema.</>
+              ) : (
+                <>Preencha suas <strong>{pendingMonth}</strong> pendência{pendingMonth > 1 ? 's' : ''} do mês para melhorar sua taxa.</>
+              )}
             </p>
           )}
 
@@ -464,19 +470,38 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!user) return
     reloadMonthlyMetrics()
+    // Depende de user?.authId (estável), não do objeto `user` inteiro — o
+    // AuthContext recria esse objeto a cada evento do Supabase Auth (inclusive
+    // TOKEN_REFRESHED silencioso, que dispara periodicamente em background),
+    // e usar o objeto como dependência recarregava os painéis a cada refresh
+    // de token, não só quando o usuário realmente muda.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, referenceMonth.monthKey, realizadaIds, agendadaIds])
+  }, [user?.authId, referenceMonth.monthKey, realizadaIds, agendadaIds])
+
+  // Auto-refresh a cada 5 minutos — mantém os painéis atualizados numa aba
+  // aberta por muito tempo, sem depender de foco de janela ou refresh de token.
+  useEffect(() => {
+    if (!user) return
+    const intervalId = setInterval(() => { reloadMonthlyMetrics() }, 5 * 60 * 1000)
+    return () => clearInterval(intervalId)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.authId, reloadMonthlyMetrics])
+
+  const rankingSorted = useMemo(() =>
+    [...monthlyMetrics.therapists]
+      .filter(t => t.total > 0)
+      .map(t => ({ ...t, rate: t.total > 0 ? Math.round((t.completed / t.total) * 100) : 0 }))
+      .sort(compareTherapistPerformance),
+  [monthlyMetrics.therapists])
+
+  const thirdPlaceEntry = rankingSorted[2] || null
 
   const myMonthlyEntry = useMemo(() => {
     if (!user?.id) return null
-    const sorted = [...monthlyMetrics.therapists]
-      .filter(t => t.total > 0)
-      .map(t => ({ ...t, rate: t.total > 0 ? Math.round((t.completed / t.total) * 100) : 0 }))
-      .sort(compareTherapistPerformance)
-    const idx = sorted.findIndex(t => t.therapistId === user.id)
+    const idx = rankingSorted.findIndex(t => t.therapistId === user.id)
     if (idx === -1) return null
-    return { ...sorted[idx], position: idx + 1 }
-  }, [monthlyMetrics.therapists, user])
+    return { ...rankingSorted[idx], position: idx + 1 }
+  }, [rankingSorted, user])
 
   // ── "Regularizar pendências" — rola até a tabela já existente e destaca ───
   const pendingSectionRef = useRef(null)
@@ -986,7 +1011,38 @@ export default function DashboardPage() {
             )}
           </div>
 
+          {/* ── Meu desempenho — card pessoal ────────────────────────────── */}
+          <MyPerformanceCard
+            me={myMonthlyEntry}
+            referenceLabel={referenceMonth.label}
+            onRegularize={pendingFill.length > 0 ? handleRegularizePending : null}
+            thirdPlaceEntry={thirdPlaceEntry}
+          />
+
+          {/* ── Ranking terapeutas + distribuição especialidade (fonte única) ── */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <TherapistPerformanceTable
+              therapists={monthlyMetrics.therapists}
+              currentUserId={user?.id}
+              title={`Terapeutas — ${referenceMonth.label}`}
+              loading={monthlyMetricsLoading}
+              error={monthlyMetricsError}
+              onRetry={reloadMonthlyMetrics}
+            />
+            <SpecialtyMonthlyPanel
+              specialties={monthlyMetrics.specialties}
+              specialtiesData={specialtiesData}
+              title={`Sessões por Especialidade — ${referenceMonth.label}`}
+              loading={monthlyMetricsLoading}
+              error={monthlyMetricsError}
+              onRetry={reloadMonthlyMetrics}
+            />
+          </div>
+
           {/* ── Pendências de preenchimento ────────────────────────────── */}
+          {/* Fica depois do ranking/"Meu desempenho" de propósito — uma lista
+              grande de pendências não pode empurrar esses painéis pra fora da
+              primeira dobra. */}
           {pendingFill.length > 0 && (
             <div
               ref={pendingSectionRef}
@@ -1035,33 +1091,6 @@ export default function DashboardPage() {
               </div>
             </div>
           )}
-
-          {/* ── Meu desempenho — card pessoal ────────────────────────────── */}
-          <MyPerformanceCard
-            me={myMonthlyEntry}
-            referenceLabel={referenceMonth.label}
-            onRegularize={pendingFill.length > 0 ? handleRegularizePending : null}
-          />
-
-          {/* ── Ranking terapeutas + distribuição especialidade (fonte única) ── */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <TherapistPerformanceTable
-              therapists={monthlyMetrics.therapists}
-              currentUserId={user?.id}
-              title={`Terapeutas — ${referenceMonth.label}`}
-              loading={monthlyMetricsLoading}
-              error={monthlyMetricsError}
-              onRetry={reloadMonthlyMetrics}
-            />
-            <SpecialtyMonthlyPanel
-              specialties={monthlyMetrics.specialties}
-              specialtiesData={specialtiesData}
-              title={`Sessões por Especialidade — ${referenceMonth.label}`}
-              loading={monthlyMetricsLoading}
-              error={monthlyMetricsError}
-              onRetry={reloadMonthlyMetrics}
-            />
-          </div>
 
           {/* ── Alertas clínicos ───────────────────────────────────────── */}
           {(evasionRisk.length > 0 || withConflicts > 0) && (

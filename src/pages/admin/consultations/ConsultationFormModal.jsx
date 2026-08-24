@@ -38,14 +38,15 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
   const { user } = useAuth()
   const isEdit = !!initial.id
 
+  // "Padrão de Agendamento" (isSchedulingDefault) é usada só pelo fluxo de
+  // Reposição (status inicial da reposição, ver `schedulingDefaultStatus`
+  // abaixo) — não deve ser reaproveitada aqui, senão o status configurado
+  // para reposições vira o padrão de qualquer atendimento novo.
   const defaultStatusId = !isEdit
-    ? (
-        consultationStatuses.find(s => s.active !== false && s.isSchedulingDefault)?.id
-        || [...consultationStatuses]
-            .filter(s => s.active !== false && s.isAwaitingOutcome)
-            .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))[0]?.id
-        || ''
-      )
+    ? [...consultationStatuses]
+        .filter(s => s.active !== false && s.isAwaitingOutcome)
+        .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))[0]?.id
+      || ''
     : ''
 
   const [newActivityDraft, setNewActivityDraft] = useState(null)
