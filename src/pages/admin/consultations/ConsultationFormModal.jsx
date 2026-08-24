@@ -41,7 +41,9 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
   const defaultStatusId = !isEdit
     ? (
         consultationStatuses.find(s => s.active !== false && s.isSchedulingDefault)?.id
-        || consultationStatuses.find(s => s.active !== false && s.name.toLowerCase().includes('agendada'))?.id
+        || [...consultationStatuses]
+            .filter(s => s.active !== false && s.isAwaitingOutcome)
+            .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))[0]?.id
         || ''
       )
     : ''
