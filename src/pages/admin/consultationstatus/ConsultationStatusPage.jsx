@@ -71,6 +71,7 @@ export default function ConsultationStatusPage() {
                       {s.adminCanEdit === false && <span className="px-1.5 py-0.5 rounded text-xs font-medium bg-red-100 text-red-700">Admin bloqueado</span>}
                       {s.requestsReplacementDecision && <span className="px-1.5 py-0.5 rounded text-xs font-medium bg-cyan-100 text-cyan-700">Define reposição</span>}
                       {s.isSchedulingDefault && <span className="px-1.5 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">Padrão de agendamento</span>}
+                      {s.isAwaitingOutcome && <span className="px-1.5 py-0.5 rounded text-xs font-medium bg-gray-200 text-gray-700">Aguarda desfecho</span>}
                     </div>
                     <div className="text-xs text-gray-400 mt-0.5">{count} atendimento(s) (últimos 30 dias)</div>
                   </div>

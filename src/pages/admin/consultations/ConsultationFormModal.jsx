@@ -39,7 +39,11 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
   const isEdit = !!initial.id
 
   const defaultStatusId = !isEdit
-    ? (consultationStatuses.find(s => s.active !== false && s.name.toLowerCase().includes('agendada'))?.id || '')
+    ? (
+        consultationStatuses.find(s => s.active !== false && s.isSchedulingDefault)?.id
+        || consultationStatuses.find(s => s.active !== false && s.name.toLowerCase().includes('agendada'))?.id
+        || ''
+      )
     : ''
 
   const [newActivityDraft, setNewActivityDraft] = useState(null)
@@ -168,10 +172,13 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
     if (!form.appointmentTypeId && form.eventType !== 'INTERVIEW') e.appointmentTypeId = 'Selecione o tipo'
     const selectedStatus = consultationStatuses.find(s => s.id === form.consultationStatusId)
     const _showsObservation = selectedStatus?.showsObservation === true
+    const _isAwaitingOutcome = selectedStatus?.isAwaitingOutcome === true
     if (_showsObservation) {
       const _requiresObservation = selectedStatus?.requiresObservation !== false
       if (_requiresObservation && !form.notes?.trim()) e.notes = 'Informe a observação do atendimento'
-    } else if (form.eventType !== 'INTERVIEW') {
+    } else if (form.eventType !== 'INTERVIEW' && !_isAwaitingOutcome) {
+      // Status "aguarda desfecho" (ex.: Agendada) representa atendimento que ainda não
+      // aconteceu — não faz sentido exigir Objetivo/Relato antes da sessão ocorrer.
       if (!form.mainObjective.trim()) e.mainObjective = 'Informe o objetivo da sessão'
       if (!form.evolutionNotes.trim()) e.evolutionNotes = 'Informe o relato da sessão / evolução'
       // "Objetivo da Próxima Sessão" é sempre opcional
@@ -253,8 +260,7 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
 
   async function doReplicateObjective() {
     if (!replicateNextObjective || !form.nextObjectives.trim() || !form.patientId) return
-    const norm = s => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
-    const agendadaIds = consultationStatuses.filter(s => norm(s.name).includes('agend')).map(s => s.id)
+    const agendadaIds = consultationStatuses.filter(s => s.isAwaitingOutcome).map(s => s.id)
     const curDT = `${form.date}T${form.time || '00:00'}`
     const next = consultations
       .filter(c =>
@@ -434,7 +440,8 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
   const selectedStatus = consultationStatuses.find(s => s.id === form.consultationStatusId)
   const requiresNote = selectedStatus?.showsObservation === true
   const requiresObservation = requiresNote && selectedStatus?.requiresObservation !== false
-  const clinicalFieldsRequired = !requiresNote && form.eventType !== 'INTERVIEW'
+  const isAwaitingOutcome = selectedStatus?.isAwaitingOutcome === true
+  const clinicalFieldsRequired = !requiresNote && !isAwaitingOutcome && form.eventType !== 'INTERVIEW'
   const willConsume = selectedStatus?.consumesPrepaidSession === true
   const showPrepaidAlert = prepaidBalance !== null && willConsume && prepaidBalance <= 0
   const selectedPatient = form.patientId ? patients.find(p => p.id === form.patientId) : null

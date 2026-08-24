@@ -268,7 +268,7 @@ export function mapCalendarBlockSeries(row) {
 }
 
 export function mapConsultationStatus(row) {
-  return { id: row.id, name: row.name, color: row.color, active: row.active, automatic: row.automatic || false, consumesPrepaidSession: row.consumes_prepaid_session || false, showsObservation: row.shows_observation || false, requiresObservation: row.requires_observation !== false, adminCanEdit: row.admin_can_edit !== false, requestsReplacementDecision: row.requests_replacement_decision || false, isSchedulingDefault: row.is_scheduling_default || false }
+  return { id: row.id, name: row.name, color: row.color, active: row.active, automatic: row.automatic || false, consumesPrepaidSession: row.consumes_prepaid_session || false, showsObservation: row.shows_observation || false, requiresObservation: row.requires_observation !== false, adminCanEdit: row.admin_can_edit !== false, requestsReplacementDecision: row.requests_replacement_decision || false, isSchedulingDefault: row.is_scheduling_default || false, isAwaitingOutcome: row.is_awaiting_outcome || false }
 }
 
 export function mapAppointmentType(row) {

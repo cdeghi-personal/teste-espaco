@@ -136,7 +136,8 @@ function TherapistPerformanceTable({ therapists, currentUserId, title, loading, 
                 <th className="px-3 py-2 text-center font-semibold">Total</th>
                 <th className="px-3 py-2 text-center font-semibold">Realizadas</th>
                 <th className="px-3 py-2 text-center font-semibold">Taxa</th>
-                <th className="px-4 py-2 text-center font-semibold hidden sm:table-cell">Pendências</th>
+                <th className="px-3 py-2 text-center font-semibold hidden sm:table-cell" title="Atendimentos com status 'aguarda desfecho' e data já passada, dentro do mês de referência">Pend. (mês)</th>
+                <th className="px-4 py-2 text-center font-semibold hidden md:table-cell" title="Atendimentos com status 'aguarda desfecho' e data anterior ao mês de referência — atraso acumulado">Pend. (anteriores)</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
@@ -163,9 +164,15 @@ function TherapistPerformanceTable({ therapists, currentUserId, title, loading, 
                         'bg-red-100 text-red-600'
                       }`}>{t.rate}%</span>
                     </td>
-                    <td className="px-4 py-2.5 text-center hidden sm:table-cell">
-                      {t.pending > 0
-                        ? <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-600">{t.pending}</span>
+                    <td className="px-3 py-2.5 text-center hidden sm:table-cell">
+                      {t.pendingMonth > 0
+                        ? <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-600">{t.pendingMonth}</span>
+                        : <span className="text-gray-300 text-xs">—</span>
+                      }
+                    </td>
+                    <td className="px-4 py-2.5 text-center hidden md:table-cell">
+                      {t.pendingPrevious > 0
+                        ? <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-orange-100 text-orange-700">{t.pendingPrevious}</span>
                         : <span className="text-gray-300 text-xs">—</span>
                       }
                     </td>
@@ -248,9 +255,11 @@ function MyPerformanceCard({ me, referenceLabel, onRegularize }) {
     )
   }
 
-  const { total, completed, pending } = me
+  const { total, completed, pendingMonth, pendingPrevious } = me
+  const totalPending = (pendingMonth || 0) + (pendingPrevious || 0)
   const tier = getPerformanceTier(total > 0 ? Math.round((completed / total) * 100) : 0, total > 0)
-  const { rate, nextGoalPct, needed, achievable } = computeFillProjection({ completed, total, pending })
+  // Projeção usa só as pendências DO MÊS — só elas afetam a Taxa deste período.
+  const { rate, nextGoalPct, needed, achievable } = computeFillProjection({ completed, total, pending: pendingMonth })
 
   return (
     <div className={`rounded-2xl border p-5 ${tier.colorClasses}`}>
@@ -279,8 +288,8 @@ function MyPerformanceCard({ me, referenceLabel, onRegularize }) {
               <div className="text-xs text-gray-500">Preenchidos</div>
             </div>
             <div>
-              <div className="text-2xl font-bold text-gray-900">{pending}</div>
-              <div className="text-xs text-gray-500">Pendências</div>
+              <div className="text-2xl font-bold text-gray-900">{totalPending}</div>
+              <div className="text-xs text-gray-500">Pendências{pendingPrevious > 0 && <span className="block text-[10px] text-gray-400">{pendingMonth} do mês + {pendingPrevious} anteriores</span>}</div>
             </div>
           </div>
 
@@ -294,11 +303,11 @@ function MyPerformanceCard({ me, referenceLabel, onRegularize }) {
             <p className="text-xs text-gray-600 mt-1">
               Meta: <strong>{nextGoalPct}%</strong>
               {needed > 0 && achievable && <> — preencha <strong>{needed}</strong> evolução{needed > 1 ? 'ões' : ''} para alcançar {nextGoalPct}%.</>}
-              {needed > 0 && !achievable && <> — preencha suas <strong>{pending}</strong> pendência{pending > 1 ? 's' : ''} para melhorar sua taxa.</>}
+              {needed > 0 && !achievable && <> — preencha suas <strong>{pendingMonth}</strong> pendência{pendingMonth > 1 ? 's' : ''} do mês para melhorar sua taxa.</>}
             </p>
           )}
 
-          {pending > 0 && onRegularize && (
+          {totalPending > 0 && onRegularize && (
             <button
               onClick={onRegularize}
               className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/70 hover:bg-white text-gray-800 text-xs font-semibold transition-colors"
@@ -392,7 +401,7 @@ export default function DashboardPage() {
   // ── status IDs ───────────────────────────────────────────────────────────
   const realizadaIds = useMemo(() =>
     consultationStatuses.filter(s =>
-      s.consumesPrepaidSession === true && !norm(s.name).includes('agend')
+      s.consumesPrepaidSession === true && !s.isAwaitingOutcome
     ).map(s => s.id),
   [consultationStatuses])
 
@@ -406,8 +415,10 @@ export default function DashboardPage() {
     consultationStatuses.filter(s => norm(s.name).includes('cancel')).map(s => s.id),
   [consultationStatuses])
 
+  // Status "aguarda desfecho" (flag explícita is_awaiting_outcome — migration 115),
+  // substitui a antiga busca textual por "agend" no nome do status.
   const agendadaIds = useMemo(() =>
-    consultationStatuses.filter(s => norm(s.name).includes('agend')).map(s => s.id),
+    consultationStatuses.filter(s => s.isAwaitingOutcome).map(s => s.id),
   [consultationStatuses])
 
   // ── painéis mensais (Terapeutas + Especialidades) — fonte única via RPC ───
@@ -434,7 +445,8 @@ export default function DashboardPage() {
       setMonthlyMetrics({
         therapists: (data.therapists || []).map(r => ({
           therapistId: r.therapist_id, therapistName: r.therapist_name, therapistColor: r.therapist_color,
-          total: r.total, completed: r.completed, pending: r.pending,
+          total: r.total, completed: r.completed,
+          pendingMonth: r.pending_month, pendingPrevious: r.pending_previous,
         })),
         specialties: (data.specialties || []).map(r => ({
           specialtyKey: r.specialty_key, total: r.total, completed: r.completed,

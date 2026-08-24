@@ -16,7 +16,7 @@ const COLOR_OPTIONS = [
   { value: 'bg-purple-100 text-purple-700', label: 'Roxo' },
 ]
 
-const EMPTY = { name: '', color: 'bg-green-100 text-green-700', active: true, automatic: false, consumesPrepaidSession: false, showsObservation: false, requiresObservation: true, adminCanEdit: true, requestsReplacementDecision: false, isSchedulingDefault: false }
+const EMPTY = { name: '', color: 'bg-green-100 text-green-700', active: true, automatic: false, consumesPrepaidSession: false, showsObservation: false, requiresObservation: true, adminCanEdit: true, requestsReplacementDecision: false, isSchedulingDefault: false, isAwaitingOutcome: false }
 
 export default function ConsultationStatusFormModal({ onClose, initial = {} }) {
   const { addConsultationStatus, updateConsultationStatus } = useData()
@@ -149,6 +149,19 @@ export default function ConsultationStatusFormModal({ onClose, initial = {} }) {
           <div>
             <label htmlFor="cs-scheduling-default" className="text-sm font-medium text-gray-700">Padrão de Agendamento</label>
             <p className="text-xs text-gray-400 mt-0.5">Status inicial usado ao criar reposições. No máximo um status ativo pode ter esta opção — marcar aqui exige desmarcar em qualquer outro status ativo antes</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
+          <input
+            id="cs-awaiting-outcome"
+            type="checkbox"
+            checked={form.isAwaitingOutcome}
+            onChange={e => set('isAwaitingOutcome', e.target.checked)}
+            className="w-4 h-4 rounded accent-brand-blue"
+          />
+          <div>
+            <label htmlFor="cs-awaiting-outcome" className="text-sm font-medium text-gray-700">Atendimento ainda não aconteceu</label>
+            <p className="text-xs text-gray-400 mt-0.5">Ex.: Agendada, Confirmada. Dispensa Objetivo da Sessão e Relato de serem obrigatórios; atendimentos com este status e data já passada entram na contagem de Pendências. Pode ser marcada em vários status</p>
           </div>
         </div>
         <div className="flex items-center gap-3 p-3 bg-amber-50 rounded-xl border border-amber-100">

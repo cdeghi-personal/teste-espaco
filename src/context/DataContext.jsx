@@ -1197,7 +1197,7 @@ export function DataProvider({ children }) {
   async function addConsultationStatus(data) {
     const { data: inserted, error } = await supabase
       .from('consultation_statuses')
-      .insert({ name: data.name, color: data.color || 'bg-gray-100 text-gray-700', active: true, automatic: data.automatic || false, consumes_prepaid_session: data.consumesPrepaidSession || false, shows_observation: data.showsObservation || false, requires_observation: data.requiresObservation !== false, admin_can_edit: data.adminCanEdit !== false, requests_replacement_decision: data.requestsReplacementDecision || false, is_scheduling_default: data.isSchedulingDefault || false })
+      .insert({ name: data.name, color: data.color || 'bg-gray-100 text-gray-700', active: true, automatic: data.automatic || false, consumes_prepaid_session: data.consumesPrepaidSession || false, shows_observation: data.showsObservation || false, requires_observation: data.requiresObservation !== false, admin_can_edit: data.adminCanEdit !== false, requests_replacement_decision: data.requestsReplacementDecision || false, is_scheduling_default: data.isSchedulingDefault || false, is_awaiting_outcome: data.isAwaitingOutcome || false })
       .select().single()
     if (error) return schedulingDefaultError(error)
     const item = mapConsultationStatus(inserted)
@@ -1217,6 +1217,7 @@ export function DataProvider({ children }) {
     if (data.adminCanEdit !== undefined) update.admin_can_edit = data.adminCanEdit
     if (data.requestsReplacementDecision !== undefined) update.requests_replacement_decision = data.requestsReplacementDecision
     if (data.isSchedulingDefault !== undefined) update.is_scheduling_default = data.isSchedulingDefault
+    if (data.isAwaitingOutcome !== undefined) update.is_awaiting_outcome = data.isAwaitingOutcome
     if (Object.keys(update).length) {
       const { error: updateErr } = await supabase.from('consultation_statuses').update(update).eq('id', id)
       if (updateErr) return schedulingDefaultError(updateErr)
