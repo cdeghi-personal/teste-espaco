@@ -280,7 +280,8 @@ export default function AgendaPage() {
             <p><strong>Criar série (admin):</strong> apenas administradores podem criar, editar e excluir séries recorrentes. Clique em <em>Série</em> para criar múltiplos atendimentos recorrentes de uma vez (ex.: toda segunda por 10 semanas). Terapeutas podem editar dados individuais de uma ocorrência, mas não têm acesso ao botão Série.</p>
             <p><strong>Entrevistas:</strong> use o tipo "Entrevista" para registrar entrevistas com responsáveis ou candidatos. Chip laranja identifica entrevistas. Entrevistas remotas exibem plataforma e link de acesso no card e não exigem sala.</p>
             <p><strong>Bloqueios de Agenda:</strong> clique em <em>Bloqueio</em> para registrar ausências ou restrições. <strong>RÍGIDO</strong> (cinza escuro) = bloqueio forte (aula, viagem). <strong>FLEX</strong> (cinza médio) = apenas alerta (reunião, home office). Crie bloqueios avulsos ou em série. Acesse o histórico completo pelo botão <em>Histórico de Bloqueios</em>.</p>
-            <p><strong>Chips nos cards:</strong> 🔵 indigo = série regular; 🟡 âmbar + ! = ocorrência alterada individualmente; 👥 N = múltiplos terapeutas (passe o mouse para ver os nomes); 🔴 ⚠ = conflito de agenda (passe o mouse para detalhes); 🟠 chip laranja = entrevista.</p>
+            <p><strong>Chips nos cards:</strong> 🔵 indigo = série regular; 🟡 âmbar + ! = ocorrência alterada individualmente; 👥 N = múltiplos terapeutas (passe o mouse para ver os nomes); 🔴 ⚠ = conflito de agenda (passe o mouse para detalhes); 🟠 chip laranja = entrevista; 🔷 "Reposição" = este atendimento é reposição de outro; 🟢 "Reposição agendada" = já existe reposição vinculada.</p>
+            <p><strong>Reposição:</strong> quando o status de um atendimento (ex.: Falta do Terapeuta, Cancelada) exige, o formulário pergunta se haverá reposição. Se sim, agenda-se um novo atendimento avulso vinculado ao original — a tela mostra um link para navegar entre os dois.</p>
             <p><strong>Visualização rápida:</strong> duplo-clique em um card (desktop) ou toque simples (mobile) abre os detalhes em modo leitura. Use o botão <em>Editar</em> para abrir no formulário de edição.</p>
             <p><strong>Filtro "Minha Agenda":</strong> terapeutas veem automaticamente apenas seus próprios atendimentos. Admins veem todos.</p>
             <p><strong>Legenda:</strong> as cores na legenda inferior identificam cada terapeuta.</p>
@@ -493,6 +494,16 @@ export default function AgendaPage() {
                                 👥 {(item.consultationTherapists || []).length}
                               </span>
                             )}
+                            {item.replacementForConsultationId && (
+                              <span title="Reposição de outro atendimento" className="inline-flex items-center px-1 py-0.5 rounded bg-cyan-500/80 text-white" style={{ fontSize: '9px' }}>
+                                Reposição
+                              </span>
+                            )}
+                            {item.willHaveReplacement === true && consultations.some(r => r.replacementForConsultationId === item.id) && (
+                              <span title="Já existe reposição agendada" className="inline-flex items-center px-1 py-0.5 rounded bg-teal-500/80 text-white" style={{ fontSize: '9px' }}>
+                                Reposição agendada
+                              </span>
+                            )}
                             {itemConflicts.length > 0 && (
                               <span
                                 title={conflictTooltip}
@@ -626,6 +637,16 @@ export default function AgendaPage() {
                                 style={{ fontSize: '9px' }}
                               >
                                 👥 {(item.consultationTherapists || []).length}
+                              </span>
+                            )}
+                            {item.replacementForConsultationId && (
+                              <span title="Reposição de outro atendimento" className="inline-flex items-center px-1 py-0.5 rounded bg-cyan-500/80 text-white" style={{ fontSize: '9px' }}>
+                                Reposição
+                              </span>
+                            )}
+                            {item.willHaveReplacement === true && consultations.some(r => r.replacementForConsultationId === item.id) && (
+                              <span title="Já existe reposição agendada" className="inline-flex items-center px-1 py-0.5 rounded bg-teal-500/80 text-white" style={{ fontSize: '9px' }}>
+                                Reposição agendada
                               </span>
                             )}
                             {itemConflicts.length > 0 && (
@@ -819,6 +840,16 @@ export default function AgendaPage() {
                                 👥 {(item.consultationTherapists || []).length}
                               </span>
                             )}
+                            {item.replacementForConsultationId && (
+                              <span title="Reposição de outro atendimento" className="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs bg-cyan-50 text-cyan-700">
+                                Reposição
+                              </span>
+                            )}
+                            {item.willHaveReplacement === true && consultations.some(r => r.replacementForConsultationId === item.id) && (
+                              <span title="Já existe reposição agendada" className="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs bg-teal-50 text-teal-700">
+                                Reposição agendada
+                              </span>
+                            )}
                             {itemConflicts.length > 0 && (
                               <span
                                 title={conflictTooltip}
@@ -927,6 +958,7 @@ export default function AgendaPage() {
         <ConsultationFormModal
           onClose={() => setShowModal(false)}
           initial={editItem || {}}
+          onNavigate={c => { setShowModal(false); setViewItem(c) }}
         />
       )}
 
@@ -940,6 +972,7 @@ export default function AgendaPage() {
               ? () => { setViewItem(null); setEditItem(viewItem); setShowModal(true) }
               : null
           }
+          onNavigate={c => setViewItem(c)}
         />
       )}
 

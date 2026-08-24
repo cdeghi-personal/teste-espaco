@@ -174,6 +174,9 @@ export function mapConsultation(row) {
     seriesId: row.series_id || null,
     seriesOriginalDate: row.series_original_date || null,
     isSeriesException: row.is_series_exception || false,
+    // Reposição — willHaveReplacement preserva null/true/false (semântica distinta, ver CLAUDE.md)
+    willHaveReplacement: row.will_have_replacement === undefined ? null : row.will_have_replacement,
+    replacementForConsultationId: row.replacement_for_consultation_id || null,
     // Terapeutas participantes (inclui o principal com isPrimary=true)
     consultationTherapists: (row.consultation_therapists || []).map(t => ({
       id: t.id,
@@ -265,7 +268,7 @@ export function mapCalendarBlockSeries(row) {
 }
 
 export function mapConsultationStatus(row) {
-  return { id: row.id, name: row.name, color: row.color, active: row.active, automatic: row.automatic || false, consumesPrepaidSession: row.consumes_prepaid_session || false, showsObservation: row.shows_observation || false, requiresObservation: row.requires_observation !== false, adminCanEdit: row.admin_can_edit !== false }
+  return { id: row.id, name: row.name, color: row.color, active: row.active, automatic: row.automatic || false, consumesPrepaidSession: row.consumes_prepaid_session || false, showsObservation: row.shows_observation || false, requiresObservation: row.requires_observation !== false, adminCanEdit: row.admin_can_edit !== false, requestsReplacementDecision: row.requests_replacement_decision || false, isSchedulingDefault: row.is_scheduling_default || false }
 }
 
 export function mapAppointmentType(row) {

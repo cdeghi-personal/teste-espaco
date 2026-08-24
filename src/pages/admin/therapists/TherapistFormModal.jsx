@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { FiMail, FiCheck, FiPlus, FiTrash2 } from 'react-icons/fi'
+import { FiMail, FiCheck, FiPlus, FiTrash2, FiAlertTriangle } from 'react-icons/fi'
 import { formatCPF, validateCPF } from '../../../utils/validators'
 import Modal from '../../../components/ui/Modal'
 import Button from '../../../components/ui/Button'
@@ -96,7 +96,9 @@ export default function TherapistFormModal({ onClose, initial = {} }) {
     setLoading(true)
     try {
       if (isEdit) {
-        await updateTherapist(initial.id, form)
+        // E-mail nunca é enviado na edição — trava reforçada além do campo desabilitado (ver abaixo)
+        const { email: _email, ...editPayload } = form
+        await updateTherapist(initial.id, editPayload)
         onClose()
       } else {
         const therapist = await addTherapist(form)
@@ -178,15 +180,27 @@ export default function TherapistFormModal({ onClose, initial = {} }) {
               error={errors.name}
               placeholder="Nome do terapeuta"
             />
+            {!isEdit && (
+              <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-300 rounded-xl text-sm text-red-800">
+                <FiAlertTriangle size={16} className="mt-0.5 shrink-0" />
+                <span><strong>Confira o e-mail com atenção.</strong> Ele não poderá ser alterado depois de cadastrado — é usado para criar o acesso do terapeuta e enviar o convite de definição de senha.</span>
+              </div>
+            )}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <Input
-                label={isEdit ? 'E-mail' : 'E-mail *'}
-                type="email"
-                value={form.email}
-                onChange={e => set('email', e.target.value)}
-                error={errors.email}
-                placeholder="email@clinica.com.br"
-              />
+              <div>
+                <Input
+                  label={isEdit ? 'E-mail' : 'E-mail *'}
+                  type="email"
+                  value={form.email}
+                  onChange={e => set('email', e.target.value)}
+                  error={errors.email}
+                  placeholder="email@clinica.com.br"
+                  disabled={isEdit}
+                />
+                {isEdit && (
+                  <p className="text-xs text-gray-400 mt-1">E-mail não pode ser alterado após o cadastro — está vinculado à conta de acesso já criada.</p>
+                )}
+              </div>
               <Input
                 label="Telefone"
                 value={form.phone}

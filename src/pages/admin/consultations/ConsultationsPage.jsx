@@ -130,7 +130,8 @@ export default function ConsultationsPage() {
             <p><strong>Registrar atendimento:</strong> clique em <em>Novo Atendimento</em> e preencha paciente, terapeuta, especialidade, data, horário, status e tipo.</p>
             <p><strong>Criar série (admin):</strong> apenas administradores podem criar, editar e excluir séries recorrentes. Clique em <em>Série</em> para criar atendimentos recorrentes (ex.: toda segunda por 10 semanas). Terapeutas podem editar campos individuais de uma ocorrência, mas sem alterar o escopo da série.</p>
             <p><strong>Entrevistas:</strong> selecione o tipo "Entrevista" para entrevistas com responsáveis ou candidatos. Paciente opcional; campo entrevistado obrigatório. Entrevistas remotas não exigem sala e não conflitam com bloqueios Flex. Entrevistas não aparecem nos relatórios financeiros.</p>
-            <p><strong>Chips nos cards:</strong> 🔵 indigo = série regular; 🟡 âmbar + ! = ocorrência alterada individualmente; 👥 N = múltiplos terapeutas (passe o mouse para ver os nomes); 🔴 ⚠ = conflito de agenda (passe o mouse para detalhes).</p>
+            <p><strong>Chips nos cards:</strong> 🔵 indigo = série regular; 🟡 âmbar + ! = ocorrência alterada individualmente; 👥 N = múltiplos terapeutas (passe o mouse para ver os nomes); 🔴 ⚠ = conflito de agenda (passe o mouse para detalhes); 🔷 "Reposição" = este atendimento é reposição de outro; 🟢 "Reposição agendada" = já existe uma reposição vinculada a este atendimento.</p>
+            <p><strong>Reposição:</strong> quando o status de um atendimento (ex.: Falta do Terapeuta, Cancelada) exige, o formulário pergunta se haverá reposição. Se sim, a reposição é agendada como um novo atendimento avulso, sem alterar a data do original — a tela mostra um link para navegar entre os dois.</p>
             <p><strong>Conflitos de agenda:</strong> ao criar ou editar, o sistema detecta sobreposições de terapeuta, sala ou bloqueios. O aviso em âmbar exibe os conflitos — você pode salvar mesmo assim ou cancelar para corrigir.</p>
             <p><strong>Filtros:</strong> use os filtros de especialidade, status, tipo (Atendimento / Entrevista) e terapeuta para localizar registros específicos.</p>
             <p><strong>Editar:</strong> clique no lápis (✏) ou olhinho (👁) na linha para editar ou visualizar. Terapeutas só podem editar ou excluir seus próprios atendimentos.</p>
@@ -336,6 +337,16 @@ export default function ConsultationsPage() {
                         ⚠ Conflito
                       </span>
                     )}
+                    {c.replacementForConsultationId && (
+                      <span title="Reposição de outro atendimento" className="px-1.5 py-0.5 rounded-full text-xs font-medium bg-cyan-50 text-cyan-700">
+                        Reposição
+                      </span>
+                    )}
+                    {c.willHaveReplacement === true && consultations.some(r => r.replacementForConsultationId === c.id) && (
+                      <span title="Já existe reposição agendada para este atendimento" className="px-1.5 py-0.5 rounded-full text-xs font-medium bg-teal-50 text-teal-700">
+                        Reposição agendada
+                      </span>
+                    )}
                   </div>
                   <div className="flex items-center gap-3 text-xs text-gray-500 flex-wrap">
                     <span>{formatDateShort(c.date)}{c.time && <span className="text-gray-400"> {c.time}</span>}</span>
@@ -447,6 +458,7 @@ export default function ConsultationsPage() {
         <ConsultationFormModal
           onClose={() => setShowModal(false)}
           initial={editConsultation || {}}
+          onNavigate={c => { setShowModal(false); setViewConsultation(c) }}
         />
       )}
       {viewConsultation && (
@@ -454,6 +466,7 @@ export default function ConsultationsPage() {
           onClose={() => setViewConsultation(null)}
           initial={viewConsultation}
           readOnly
+          onNavigate={c => setViewConsultation(c)}
         />
       )}
       {showSeriesModal && (

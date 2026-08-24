@@ -23,10 +23,18 @@ const EMPTY = {
   evolutionNotes: '', nextObjectives: '',
   sessionQuality: 'good', guardianFeedback: '', appointmentId: '',
   secondaryTherapists: [],
+  willHaveReplacement: null,
 }
 
-export default function ConsultationFormModal({ onClose, initial = {}, readOnly = false, onEditRequest = null }) {
-  const { patients, therapists, specialtiesData, rooms, consultationStatuses, appointmentTypes, appointments, addConsultation, updateConsultation, updateConsultationSeries, getPrepaidData, consultations, calendarBlocks } = useData()
+const EMPTY_REPLACEMENT_DRAFT = { date: '', time: '', roomId: '', therapistId: '', specialty: '', appointmentTypeId: '', secondaryTherapists: [] }
+
+function fmtShortDate(iso) {
+  if (!iso) return ''
+  return `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}`
+}
+
+export default function ConsultationFormModal({ onClose, initial = {}, readOnly = false, onEditRequest = null, onNavigate = null }) {
+  const { patients, therapists, specialtiesData, rooms, consultationStatuses, appointmentTypes, appointments, addConsultation, updateConsultation, createConsultationReplacement, updateConsultationSeries, getPrepaidData, consultations, calendarBlocks } = useData()
   const { user } = useAuth()
   const isEdit = !!initial.id
 
@@ -52,9 +60,20 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
   const [pendingConflicts, setPendingConflicts] = useState([])
   const [saving, setSaving] = useState(false)
   const [replicateNextObjective, setReplicateNextObjective] = useState(true)
+  const [replacementDraft, setReplacementDraft] = useState(EMPTY_REPLACEMENT_DRAFT)
+  const [replacementConflictsToConfirm, setReplacementConflictsToConfirm] = useState(null)
   const { show } = useToast()
 
   const hasSeries = isEdit && !!initial.seriesId
+
+  // Reposição — derivados calculados ao vivo a partir de `consultations` (sem state próprio)
+  const selectedStatusForReplacement = consultationStatuses.find(s => s.id === form.consultationStatusId)
+  const showsReplacementQuestion = isEdit && form.eventType === 'SESSION' && selectedStatusForReplacement?.requestsReplacementDecision === true
+  const linkedReplacement = isEdit ? consultations.find(c => c.replacementForConsultationId === initial.id) : null
+  const originalConsultation = initial.replacementForConsultationId
+    ? consultations.find(c => c.id === initial.replacementForConsultationId)
+    : null
+  const schedulingDefaultStatus = consultationStatuses.find(s => s.isSchedulingDefault && s.active !== false)
 
   useEffect(() => {
     if (!form.patientId || !form.specialty) { setPrepaidBalance(null); return }
@@ -99,6 +118,39 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
 
   function removeSecondaryTherapist(tempId) {
     set('secondaryTherapists', form.secondaryTherapists.filter(t => t.tempId !== tempId))
+  }
+
+  // Troca manual de status: reseta a decisão de reposição (não se aplica mais / se aplica de novo do zero)
+  function handleStatusChange(newStatusId) {
+    set('consultationStatusId', newStatusId)
+    set('willHaveReplacement', null)
+    setReplacementDraft(EMPTY_REPLACEMENT_DRAFT)
+  }
+
+  function openReplacementDraft() {
+    set('willHaveReplacement', true)
+    setReplacementDraft({
+      date: '', time: '',
+      roomId: form.roomId, therapistId: form.therapistId, specialty: form.specialty, appointmentTypeId: form.appointmentTypeId,
+      secondaryTherapists: form.secondaryTherapists.map(t => ({ ...t, tempId: generateId() })),
+    })
+  }
+
+  function setReplacementField(field, value) {
+    setReplacementDraft(d => ({ ...d, [field]: value }))
+    setErrors(e => ({ ...e, [`replacement${field.charAt(0).toUpperCase()}${field.slice(1)}`]: undefined }))
+  }
+
+  function addReplacementSecondaryTherapist() {
+    setReplacementDraft(d => ({ ...d, secondaryTherapists: [...d.secondaryTherapists, { tempId: generateId(), therapistId: '', specialty: '' }] }))
+  }
+
+  function updateReplacementSecondaryTherapist(tempId, field, value) {
+    setReplacementDraft(d => ({ ...d, secondaryTherapists: d.secondaryTherapists.map(t => t.tempId === tempId ? { ...t, [field]: value } : t) }))
+  }
+
+  function removeReplacementSecondaryTherapist(tempId) {
+    setReplacementDraft(d => ({ ...d, secondaryTherapists: d.secondaryTherapists.filter(t => t.tempId !== tempId) }))
   }
 
   const isRemoteInterview = form.eventType === 'INTERVIEW' && form.interviewFormat === 'REMOTE'
@@ -148,6 +200,22 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
         e.therapistId = 'Em atendimentos com múltiplos terapeutas, o terapeuta principal deve ser um profissional da equipe. Terapeutas externos podem ser incluídos apenas como participantes adicionais.'
       }
     }
+    // Decisão de reposição — só quando o status pede e ainda não existe reposição criada
+    if (showsReplacementQuestion && !linkedReplacement) {
+      if (form.willHaveReplacement == null) {
+        e.willHaveReplacement = 'Informe se este atendimento terá reposição'
+      } else if (form.willHaveReplacement === true) {
+        if (!schedulingDefaultStatus) {
+          e.willHaveReplacement = 'Nenhum status padrão de agendamento está configurado. Peça a um administrador para configurar em Status Atendimento.'
+        }
+        if (!replacementDraft.date) e.replacementDate = 'Informe a data da reposição'
+        if (!replacementDraft.time) e.replacementTime = 'Informe o horário da reposição'
+        if (!replacementDraft.therapistId) e.replacementTherapistId = 'Selecione o terapeuta da reposição'
+        if (!replacementDraft.specialty) e.replacementSpecialty = 'Selecione a especialidade da reposição'
+        if (!replacementDraft.roomId) e.replacementRoomId = 'Selecione a sala da reposição'
+        if (!replacementDraft.appointmentTypeId) e.replacementAppointmentTypeId = 'Selecione o tipo de atendimento da reposição'
+      }
+    }
     return e
   }
 
@@ -163,6 +231,22 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
       consultationTherapists: [
         { therapistId: form.therapistId, isPrimary: true },
         ...(form.secondaryTherapists || []).filter(t => t.therapistId).map(t => ({ therapistId: t.therapistId, isPrimary: false })),
+      ],
+    }
+  }
+
+  function buildReplacementConflictInput() {
+    return {
+      id: null,
+      date: replacementDraft.date,
+      time: replacementDraft.time,
+      therapistId: replacementDraft.therapistId,
+      roomId: replacementDraft.roomId,
+      eventType: 'SESSION',
+      interviewFormat: null,
+      consultationTherapists: [
+        { therapistId: replacementDraft.therapistId, isPrimary: true },
+        ...(replacementDraft.secondaryTherapists || []).filter(t => t.therapistId).map(t => ({ therapistId: t.therapistId, isPrimary: false })),
       ],
     }
   }
@@ -195,12 +279,57 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
   function handleSave() {
     const e = validate()
     if (Object.keys(e).length) { setErrors(e); return }
+
+    // Decisão de reposição = Sim: fluxo dedicado, sempre individual (nunca passa por
+    // proceedSave/série) e nunca reaproveita a checagem de conflito do atendimento original
+    // (que não muda de data/hora/sala nesse fluxo) — só a proposta da própria reposição.
+    if (showsReplacementQuestion && form.willHaveReplacement === true && !linkedReplacement) {
+      const replConflicts = detectConflicts(buildReplacementConflictInput(), consultations, calendarBlocks, rooms)
+      if (replConflicts.length > 0) {
+        setReplacementConflictsToConfirm(replConflicts)
+        return
+      }
+      finalizeReplacementSave([])
+      return
+    }
+
     const conflicts = detectConflicts(buildConflictInput(), consultations, calendarBlocks, rooms)
     if (conflicts.length > 0) {
       setConflictsToConfirm(conflicts)
       return
     }
     proceedSave([])
+  }
+
+  async function finalizeReplacementSave(conflicts) {
+    setSaving(true)
+    const result = await createConsultationReplacement({
+      originalId: initial.id,
+      originalUpdateData: applyFieldCleanup(form),
+      replacementData: {
+        patientId: form.patientId,
+        eventType: 'SESSION',
+        therapistId: replacementDraft.therapistId,
+        specialty: replacementDraft.specialty,
+        date: replacementDraft.date,
+        time: replacementDraft.time,
+        roomId: replacementDraft.roomId,
+        appointmentTypeId: replacementDraft.appointmentTypeId,
+        consultationStatusId: schedulingDefaultStatus.id,
+        secondaryTherapists: replacementDraft.secondaryTherapists,
+      },
+      conflicts,
+    })
+    setSaving(false)
+    if (result?.error) { show(result.error, 'error'); return }
+    show('Atendimento salvo e reposição agendada com sucesso.', 'success')
+    onClose()
+  }
+
+  async function handleSaveReplacementAnyway() {
+    const conflicts = replacementConflictsToConfirm || []
+    setReplacementConflictsToConfirm(null)
+    await finalizeReplacementSave(conflicts)
   }
 
   // Aplica limpeza de campos para manter consistência entre modo clínico e administrativo.
@@ -331,6 +460,11 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
               <Button variant="ghost" onClick={() => setConflictsToConfirm(null)} disabled={saving}>Cancelar</Button>
               <Button variant="danger" onClick={handleSaveAnyway} disabled={saving}>{saving ? 'Salvando…' : 'Salvar mesmo assim'}</Button>
             </>
+          : replacementConflictsToConfirm !== null
+          ? <>
+              <Button variant="ghost" onClick={() => setReplacementConflictsToConfirm(null)} disabled={saving}>Cancelar</Button>
+              <Button variant="danger" onClick={handleSaveReplacementAnyway} disabled={saving}>{saving ? 'Salvando…' : 'Salvar mesmo assim'}</Button>
+            </>
           : confirmSeriesEdit
           ? <>
               <Button variant="ghost" onClick={() => setConfirmSeriesEdit(false)} disabled={saving}>Voltar</Button>
@@ -438,6 +572,23 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
             <p className="text-xs text-amber-700 mt-1">Deseja salvar mesmo assim?</p>
           </div>
         )}
+        {replacementConflictsToConfirm !== null && replacementConflictsToConfirm.length > 0 && (
+          <div className="flex flex-col gap-2 p-3 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-900">
+            <div className="flex items-center gap-2 font-semibold">
+              <span>⚠️</span>
+              <span>Conflitos encontrados para a reposição:</span>
+            </div>
+            <ul className="space-y-1 pl-2 text-xs text-amber-800">
+              {replacementConflictsToConfirm.map((c, i) => (
+                <li key={i} className="flex items-start gap-1.5">
+                  <span className="shrink-0">•</span>
+                  <span>{buildConflictTooltip([c], { therapists, rooms, patients, consultations, calendarBlocks })}</span>
+                </li>
+              ))}
+            </ul>
+            <p className="text-xs text-amber-700 mt-1">Deseja salvar mesmo assim?</p>
+          </div>
+        )}
         {isBlocked && (
           <div className="flex items-start gap-2 p-3 bg-amber-50 rounded-xl text-xs text-amber-700 border border-amber-200">
             <span className="shrink-0 mt-0.5">⚠️</span>
@@ -519,7 +670,7 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
                   <option key={s.key} value={s.key}>{s.label}</option>
                 ))}
               </Select>
-              <Select label="Status Atendimento *" value={form.consultationStatusId} onChange={e => set('consultationStatusId', e.target.value)} error={errors.consultationStatusId} disabled={readOnly}>
+              <Select label="Status Atendimento *" value={form.consultationStatusId} onChange={e => handleStatusChange(e.target.value)} error={errors.consultationStatusId} disabled={readOnly}>
                 <option value="">Selecione</option>
                 {activeStatuses.map(s => (
                   <option key={s.id} value={s.id}>{s.name}</option>
@@ -767,6 +918,132 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
               </div>
             </section>
           </>
+        )}
+
+        {/* Este atendimento É uma reposição — link para o original */}
+        {originalConsultation && (
+          <div className="flex items-center justify-between gap-3 p-3 bg-cyan-50 border border-cyan-200 rounded-xl text-sm text-cyan-800">
+            <span>Reposição do atendimento de <strong>{fmtShortDate(originalConsultation.date)}</strong>.</span>
+            {onNavigate && <Button type="button" variant="outline" onClick={() => onNavigate(originalConsultation)}>Ver atendimento original</Button>}
+          </div>
+        )}
+
+        {/* Decisão de reposição — só quando o status selecionado solicita */}
+        {showsReplacementQuestion && (
+          <section>
+            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3 pb-2 border-b border-gray-100">
+              Reposição
+            </h3>
+            {linkedReplacement ? (
+              <div className="flex items-center justify-between gap-3 p-3 bg-teal-50 border border-teal-200 rounded-xl text-sm text-teal-800">
+                <span>
+                  <strong>Reposição agendada</strong> para {fmtShortDate(linkedReplacement.date)}
+                  {linkedReplacement.time ? ` às ${linkedReplacement.time.slice(0, 5)}` : ''}
+                  {' '}com {therapists.find(t => t.id === linkedReplacement.therapistId)?.name || '—'}.
+                </span>
+                {onNavigate && <Button type="button" variant="outline" onClick={() => onNavigate(linkedReplacement)}>Abrir reposição</Button>}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div>
+                  <p className="text-sm font-medium text-gray-700 mb-2">Este atendimento terá reposição? *</p>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      disabled={readOnly}
+                      onClick={() => { set('willHaveReplacement', false); setReplacementDraft(EMPTY_REPLACEMENT_DRAFT) }}
+                      className={`px-4 py-1.5 rounded-lg text-sm font-medium border transition-all ${
+                        form.willHaveReplacement === false ? 'bg-gray-700 text-white border-gray-700' : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'
+                      }`}
+                    >
+                      Não
+                    </button>
+                    <button
+                      type="button"
+                      disabled={readOnly}
+                      onClick={openReplacementDraft}
+                      className={`px-4 py-1.5 rounded-lg text-sm font-medium border transition-all ${
+                        form.willHaveReplacement === true ? 'bg-teal-600 text-white border-teal-600' : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'
+                      }`}
+                    >
+                      Sim
+                    </button>
+                  </div>
+                  {errors.willHaveReplacement && <p className="text-xs text-red-500 mt-1">{errors.willHaveReplacement}</p>}
+                </div>
+
+                {hasSeries && form.willHaveReplacement === true && (
+                  <p className="text-xs text-blue-700 bg-blue-50 border border-blue-100 rounded-xl p-2">
+                    Esta decisão será aplicada apenas a este atendimento — a série recorrente não será alterada.
+                  </p>
+                )}
+
+                {form.willHaveReplacement === true && (
+                  <div className="border border-teal-200 bg-teal-50/40 rounded-xl p-4 space-y-3">
+                    <h4 className="text-xs font-semibold text-teal-700 uppercase tracking-wide">Agendamento da Reposição</h4>
+                    {!schedulingDefaultStatus && (
+                      <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg p-2">
+                        Nenhum status padrão de agendamento configurado — peça a um administrador para marcar "Padrão de Agendamento" em Status Atendimento antes de salvar.
+                      </p>
+                    )}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <Select label="Terapeuta *" value={replacementDraft.therapistId} onChange={e => setReplacementField('therapistId', e.target.value)} error={errors.replacementTherapistId} disabled={readOnly}>
+                        <option value="">Selecione</option>
+                        {activeTherapists.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                      </Select>
+                      <Input label="Data *" type="date" value={replacementDraft.date} onChange={e => setReplacementField('date', e.target.value)} error={errors.replacementDate} disabled={readOnly} />
+                      <Input label="Horário *" type="time" value={replacementDraft.time} onChange={e => setReplacementField('time', e.target.value)} error={errors.replacementTime} disabled={readOnly} />
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <Select label="Sala *" value={replacementDraft.roomId} onChange={e => setReplacementField('roomId', e.target.value)} error={errors.replacementRoomId} disabled={readOnly}>
+                        <option value="">Selecione</option>
+                        {activeRooms.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+                      </Select>
+                      <Select label="Especialidade *" value={replacementDraft.specialty} onChange={e => setReplacementField('specialty', e.target.value)} error={errors.replacementSpecialty} disabled={readOnly}>
+                        <option value="">Selecione</option>
+                        {activeSpecialties.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
+                      </Select>
+                      <Select label="Tipo de Atendimento *" value={replacementDraft.appointmentTypeId} onChange={e => setReplacementField('appointmentTypeId', e.target.value)} error={errors.replacementAppointmentTypeId} disabled={readOnly}>
+                        <option value="">Selecione</option>
+                        {activeAppointmentTypes.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Terapeutas Participantes</p>
+                      {replacementDraft.secondaryTherapists.map(sec => {
+                        const usedIds = [replacementDraft.therapistId, ...replacementDraft.secondaryTherapists.filter(t => t.tempId !== sec.tempId).map(t => t.therapistId)]
+                        return (
+                          <div key={sec.tempId} className="flex items-end gap-2">
+                            <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                              <Select label="Terapeuta" value={sec.therapistId} onChange={e => updateReplacementSecondaryTherapist(sec.tempId, 'therapistId', e.target.value)} disabled={readOnly}>
+                                <option value="">Selecione</option>
+                                {activeTherapists.filter(t => !usedIds.includes(t.id)).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                              </Select>
+                              <Select label="Especialidade" value={sec.specialty} onChange={e => updateReplacementSecondaryTherapist(sec.tempId, 'specialty', e.target.value)} disabled={readOnly}>
+                                <option value="">Selecione</option>
+                                {activeSpecialties.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
+                              </Select>
+                            </div>
+                            {!readOnly && (
+                              <button type="button" onClick={() => removeReplacementSecondaryTherapist(sec.tempId)} className="mb-1 p-1.5 text-gray-400 hover:text-red-500 transition-colors shrink-0">
+                                <FiTrash2 size={14} />
+                              </button>
+                            )}
+                          </div>
+                        )
+                      })}
+                      {!readOnly && (
+                        <button type="button" onClick={addReplacementSecondaryTherapist} className="flex items-center gap-1.5 text-sm text-brand-blue hover:underline mt-1">
+                          <FiPlus size={14} /> Adicionar terapeuta
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </section>
         )}
 
         {/* Seção NF — visível apenas para admin em modo edição */}

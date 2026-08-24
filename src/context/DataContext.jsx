@@ -61,6 +61,7 @@ const CONSULTATION_SELECT = `
   consultation_status_id, appointment_type_id, prepaid_session_consumed,
   nf_number, nf_issue_date, previous_status_before_invoice,
   series_id, series_original_date, is_series_exception,
+  will_have_replacement, replacement_for_consultation_id,
   event_type, interview_format, meeting_platform, meeting_link, interviewee_name,
   notes, main_objective, evolution_notes, next_objectives, guardian_feedback,
   session_quality, created_at,
@@ -129,6 +130,11 @@ export function DataProvider({ children }) {
           CONSULTATION_SELECT
             .replace(/,\s*consultation_conflicts[^(]*\([^)]*\)/, '')
             .replace(/\bnotes,\s*/, ''),
+          // Fallback 3: sem colunas de reposição (migration 113 pode não ter rodado ainda)
+          CONSULTATION_SELECT
+            .replace(/,\s*consultation_conflicts[^(]*\([^)]*\)/, '')
+            .replace(/\bnotes,\s*/, '')
+            .replace(/\bwill_have_replacement,\s*replacement_for_consultation_id,\s*/, ''),
         ]
         let selectStr = SELECT_CANDIDATES[0]
         let candidateIdx = 0
@@ -730,6 +736,9 @@ export function DataProvider({ children }) {
         next_objectives: rest.nextObjectives || null,
         guardian_feedback: rest.guardianFeedback || null,
         session_quality: rest.sessionQuality || null,
+        replacement_for_consultation_id: rest.replacementForConsultationId || null,
+        // Atenção: NÃO usar `|| null` aqui — false é um valor válido e distinto de "não aplicável" (null)
+        will_have_replacement: rest.willHaveReplacement === undefined ? null : rest.willHaveReplacement,
       })
       .select()
       .single()
@@ -849,9 +858,11 @@ export function DataProvider({ children }) {
     if (rest.nfNumber !== undefined) update.nf_number = rest.nfNumber || null
     if (rest.nfIssueDate !== undefined) update.nf_issue_date = rest.nfIssueDate || null
     if (rest.isSeriesException !== undefined) update.is_series_exception = rest.isSeriesException
+    if (rest.willHaveReplacement !== undefined) update.will_have_replacement = rest.willHaveReplacement
 
     if (Object.keys(update).length) {
-      await supabase.from('consultations').update(update).eq('id', id)
+      const { error: updateErr } = await supabase.from('consultations').update(update).eq('id', id)
+      if (updateErr) return dbError(updateErr, toast)
     }
 
     if (activities !== undefined) {
@@ -952,6 +963,29 @@ export function DataProvider({ children }) {
       const updatedAll = consultations.filter(c => c.id !== id)
       await rebuildRelatedConflicts(reverseRelated, updatedAll)
     }
+  }
+
+  // Cria o atendimento de reposição vinculado ao original e, só em caso de sucesso,
+  // atualiza o original (novo status + willHaveReplacement=true). Se a atualização do
+  // original falhar, desfaz (compensação) a reposição recém-criada — nunca deixa o
+  // original marcado como "terá reposição" sem que ela exista de fato.
+  async function createConsultationReplacement({ originalId, originalUpdateData, replacementData, conflicts = [] }) {
+    const createdReplacement = await addConsultation({
+      ...replacementData,
+      replacementForConsultationId: originalId,
+      conflicts,
+    })
+    if (createdReplacement?.error) return createdReplacement
+
+    const updateResult = await updateConsultation(originalId, {
+      ...originalUpdateData,
+      willHaveReplacement: true,
+    })
+    if (updateResult?.error) {
+      await deleteConsultation(createdReplacement.id)
+      return { error: `Não foi possível atualizar o atendimento original: ${updateResult.error}. A reposição criada foi desfeita.` }
+    }
+    return { replacement: createdReplacement }
   }
 
   // ─── Therapists ─────────────────────────────────────────────────────────────
@@ -1153,12 +1187,19 @@ export function DataProvider({ children }) {
 
   // ─── Consultation Statuses ────────────────────────────────────────────────────
 
+  function schedulingDefaultError(error) {
+    if (error?.code === '23505') {
+      return { error: 'Já existe um status ativo definido como padrão de agendamento. Desmarque-o primeiro em Status Atendimento.' }
+    }
+    return dbError(error, toast)
+  }
+
   async function addConsultationStatus(data) {
     const { data: inserted, error } = await supabase
       .from('consultation_statuses')
-      .insert({ name: data.name, color: data.color || 'bg-gray-100 text-gray-700', active: true, automatic: data.automatic || false, consumes_prepaid_session: data.consumesPrepaidSession || false, shows_observation: data.showsObservation || false, requires_observation: data.requiresObservation !== false, admin_can_edit: data.adminCanEdit !== false })
+      .insert({ name: data.name, color: data.color || 'bg-gray-100 text-gray-700', active: true, automatic: data.automatic || false, consumes_prepaid_session: data.consumesPrepaidSession || false, shows_observation: data.showsObservation || false, requires_observation: data.requiresObservation !== false, admin_can_edit: data.adminCanEdit !== false, requests_replacement_decision: data.requestsReplacementDecision || false, is_scheduling_default: data.isSchedulingDefault || false })
       .select().single()
-    if (error) return dbError(error, toast)
+    if (error) return schedulingDefaultError(error)
     const item = mapConsultationStatus(inserted)
     setConsultationStatuses(prev => [...prev, item])
     return item
@@ -1174,7 +1215,12 @@ export function DataProvider({ children }) {
     if (data.showsObservation !== undefined) update.shows_observation = data.showsObservation
     if (data.requiresObservation !== undefined) update.requires_observation = data.requiresObservation
     if (data.adminCanEdit !== undefined) update.admin_can_edit = data.adminCanEdit
-    await supabase.from('consultation_statuses').update(update).eq('id', id)
+    if (data.requestsReplacementDecision !== undefined) update.requests_replacement_decision = data.requestsReplacementDecision
+    if (data.isSchedulingDefault !== undefined) update.is_scheduling_default = data.isSchedulingDefault
+    if (Object.keys(update).length) {
+      const { error: updateErr } = await supabase.from('consultation_statuses').update(update).eq('id', id)
+      if (updateErr) return schedulingDefaultError(updateErr)
+    }
     setConsultationStatuses(prev => prev.map(s => s.id === id ? { ...s, ...data } : s))
   }
 
@@ -2229,7 +2275,7 @@ export function DataProvider({ children }) {
     patients, addPatient, updatePatient, deletePatient, restorePatient, getPatientById, fetchInactivePatients,
     guardians, addGuardian, updateGuardian, deleteGuardian, restoreGuardian, getGuardianById, getGuardiansForPatient,
     appointments, addAppointment, updateAppointment, deleteAppointment,
-    consultations, addConsultation, updateConsultation, deleteConsultation, addConsultationSeries, updateConsultationSeries, deleteConsultationSeries,
+    consultations, addConsultation, updateConsultation, deleteConsultation, createConsultationReplacement, addConsultationSeries, updateConsultationSeries, deleteConsultationSeries,
     therapists, addTherapist, updateTherapist, deleteTherapist, getTherapistById,
     specialtiesData, addSpecialtyData, updateSpecialtyData,
     paymentMethods, addPaymentMethod, updatePaymentMethod,

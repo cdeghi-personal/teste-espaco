@@ -4,6 +4,7 @@ import Button from '../../../components/ui/Button'
 import Input from '../../../components/ui/Input'
 import Select from '../../../components/ui/Select'
 import { useData } from '../../../context/DataContext'
+import { useToast } from '../../../components/ui/Toast'
 
 const COLOR_OPTIONS = [
   { value: 'bg-green-100 text-green-700',   label: 'Verde' },
@@ -15,10 +16,11 @@ const COLOR_OPTIONS = [
   { value: 'bg-purple-100 text-purple-700', label: 'Roxo' },
 ]
 
-const EMPTY = { name: '', color: 'bg-green-100 text-green-700', active: true, automatic: false, consumesPrepaidSession: false, showsObservation: false, requiresObservation: true, adminCanEdit: true }
+const EMPTY = { name: '', color: 'bg-green-100 text-green-700', active: true, automatic: false, consumesPrepaidSession: false, showsObservation: false, requiresObservation: true, adminCanEdit: true, requestsReplacementDecision: false, isSchedulingDefault: false }
 
 export default function ConsultationStatusFormModal({ onClose, initial = {} }) {
   const { addConsultationStatus, updateConsultationStatus } = useData()
+  const { show } = useToast()
   const isEdit = !!initial.id
   const [form, setForm] = useState({ ...EMPTY, ...initial })
   const [errors, setErrors] = useState({})
@@ -34,11 +36,11 @@ export default function ConsultationStatusFormModal({ onClose, initial = {} }) {
     return e
   }
 
-  function handleSave() {
+  async function handleSave() {
     const e = validate()
     if (Object.keys(e).length) { setErrors(e); return }
-    if (isEdit) updateConsultationStatus(initial.id, form)
-    else addConsultationStatus(form)
+    const result = isEdit ? await updateConsultationStatus(initial.id, form) : await addConsultationStatus(form)
+    if (result?.error) { show(result.error, 'error'); return }
     onClose()
   }
 
@@ -123,6 +125,32 @@ export default function ConsultationStatusFormModal({ onClose, initial = {} }) {
             </div>
           </div>
         )}
+        <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
+          <input
+            id="cs-requests-replacement"
+            type="checkbox"
+            checked={form.requestsReplacementDecision}
+            onChange={e => set('requestsReplacementDecision', e.target.checked)}
+            className="w-4 h-4 rounded accent-brand-blue"
+          />
+          <div>
+            <label htmlFor="cs-requests-replacement" className="text-sm font-medium text-gray-700">Solicita definição de reposição</label>
+            <p className="text-xs text-gray-400 mt-0.5">Ao atribuir este status a um atendimento, pergunta se haverá reposição e permite agendá-la imediatamente</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-xl border border-blue-100">
+          <input
+            id="cs-scheduling-default"
+            type="checkbox"
+            checked={form.isSchedulingDefault}
+            onChange={e => set('isSchedulingDefault', e.target.checked)}
+            className="w-4 h-4 rounded accent-brand-blue"
+          />
+          <div>
+            <label htmlFor="cs-scheduling-default" className="text-sm font-medium text-gray-700">Padrão de Agendamento</label>
+            <p className="text-xs text-gray-400 mt-0.5">Status inicial usado ao criar reposições. No máximo um status ativo pode ter esta opção — marcar aqui exige desmarcar em qualquer outro status ativo antes</p>
+          </div>
+        </div>
         <div className="flex items-center gap-3 p-3 bg-amber-50 rounded-xl border border-amber-100">
           <input
             id="cs-admin-can-edit"

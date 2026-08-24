@@ -194,6 +194,8 @@ supabase/
   109_payment_method_display_order.sql # Coluna display_order (INTEGER) em payment_methods + índice único parcial (valores não-nulos)
   110_consultation_status_observation_flags.sql # RENOMEIA requires_objective_note → shows_observation; adiciona requires_observation (default true) — separa "exibe observação" de "observação obrigatória"
   111_room_allows_multiple_patients.sql # Coluna allows_multiple_patients em rooms — sala não gera ROOM_OVERLAP quando true
+  112_consultation_status_replacement_flags.sql # Colunas requests_replacement_decision e is_scheduling_default em consultation_statuses (+ índice único parcial no máximo 1 status ativo padrão de agendamento)
+  113_consultations_replacement.sql    # Colunas will_have_replacement e replacement_for_consultation_id em consultations (Reposição de Atendimentos) — CHECK anti-auto-referência + índice único parcial (no máx. 1 reposição direta por atendimento)
   functions/
     invite-therapist/index.ts    # Edge Function — envia convite por e-mail ao criar terapeuta
     suggest-convenio/index.ts    # Edge Function — gera sugestões de texto para relatório de convênio via OpenAI gpt-4o-mini
@@ -224,7 +226,7 @@ Encontrar em: Supabase Dashboard → Project Settings → API.
 | `guardians` | Responsáveis — soft delete com `active = false`; tem campo `neighborhood` |
 | `patient_guardians` | Relação N:N paciente ↔ responsável |
 | `appointments` | Agendamentos — hard delete; campos `time` (HH:MM), `room_id` |
-| `consultations` | Consultas/evolução — hard delete; tem `appointment_type_id`, `time` (HH:MM), `room_id`, `nf_number`, `nf_issue_date`, `previous_status_before_invoice`, `series_id`, `series_original_date`, `is_series_exception`, `event_type` (SESSION/INTERVIEW), `interview_format` (PRESENTIAL/REMOTE), `meeting_platform`, `meeting_link`, `interviewee_name` |
+| `consultations` | Consultas/evolução — hard delete; tem `appointment_type_id`, `time` (HH:MM), `room_id`, `nf_number`, `nf_issue_date`, `previous_status_before_invoice`, `series_id`, `series_original_date`, `is_series_exception`, `event_type` (SESSION/INTERVIEW), `interview_format` (PRESENTIAL/REMOTE), `meeting_platform`, `meeting_link`, `interviewee_name`, `will_have_replacement` (migration 113 — NULL/true/false, ver seção Reposição de Atendimentos), `replacement_for_consultation_id` (migration 113 — preenchido só no atendimento de reposição) |
 | `consultation_activities` | Atividades dentro de uma consulta |
 | `specialties` | Tabela de config — toggle `active` |
 | `payment_methods` | Tabela de config — toggle `active`; `display_order` (INTEGER opcional, único quando preenchido) — ordem manual de exibição |
@@ -233,7 +235,7 @@ Encontrar em: Supabase Dashboard → Project Settings → API.
 | `rooms` | Salas — toggle `active`; `allows_multiple_patients` (boolean, default false) — quando true, a sala não gera conflito `ROOM_OVERLAP` mesmo com atendimentos sobrepostos |
 | `therapist_specialties` | Relação N:N terapeuta ↔ especialidade + nº do conselho regional + flag `can_be_rt` |
 | `patient_external_therapists` | Terapeutas externos vinculados ao paciente (nome, especialidade, telefone) |
-| `consultation_statuses` | Status do atendimento — toggle `active`, cor configurável, flag `automatic`, `admin_can_edit`; `shows_observation` (renomeada de `requires_objective_note` na migration 110) — oculta campos clínicos e mostra só "Observação do Atendimento"; `requires_observation` (default true) — só tem efeito quando `shows_observation=true`, define se a observação é obrigatória ou opcional |
+| `consultation_statuses` | Status do atendimento — toggle `active`, cor configurável, flag `automatic`, `admin_can_edit`; `shows_observation` (renomeada de `requires_objective_note` na migration 110) — oculta campos clínicos e mostra só "Observação do Atendimento"; `requires_observation` (default true) — só tem efeito quando `shows_observation=true`, define se a observação é obrigatória ou opcional; `requests_replacement_decision` (migration 112) — pede decisão de reposição ao atribuir o status; `is_scheduling_default` (migration 112) — status inicial usado ao criar reposições, no máximo 1 ativo |
 | `appointment_types` | Tipos de atendimento (Sessão Individual, Grupo etc.) — toggle `active` |
 | `medical_records` | Prontuário do paciente — 1:1, criado automaticamente ao abrir; campos `therapeutic_project_description` e `therapeutic_project_notes` TEXT (Projeto Terapêutico); campos `anamnesis_description` e `anamnesis_notes` TEXT (Anamnese/HPMA, migration 108) |
 | `medical_record_exams` | Exames complementares do paciente — N por prontuário |
@@ -264,9 +266,9 @@ Todos em `src/lib/supabase.js`. Convertem snake_case do banco para camelCase do 
 - `mapTherapist` — `therapistSpecialties` agora é `[{ specialty, credential, canBeRt }]`
 - `mapGuardian` (inclui `neighborhood`), `mapTherapist`, `mapAppointment` (inclui `startTime`, `endTime` calculado via duration), `mapConsultation` (inclui `time`, `roomId`)
 - `mapSpecialty`, `mapPaymentMethod` (inclui `displayOrder`), `mapDiagnosis`, `mapPatientStatus`, `mapRoom` (inclui `allowsMultiplePatients`)
-- `mapConsultation` também inclui `nfNumber`, `nfIssueDate`, `previousStatusBeforeInvoice`, `seriesId`, `seriesOriginalDate`, `isSeriesException`, `consultationTherapists[{id, therapistId, specialty, isPrimary}]`, `eventType`, `interviewFormat`, `meetingPlatform`, `meetingLink`, `intervieweeName`
+- `mapConsultation` também inclui `nfNumber`, `nfIssueDate`, `previousStatusBeforeInvoice`, `seriesId`, `seriesOriginalDate`, `isSeriesException`, `consultationTherapists[{id, therapistId, specialty, isPrimary}]`, `eventType`, `interviewFormat`, `meetingPlatform`, `meetingLink`, `intervieweeName`, `willHaveReplacement` (preserva `null`/`true`/`false`, nunca normalizado para boolean — ver seção Reposição de Atendimentos), `replacementForConsultationId`
 - `mapConsultationSeries` — mapper para `consultation_series`; inclui `eventType`, `interviewFormat`, `meetingPlatform`, `meetingLink`, `intervieweeName`
-- `mapConsultationStatus` (inclui `automatic`, `showsObservation`, `requiresObservation` — migration 110), `mapAppointmentType`, `mapExam`, `mapMedication`, `mapConduct`
+- `mapConsultationStatus` (inclui `automatic`, `showsObservation`, `requiresObservation` — migration 110; `requestsReplacementDecision`, `isSchedulingDefault` — migration 112), `mapAppointmentType`, `mapExam`, `mapMedication`, `mapConduct`
 - `sortPaymentMethods(list)` (`src/utils/paymentMethodUtils.js`) — ordenação centralizada de formas de pagamento: `displayOrder` crescente (desempate alfabético), depois as sem `displayOrder` em ordem alfabética; aplicada em `fetchAll`/`addPaymentMethod`/`updatePaymentMethod` no DataContext, então `paymentMethods` do `useData()` já vem sempre ordenado
 - `mapCalendarBlock` — mapper para `calendar_blocks` (camelCase; inclui `seriesId`, `blockType`, `startTime`, `endTime`, `cancelled`, `cancelledAt`, `cancelledBy`)
 - `mapCalendarBlockSeries` — mapper para `calendar_block_series`
@@ -333,6 +335,8 @@ Admin cria terapeuta no TherapistFormModal
   → Terapeuta clica no link → abre ResetPasswordPage
   → Define senha → therapists.user_id é vinculado automaticamente
 ```
+
+**E-mail é imutável após o cadastro:** `TherapistFormModal` desabilita o campo de e-mail em modo edição (é a base do convite/conta já criada) e exclui `email` do payload enviado a `updateTherapist` mesmo assim (dupla trava). No cadastro, exibe alerta vermelho destacado orientando a conferir o e-mail antes de salvar, já que não há como corrigi-lo depois pela tela.
 
 ### Deploy da Edge Function
 
@@ -708,6 +712,7 @@ Não é mais editável. Texto padrão fixo definido em `DESEMPENHO_FIXO` em `gen
 - Flag `automatic = true` → não aparece no Select do `ConsultationFormModal`, mas **aparece** nos filtros de relatório e no prontuário
 - Ações em lote do prontuário mostram **todos os status ativos** (incluindo automáticos)
 - Flag `consumes_prepaid_session = true` → ao salvar/atualizar consulta com este status, debita automaticamente 1 sessão do pacote pré-pago do paciente (se especialidade for `PREPAID_PACKAGE`); exibido como chip verde "Consome pré-paga" na listagem de status
+- Flags `requests_replacement_decision` e `is_scheduling_default` (migration 112) — ver seção "Reposição de Atendimentos" mais abaixo
 
 ### Flags de Observação (`shows_observation` / `requires_observation` — migration 110)
 
@@ -727,6 +732,23 @@ Quando o status selecionado **não** tem `shows_observation = true` (fluxo clín
 - Entrevistas (`event_type = 'INTERVIEW'`) não são bloqueadas por essa exigência.
 - **Atenção:** status usados para agendamento futuro (ex.: "Agendada") que não tenham `shows_observation` marcado passam a exigir Objetivo/Relato já no momento de agendar. Se isso não for desejado operacionalmente, configure esses status como "Exibe Observação = true" (com "Obrigatoriedade" ligada ou desligada, conforme o caso).
 - **Regra do Objetivo da Próxima Sessão:** ao salvar, se preenchido, `doReplicateObjective` propaga o texto como `mainObjective` do próximo atendimento agendado do mesmo paciente+terapeuta; se vazio, não altera nada (nunca sobrescreve com string vazia, nunca bloqueia o salvamento).
+
+## Reposição de Atendimentos
+
+Quando um atendimento em edição recebe um status configurado com `requests_replacement_decision = true` (migration 112 — inicialmente ativado manualmente em "Falta do Terapeuta" e "Cancelada", nunca por nome), o `ConsultationFormModal` exige uma resposta explícita: **"Este atendimento terá reposição?"** (Sim/Não). A regra nunca depende do texto do status — só da flag.
+
+- **Só se aplica em edição** (`isEdit === true`) e a `event_type === 'SESSION'` — criar um atendimento novo já com um desses status não pergunta sobre reposição.
+- **Não** (`willHaveReplacement = false`): salva o atendimento normalmente, sem criar nada.
+- **Sim** (`willHaveReplacement = true`): exibe a seção "Agendamento da Reposição" (Terapeuta, Data, Horário, Sala, Especialidade, Tipo de Atendimento, Terapeutas Participantes) pré-preenchida com os dados administrativos do original (paciente, terapeuta, especialidade, tipo, sala, participantes) — **exceto** data/horário, que ficam em branco e devem ser informados. Campos clínicos, Observação da falta/cancelamento, NF, faturamento e consumo pré-pago **nunca** são copiados.
+- **Status inicial da reposição:** sempre o status com `is_scheduling_default = true` (migration 112) — nunca herda o status do original. Índice único parcial garante no máximo 1 status **ativo** com essa flag; se nenhum estiver configurado, o salvamento é bloqueado com mensagem clara.
+- **Vínculo:** `replacement_for_consultation_id` (migration 113) é preenchido **só** no atendimento de reposição, apontando para o original. Índice único parcial garante **no máximo 1 reposição direta** por atendimento original — mas permite **cadeia** (`original → repl1 → repl2`, cada um aponta para um valor diferente), pois uma reposição também pode receber um status que solicita nova decisão de reposição.
+- **Série:** a reposição nasce sempre via `addConsultation` (nunca `addConsultationSeries`), que não seta `series_id`/`series_original_date`/`is_series_exception` — portanto a reposição é sempre um atendimento avulso, e a série do original permanece intocada. O fluxo nunca passa por `proceedSave`/`doSave`/o diálogo "Apenas esta / Esta e as próximas".
+- **Consistência (`DataContext.createConsultationReplacement`):** operação coordenada (não RPC) — cria a reposição primeiro via `addConsultation`; só em caso de sucesso atualiza o original (`updateConsultation` com o novo status + `willHaveReplacement=true`); se a atualização do original falhar, a reposição recém-criada é desfeita (`deleteConsultation`) — nunca fica um original marcado "terá reposição" sem que ela exista. Reaproveita 100% a lógica já existente de participantes (`consultation_therapists`), conflitos e pré-pago — nada duplicado em SQL.
+- **Financeiro/pré-pago:** nenhuma regra paralela — a reposição só passa a consumir pacote pré-pago quando futuramente receber um status com `consumes_prepaid_session=true`, igual a qualquer atendimento. NF/faturamento nunca são copiados (nem fazem parte do payload de criação).
+- **Decisão já existente:** se já há uma reposição vinculada (`consultations.find(c => c.replacementForConsultationId === original.id)`), a pergunta Sim/Não some e dá lugar a um card de resumo + botão "Abrir reposição" — impossível criar uma segunda reposição direta pela tela (e o índice único do banco garante isso mesmo por fora). Se a reposição vinculada for excluída depois, a pergunta reaparece automaticamente (o vínculo é sempre recalculado ao vivo, nunca lido de um cache separado).
+- **Navegação:** prop `onNavigate(consultation)` no `ConsultationFormModal`, opcional — reaproveita o mesmo estado de visualização (`viewItem`/`viewConsultation`) já usado para a transição visualizar→editar em `AgendaPage.jsx`/`ConsultationsPage.jsx`/`MedicalRecordsPage.jsx`. Card "Ver atendimento original" aparece quando o registro aberto tem `replacementForConsultationId` preenchido.
+- **Chips:** "Reposição" (cyan) no atendimento de reposição; "Reposição agendada" (teal) no original quando há vínculo. Sem chip "Sem reposição" persistente nos cards de lista (evita poluir a maioria dos cards de falta/cancelamento) — esse estado fica visível dentro do próprio modal.
+- **Auditoria:** nenhuma chamada manual — os triggers genéricos de INSERT/UPDATE em `consultations` (migration 25/26/107) já cobrem a criação da reposição e a atualização do original.
 
 ## Gestão Financeira / Pacotes Pré-pagos
 
@@ -1097,3 +1119,5 @@ Identificadas durante a implementação das migrations 108-111 (anamnese, ordem 
 - O bloco de aviso de "Modalidade de Pagamento" (azul/âmbar, saldo pré-pago) é praticamente idêntico entre `ConsultationFormModal.jsx` e `SeriesFormModal.jsx` — copiado, não compartilhado.
 - `applyFieldCleanup` (limpeza de campos clínicos vs. Observação conforme `shows_observation`) só existe em `ConsultationFormModal`; não há equivalente centralizado caso outro fluxo precise da mesma regra.
 - `detectConflicts`/`detectSeriesConflicts` já são um bom exemplo de compartilhamento (ver `conflictUtils.js`) — usar como referência para uma futura extração de um hook `useConsultationFormShared({ patientId, specialty, therapistId })` cobrindo os pontos acima.
+- A seção "Agendamento da Reposição" (Reposição de Atendimentos) reaproveita inline os mesmos `Select`s de terapeuta/especialidade/sala/tipo já usados em "Dados do Atendimento" no mesmo arquivo — candidato ao mesmo hook/fieldset compartilhado acima, se um terceiro fluxo similar aparecer.
+- Existem 3 pontos com busca textual por `"agend"` no nome do status (`ConsultationFormModal.jsx` — status padrão de novo atendimento e `doReplicateObjective`; `DashboardPage.jsx` — `agendadaIds`) que **não** foram migrados para a nova flag explícita `is_scheduling_default` (migration 112) — ficaram fora do escopo da Reposição de Atendimentos por prudência (mudaria comportamento hoje estabelecido em telas não solicitadas). Migrá-los para a flag explícita é candidato de backlog natural, já que a flag existe e resolveria a fragilidade.

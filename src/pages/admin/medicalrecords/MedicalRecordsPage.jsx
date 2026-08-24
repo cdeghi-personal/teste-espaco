@@ -531,6 +531,7 @@ export default function MedicalRecordsPage() {
           <p><strong>Projeto Terapêutico:</strong> campos de texto livre para descrever o projeto terapêutico — Descrição do Projeto e Observações. Único por prontuário; editável por admin e terapeutas da equipe.</p>
           <p><strong>Conduta & Objetivo Terapêutico:</strong> registre a conduta de cada terapeuta com objetivos, datas e status de andamento.</p>
           <p><strong>Histórico de Atendimentos:</strong> navegue pelo histórico usando os filtros de período (Mês -2, Mês Anterior, Mês Corrente ou Período personalizado) e filtre por status. Clique no lápis (✏) para editar um atendimento.</p>
+          <p><strong>Reposição:</strong> chip "Reposição" identifica um atendimento criado como reposição de outro; chip "Reposição agendada" indica que já existe uma reposição vinculada.</p>
           <p><strong>Ações em lote:</strong> admin pode selecionar múltiplos atendimentos e alterar o status em massa.</p>
           <p><strong>PDF:</strong> admin pode gerar o prontuário completo em PDF pelo botão no topo.</p>
         </HelpButton>
@@ -995,6 +996,12 @@ export default function MedicalRecordsPage() {
                                 {room.name}
                               </span>
                             )}
+                            {c.replacementForConsultationId && (
+                              <span title="Reposição de outro atendimento" className="px-1.5 py-0.5 rounded-full text-xs font-medium bg-cyan-50 text-cyan-700">Reposição</span>
+                            )}
+                            {c.willHaveReplacement === true && consultations.some(r => r.replacementForConsultationId === c.id) && (
+                              <span title="Já existe reposição agendada" className="px-1.5 py-0.5 rounded-full text-xs font-medium bg-teal-50 text-teal-700">Reposição agendada</span>
+                            )}
                             <div className="ml-auto flex gap-0.5 shrink-0">
                               {/* Olho: apenas participantes (principal ou adicional) */}
                               {canViewConsultationDetails(user, c) && (
@@ -1053,6 +1060,7 @@ export default function MedicalRecordsPage() {
         <ConsultationFormModal
           onClose={() => setShowConsultationModal(false)}
           initial={editConsultation || (selectedPatientId ? { patientId: selectedPatientId } : {})}
+          onNavigate={c => { setShowConsultationModal(false); setViewConsultation(c) }}
         />
       )}
       {viewConsultation && (
@@ -1060,6 +1068,7 @@ export default function MedicalRecordsPage() {
           onClose={() => setViewConsultation(null)}
           initial={viewConsultation}
           readOnly
+          onNavigate={c => setViewConsultation(c)}
         />
       )}
       {showSeriesModal && (
