@@ -51,31 +51,42 @@ export function getPerformanceTier(rate, hasEligible = true) {
   return TIERS.find(t => rate >= t.min)
 }
 
-// Quantos preenchimentos faltam para entrar no pódio (3º lugar do ranking),
+// Quantos preenchimentos faltam para entrar no pódio (top 3 do ranking),
 // não para uma faixa arbitrária de 85/95% — a meta real é sempre 100%, o
-// pódio é só o próximo marco acionável no caminho até lá. Usa o mesmo
-// comparador do ranking (compareTherapistPerformance), então "entrar no
-// pódio" aqui significa exatamente a mesma coisa que aparecer entre os 3
-// primeiros na tabela. Sem prometer o impossível: se nem preenchendo todas
-// as pendências (`pending`) bastar, `achievable` fica false.
-export function computePodiumProjection({ completed, total, pending, thirdPlaceEntry }) {
-  if (!total) return { rate: null, needed: 0, achievable: true, onPodium: false, targetRate: null }
+// pódio é só o próximo marco acionável no caminho até lá. `rankingSorted` é
+// a lista completa já ordenada (mesma usada na tabela); simula
+// `completed + x` (x de 1 até `pending`) substituindo o próprio terapeuta
+// nessa lista e recalculando a posição com o mesmo `compareTherapistPerformance`
+// do ranking — então a posição prevista (`targetPosition`) é sempre exata,
+// nunca uma suposição de "pelo menos 3º". Sem prometer o impossível: se nem
+// preenchendo todas as pendências (`pending`) bastar pro pódio, `achievable`
+// fica false.
+export function computePodiumProjection({ completed, total, pending, therapistId, rankingSorted = [] }) {
+  if (!total) return { rate: null, needed: 0, achievable: true, onPodium: false, targetRate: null, targetPosition: null }
   const rate = Math.round((completed / total) * 100)
-  if (!thirdPlaceEntry) return { rate, needed: 0, achievable: true, onPodium: true, targetRate: null }
+  const others = rankingSorted.filter(t => t.therapistId !== therapistId)
 
-  if (compareTherapistPerformance({ rate, completed, total }, thirdPlaceEntry) <= 0) {
-    return { rate, needed: 0, achievable: true, onPodium: true, targetRate: null }
+  function positionFor(candidate) {
+    const ahead = others.filter(o => compareTherapistPerformance(o, candidate) < 0).length
+    return ahead + 1
+  }
+
+  const myPosition = positionFor({ rate, completed, total })
+  if (myPosition <= 3) {
+    return { rate, needed: 0, achievable: true, onPodium: true, targetRate: null, targetPosition: myPosition }
   }
 
   const maxFill = Math.max(0, pending || 0)
   for (let x = 1; x <= maxFill; x++) {
     const candidateCompleted = completed + x
     const candidateRate = Math.round((candidateCompleted / total) * 100)
-    if (compareTherapistPerformance({ rate: candidateRate, completed: candidateCompleted, total }, thirdPlaceEntry) <= 0) {
-      return { rate, needed: x, achievable: true, onPodium: false, targetRate: candidateRate }
+    const candidate = { rate: candidateRate, completed: candidateCompleted, total }
+    const targetPosition = positionFor(candidate)
+    if (targetPosition <= 3) {
+      return { rate, needed: x, achievable: true, onPodium: false, targetRate: candidateRate, targetPosition }
     }
   }
-  return { rate, needed: maxFill, achievable: false, onPodium: false, targetRate: null }
+  return { rate, needed: maxFill, achievable: false, onPodium: false, targetRate: null, targetPosition: null }
 }
 
 // Ordenação única do ranking: maior Taxa > maior preenchidos > maior Total > nome (pt-BR).

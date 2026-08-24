@@ -245,7 +245,7 @@ function SpecialtyMonthlyPanel({ specialties, specialtiesData, title, loading, e
   )
 }
 
-function MyPerformanceCard({ me, referenceLabel, onRegularize, thirdPlaceEntry }) {
+function MyPerformanceCard({ me, referenceLabel, onRegularize, rankingSorted }) {
   if (!me) {
     return (
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
@@ -259,9 +259,12 @@ function MyPerformanceCard({ me, referenceLabel, onRegularize, thirdPlaceEntry }
   const totalPending = (pendingMonth || 0) + (pendingPrevious || 0)
   const tier = getPerformanceTier(total > 0 ? Math.round((completed / total) * 100) : 0, total > 0)
   // Projeção usa só as pendências DO MÊS — só elas afetam a Taxa deste período.
-  // A meta real é sempre 100%; o pódio (3º lugar do ranking) é só o próximo
-  // marco acionável no caminho até lá.
-  const { rate, needed, achievable, onPodium, targetRate } = computePodiumProjection({ completed, total, pending: pendingMonth, thirdPlaceEntry })
+  // A meta real é sempre 100%; o pódio é só o próximo marco acionável no
+  // caminho até lá. targetPosition é a posição exata prevista, não uma
+  // suposição de "pelo menos 3º".
+  const { rate, needed, achievable, onPodium, targetRate, targetPosition } = computePodiumProjection({
+    completed, total, pending: pendingMonth, therapistId: me.therapistId, rankingSorted,
+  })
 
   return (
     <div className={`rounded-2xl border p-5 ${tier.colorClasses}`}>
@@ -306,7 +309,7 @@ function MyPerformanceCard({ me, referenceLabel, onRegularize, thirdPlaceEntry }
               {onPodium ? (
                 <>Você está no pódio 🏆 — preencha suas <strong>{pendingMonth}</strong> pendência{pendingMonth > 1 ? 's' : ''} do mês para chegar a 100%.</>
               ) : achievable ? (
-                <>Preencha <strong>{needed}</strong> atendimento{needed > 1 ? 's' : ''} para atingir {targetRate}% e entrar no pódio (3º lugar) — pode ser que você suba ainda mais, sem problema.</>
+                <>Preencha <strong>{needed}</strong> atendimento{needed > 1 ? 's' : ''} para atingir {targetRate}% e entrar no pódio em <strong>{targetPosition}º lugar</strong>.</>
               ) : (
                 <>Preencha suas <strong>{pendingMonth}</strong> pendência{pendingMonth > 1 ? 's' : ''} do mês para melhorar sua taxa.</>
               )}
@@ -493,8 +496,6 @@ export default function DashboardPage() {
       .map(t => ({ ...t, rate: t.total > 0 ? Math.round((t.completed / t.total) * 100) : 0 }))
       .sort(compareTherapistPerformance),
   [monthlyMetrics.therapists])
-
-  const thirdPlaceEntry = rankingSorted[2] || null
 
   const myMonthlyEntry = useMemo(() => {
     if (!user?.id) return null
@@ -1016,7 +1017,7 @@ export default function DashboardPage() {
             me={myMonthlyEntry}
             referenceLabel={referenceMonth.label}
             onRegularize={pendingFill.length > 0 ? handleRegularizePending : null}
-            thirdPlaceEntry={thirdPlaceEntry}
+            rankingSorted={rankingSorted}
           />
 
           {/* ── Ranking terapeutas + distribuição especialidade (fonte única) ── */}
