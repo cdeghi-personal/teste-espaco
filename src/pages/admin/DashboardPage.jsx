@@ -2,18 +2,23 @@ import {
   FiUsers, FiCalendar, FiClipboard, FiTrendingUp,
   FiMessageSquare, FiArrowRight, FiBell, FiLifeBuoy,
   FiDollarSign, FiCheckCircle, FiAlertTriangle,
-  FiArrowUp, FiArrowDown, FiMinus, FiActivity, FiEdit2,
+  FiArrowUp, FiArrowDown, FiMinus, FiActivity, FiEdit2, FiTarget, FiRefreshCw,
 } from 'react-icons/fi'
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { format, subMonths, addDays, subDays } from 'date-fns'
 import { Link } from 'react-router-dom'
 import { useData } from '../../context/DataContext'
 import { useAuth } from '../../context/AuthContext'
+import { useToast } from '../../components/ui/Toast'
 import Badge from '../../components/ui/Badge'
+import Spinner from '../../components/ui/Spinner'
 import { formatDateShort } from '../../utils/dateUtils'
 import { supabase } from '../../lib/supabase'
 import { ROUTES } from '../../constants/routes'
 import ConsultationFormModal from './consultations/ConsultationFormModal'
+import {
+  getReferenceMonth, getPerformanceTier, computeFillProjection, compareTherapistPerformance,
+} from '../../utils/dashboardMetrics'
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -94,6 +99,221 @@ function SectionHeader({ title, icon, action }) {
   )
 }
 
+// ── painéis mensais compartilhados (Admin + Terapeuta) ─────────────────────────
+
+function TherapistPerformanceTable({ therapists, currentUserId, title, loading, error, onRetry }) {
+  const rows = useMemo(() => {
+    return (therapists || [])
+      .filter(t => t.total > 0)
+      .map(t => ({ ...t, rate: t.total > 0 ? Math.round((t.completed / t.total) * 100) : 0 }))
+      .sort(compareTherapistPerformance)
+  }, [therapists])
+
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+      <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+        <h2 className="font-semibold text-gray-900 text-sm">🏆 {title}</h2>
+      </div>
+      {loading ? (
+        <div className="px-4 py-8 flex items-center justify-center"><Spinner size="sm" /></div>
+      ) : error ? (
+        <div className="px-4 py-8 text-center text-sm text-red-500 space-y-2">
+          <p>Não foi possível carregar o ranking.</p>
+          {onRetry && (
+            <button onClick={onRetry} className="inline-flex items-center gap-1 text-brand-blue hover:underline text-xs font-medium">
+              <FiRefreshCw size={11} /> Tentar novamente
+            </button>
+          )}
+        </div>
+      ) : rows.length === 0 ? (
+        <div className="px-4 py-8 text-center text-gray-400 text-sm">Ainda não há atendimentos elegíveis para o período.</div>
+      ) : (
+        <div className="overflow-x-auto max-h-96 overflow-y-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="bg-gray-50 text-gray-400 uppercase tracking-wide sticky top-0">
+                <th className="px-4 py-2 text-left font-semibold">Terapeuta</th>
+                <th className="px-3 py-2 text-center font-semibold">Total</th>
+                <th className="px-3 py-2 text-center font-semibold">Realizadas</th>
+                <th className="px-3 py-2 text-center font-semibold">Taxa</th>
+                <th className="px-4 py-2 text-center font-semibold hidden sm:table-cell">Pendências</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {rows.map((t, i) => {
+                const isMe = t.therapistId === currentUserId
+                return (
+                  <tr key={t.therapistId} className={`transition-colors ${isMe ? 'bg-blue-50/70' : 'hover:bg-gray-50/60'}`}>
+                    <td className={`px-4 py-2.5 ${isMe ? 'border-l-2 border-brand-blue' : ''}`}>
+                      <div className="flex items-center gap-2">
+                        {i < 3 && <span title="Posição baseada na Taxa de preenchimento do período." className="text-base">{['🥇', '🥈', '🥉'][i]}</span>}
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          {t.therapistColor && <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: t.therapistColor }} />}
+                          <span className="font-medium text-gray-900 truncate max-w-[110px]">{t.therapistName}</span>
+                          {isMe && <span className="text-brand-blue font-semibold shrink-0">— Você</span>}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-3 py-2.5 text-center text-gray-600">{t.total}</td>
+                    <td className="px-3 py-2.5 text-center font-semibold text-green-700">{t.completed}</td>
+                    <td className="px-3 py-2.5 text-center">
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
+                        t.rate >= 80 ? 'bg-green-100 text-green-700' :
+                        t.rate >= 60 ? 'bg-amber-100 text-amber-700' :
+                        'bg-red-100 text-red-600'
+                      }`}>{t.rate}%</span>
+                    </td>
+                    <td className="px-4 py-2.5 text-center hidden sm:table-cell">
+                      {t.pending > 0
+                        ? <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-600">{t.pending}</span>
+                        : <span className="text-gray-300 text-xs">—</span>
+                      }
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+      <div className="px-4 py-2 border-t border-gray-100 text-xs text-gray-400">
+        A Taxa representa atendimentos preenchidos sobre o total elegível no período. Considere também o volume de atendimentos (coluna Total).
+      </div>
+    </div>
+  )
+}
+
+function SpecialtyMonthlyPanel({ specialties, specialtiesData, title, loading, error, onRetry }) {
+  const rows = useMemo(() => {
+    const bySpec = new Map((specialties || []).map(s => [s.specialtyKey, s]))
+    return (specialtiesData || [])
+      .filter(s => s.active !== false)
+      .map(spec => ({ ...spec, ...( bySpec.get(spec.key) || { total: 0, completed: 0 } ) }))
+      .filter(s => s.total > 0)
+      .sort((a, b) => b.total - a.total)
+  }, [specialties, specialtiesData])
+
+  const grandTotal = rows.reduce((sum, r) => sum + r.total, 0)
+
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+      <div className="px-4 py-3 border-b border-gray-100">
+        <h2 className="font-semibold text-gray-900 text-sm">📊 {title}</h2>
+        <p className="text-xs text-gray-400 mt-0.5">Visão consolidada da clínica no período.</p>
+      </div>
+      {loading ? (
+        <div className="px-4 py-8 flex items-center justify-center"><Spinner size="sm" /></div>
+      ) : error ? (
+        <div className="px-4 py-8 text-center text-sm text-red-500 space-y-2">
+          <p>Não foi possível carregar os dados.</p>
+          {onRetry && (
+            <button onClick={onRetry} className="inline-flex items-center gap-1 text-brand-blue hover:underline text-xs font-medium">
+              <FiRefreshCw size={11} /> Tentar novamente
+            </button>
+          )}
+        </div>
+      ) : rows.length === 0 ? (
+        <div className="px-4 py-8 text-center text-gray-400 text-sm">Ainda não há atendimentos elegíveis para o período.</div>
+      ) : (
+        <div className="p-4 grid grid-cols-2 gap-2">
+          {rows.map(spec => {
+            const bg = spec.color || '#e5e7eb'
+            const tc = textColorForBg(bg)
+            const pct = grandTotal > 0 ? Math.round(spec.total / grandTotal * 100) : 0
+            return (
+              <div key={spec.key} className="rounded-xl px-3 py-2.5 border border-gray-100" style={{ backgroundColor: bg }}>
+                <div className="text-xl font-bold" style={{ color: tc }}>{spec.total}</div>
+                <div className="text-xs font-medium leading-tight" style={{ color: tc, opacity: .85 }}>{spec.label}</div>
+                <div className="text-xs mt-1 flex items-center gap-1 flex-wrap">
+                  <span style={{ color: tc, opacity: .75 }}>{spec.completed} realizadas</span>
+                  <span style={{ color: tc, opacity: .4 }}>·</span>
+                  <span style={{ color: tc, opacity: .55 }}>{pct}% do mês</span>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function MyPerformanceCard({ me, referenceLabel, onRegularize }) {
+  if (!me) {
+    return (
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+        <h2 className="font-semibold text-gray-900 text-sm mb-2">Meu desempenho — {referenceLabel}</h2>
+        <p className="text-sm text-gray-400">Você ainda não possui atendimentos elegíveis neste período.</p>
+      </div>
+    )
+  }
+
+  const { total, completed, pending } = me
+  const tier = getPerformanceTier(total > 0 ? Math.round((completed / total) * 100) : 0, total > 0)
+  const { rate, nextGoalPct, needed, achievable } = computeFillProjection({ completed, total, pending })
+
+  return (
+    <div className={`rounded-2xl border p-5 ${tier.colorClasses}`}>
+      <div className="flex items-center justify-between gap-3 flex-wrap mb-3">
+        <h2 className="font-semibold text-gray-900 text-sm">Meu desempenho — {referenceLabel}</h2>
+        {tier.label && (
+          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-white/60">
+            <FiTarget size={11} /> {tier.label}
+          </span>
+        )}
+      </div>
+
+      {total > 0 ? (
+        <>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
+            <div>
+              <div className="text-2xl font-bold text-gray-900">{rate}%</div>
+              <div className="text-xs text-gray-500">Taxa de preenchimento</div>
+            </div>
+            <div>
+              <div className="text-2xl font-bold text-gray-900">{me.position ? `${me.position}º` : '—'}</div>
+              <div className="text-xs text-gray-500">Posição</div>
+            </div>
+            <div>
+              <div className="text-2xl font-bold text-gray-900">{completed}<span className="text-sm font-normal text-gray-500"> / {total}</span></div>
+              <div className="text-xs text-gray-500">Preenchidos</div>
+            </div>
+            <div>
+              <div className="text-2xl font-bold text-gray-900">{pending}</div>
+              <div className="text-xs text-gray-500">Pendências</div>
+            </div>
+          </div>
+
+          <div className="w-full bg-white/60 rounded-full h-2 mb-2 overflow-hidden">
+            <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(rate, 100)}%`, backgroundColor: tier.barColor }} />
+          </div>
+
+          <p className="text-xs text-gray-700">{tier.message}</p>
+
+          {nextGoalPct != null && (
+            <p className="text-xs text-gray-600 mt-1">
+              Meta: <strong>{nextGoalPct}%</strong>
+              {needed > 0 && achievable && <> — preencha <strong>{needed}</strong> evolução{needed > 1 ? 'ões' : ''} para alcançar {nextGoalPct}%.</>}
+              {needed > 0 && !achievable && <> — preencha suas <strong>{pending}</strong> pendência{pending > 1 ? 's' : ''} para melhorar sua taxa.</>}
+            </p>
+          )}
+
+          {pending > 0 && onRegularize && (
+            <button
+              onClick={onRegularize}
+              className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/70 hover:bg-white text-gray-800 text-xs font-semibold transition-colors"
+            >
+              Regularizar pendências <FiArrowRight size={11} />
+            </button>
+          )}
+        </>
+      ) : (
+        <p className="text-sm text-gray-600">{tier.message}</p>
+      )}
+    </div>
+  )
+}
+
 // ── greeting constants ────────────────────────────────────────────────────────
 
 const GREETING_CATEGORIAS = [
@@ -150,6 +370,7 @@ export default function DashboardPage() {
     patients, consultations, therapists, rooms,
     patientStatuses, specialtiesData, consultationStatuses,
   } = useData()
+  const { show: showToast } = useToast()
 
   const now        = new Date()
   const today      = format(now, 'yyyy-MM-dd')
@@ -188,6 +409,71 @@ export default function DashboardPage() {
   const agendadaIds = useMemo(() =>
     consultationStatuses.filter(s => norm(s.name).includes('agend')).map(s => s.id),
   [consultationStatuses])
+
+  // ── painéis mensais (Terapeutas + Especialidades) — fonte única via RPC ───
+  // Regra do 3º dia útil: só se aplica aqui e ao card "Meu desempenho" —
+  // os StatCards abaixo continuam no mês corrente literal, por decisão do produto.
+  const referenceMonth = useMemo(() => getReferenceMonth(now), []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const [monthlyMetrics, setMonthlyMetrics] = useState({ therapists: [], specialties: [] })
+  const [monthlyMetricsLoading, setMonthlyMetricsLoading] = useState(true)
+  const [monthlyMetricsError, setMonthlyMetricsError] = useState(false)
+
+  const reloadMonthlyMetrics = useCallback(async () => {
+    setMonthlyMetricsLoading(true)
+    setMonthlyMetricsError(false)
+    try {
+      const { data, error } = await supabase.rpc('get_dashboard_monthly_metrics', {
+        p_year: referenceMonth.year,
+        p_month: referenceMonth.month,
+        p_cutoff_date: today,
+        p_realizada_status_ids: realizadaIds,
+        p_agendada_status_ids: agendadaIds,
+      })
+      if (error || data?.error) throw new Error(data?.error || error?.message)
+      setMonthlyMetrics({
+        therapists: (data.therapists || []).map(r => ({
+          therapistId: r.therapist_id, therapistName: r.therapist_name, therapistColor: r.therapist_color,
+          total: r.total, completed: r.completed, pending: r.pending,
+        })),
+        specialties: (data.specialties || []).map(r => ({
+          specialtyKey: r.specialty_key, total: r.total, completed: r.completed,
+        })),
+      })
+    } catch (err) {
+      console.error('[DashboardPage] get_dashboard_monthly_metrics', err)
+      setMonthlyMetricsError(true)
+      showToast('Não foi possível carregar os painéis mensais.', 'error')
+    } finally {
+      setMonthlyMetricsLoading(false)
+    }
+  }, [referenceMonth, today, realizadaIds, agendadaIds, showToast])
+
+  useEffect(() => {
+    if (!user) return
+    reloadMonthlyMetrics()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, referenceMonth.monthKey, realizadaIds, agendadaIds])
+
+  const myMonthlyEntry = useMemo(() => {
+    if (!user?.id) return null
+    const sorted = [...monthlyMetrics.therapists]
+      .filter(t => t.total > 0)
+      .map(t => ({ ...t, rate: t.total > 0 ? Math.round((t.completed / t.total) * 100) : 0 }))
+      .sort(compareTherapistPerformance)
+    const idx = sorted.findIndex(t => t.therapistId === user.id)
+    if (idx === -1) return null
+    return { ...sorted[idx], position: idx + 1 }
+  }, [monthlyMetrics.therapists, user])
+
+  // ── "Regularizar pendências" — rola até a tabela já existente e destaca ───
+  const pendingSectionRef = useRef(null)
+  const [highlightPending, setHighlightPending] = useState(false)
+  function handleRegularizePending() {
+    pendingSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    setHighlightPending(true)
+    setTimeout(() => setHighlightPending(false), 1500)
+  }
 
   // ── sessões pessoais (primário ou secundário) — painel terapeuta ──────────
   const mySessions = useMemo(() => {
@@ -317,46 +603,12 @@ export default function DashboardPage() {
       .sort((a, b) => a.date.localeCompare(b.date) || (a.time || '').localeCompare(b.time || '')),
   [mySessions, today, user, agendadaIds])
 
-  // ── ranking terapeutas (admin) ────────────────────────────────────────────
-  const therapistRanking = useMemo(() => {
-    if (!isAdmin) return []
-    return therapists
-      .map(t => {
-        const tSessions = consultations.filter(c =>
-          c.therapistId === t.id &&
-          c.date?.startsWith(thisMonth) &&
-          c.eventType !== 'INTERVIEW'
-        )
-        const realized = tSessions.filter(c => realizadaIds.includes(c.consultationStatusId))
-        const rate = tSessions.length > 0 ? Math.round(realized.length / tSessions.length * 100) : 0
-        // Pendências: apenas onde o terapeuta é o responsável principal
-        const pending = consultations.filter(c =>
-          c.therapistId === t.id &&
-          c.date < today &&
-          c.eventType !== 'INTERVIEW' &&
-          agendadaIds.includes(c.consultationStatusId)
-        ).length
-        return { therapist: t, total: tSessions.length, realized: realized.length, rate, pending }
-      })
-      .filter(x => x.total > 0)
-      .sort((a, b) => b.realized - a.realized)
-      .slice(0, 8)
-  }, [isAdmin, therapists, consultations, thisMonth, realizadaIds, today, agendadaIds])
-
-  // ── distribuição por especialidade ────────────────────────────────────────
+  // ── distribuição de PACIENTES por especialidade (pessoal, terapeuta) ──────
+  // Indicador pessoal — mantido separado do painel coletivo "Sessões por
+  // Especialidade" (esse vem de monthlyMetrics/RPC) para não confundir os dois.
   const activeSpecialties = specialtiesData.filter(s => s.active !== false)
 
-  const specialtyDist = useMemo(() => {
-    if (effectiveView === 'admin') {
-      return activeSpecialties
-        .map(spec => ({
-          ...spec,
-          count: clinicThisMonth.filter(c => c.specialty === spec.key).length,
-          realized: clinicThisMonth.filter(c => c.specialty === spec.key && realizadaIds.includes(c.consultationStatusId)).length,
-        }))
-        .filter(s => s.count > 0)
-        .sort((a, b) => b.count - a.count)
-    }
+  const myPatientsBySpecialty = useMemo(() => {
     return activeSpecialties
       .map(spec => ({
         ...spec,
@@ -364,7 +616,7 @@ export default function DashboardPage() {
       }))
       .filter(s => s.count > 0)
       .sort((a, b) => b.count - a.count)
-  }, [effectiveView, activeSpecialties, clinicThisMonth, myPatients, realizadaIds])
+  }, [activeSpecialties, myPatients])
 
   // ── admin: financial data ─────────────────────────────────────────────────
   const [financial, setFinancial] = useState(null)
@@ -586,91 +838,24 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* ── Ranking terapeutas + distribuição especialidade ────────── */}
+          {/* ── Ranking terapeutas + distribuição especialidade (fonte única: RPC) ── */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-
-            {/* Ranking */}
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-              <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-                <h2 className="font-semibold text-gray-900 text-sm">🏆 Terapeutas — {now.toLocaleDateString('pt-BR', { month: 'long' })}</h2>
-              </div>
-              {therapistRanking.length === 0 ? (
-                <div className="px-4 py-8 text-center text-gray-400 text-sm">Nenhuma sessão registrada no mês</div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-xs">
-                    <thead>
-                      <tr className="bg-gray-50 text-gray-400 uppercase tracking-wide">
-                        <th className="px-4 py-2 text-left font-semibold">Terapeuta</th>
-                        <th className="px-3 py-2 text-center font-semibold">Total</th>
-                        <th className="px-3 py-2 text-center font-semibold">Realizadas</th>
-                        <th className="px-3 py-2 text-center font-semibold">Taxa</th>
-                        <th className="px-4 py-2 text-center font-semibold hidden sm:table-cell">Pendências</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-50">
-                      {therapistRanking.map(({ therapist: t, total, realized, rate, pending }, i) => (
-                        <tr key={t.id} className="hover:bg-gray-50/60 transition-colors">
-                          <td className="px-4 py-2.5">
-                            <div className="flex items-center gap-2">
-                              {i < 3 && <span className="text-base">{['🥇','🥈','🥉'][i]}</span>}
-                              <div className="flex items-center gap-1.5">
-                                {t.color && <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: t.color }} />}
-                                <span className="font-medium text-gray-900 truncate max-w-[110px]">{t.name}</span>
-                              </div>
-                            </div>
-                          </td>
-                          <td className="px-3 py-2.5 text-center text-gray-600">{total}</td>
-                          <td className="px-3 py-2.5 text-center font-semibold text-green-700">{realized}</td>
-                          <td className="px-3 py-2.5 text-center">
-                            <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
-                              rate >= 80 ? 'bg-green-100 text-green-700' :
-                              rate >= 60 ? 'bg-amber-100 text-amber-700' :
-                              'bg-red-100 text-red-600'
-                            }`}>{rate}%</span>
-                          </td>
-                          <td className="px-4 py-2.5 text-center hidden sm:table-cell">
-                            {pending > 0
-                              ? <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-600">{pending}</span>
-                              : <span className="text-gray-300 text-xs">—</span>
-                            }
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-
-            {/* Distribuição por especialidade */}
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-              <div className="px-4 py-3 border-b border-gray-100">
-                <h2 className="font-semibold text-gray-900 text-sm">📊 Sessões por Especialidade — {now.toLocaleDateString('pt-BR', { month: 'long' })}</h2>
-              </div>
-              {specialtyDist.length === 0 ? (
-                <div className="px-4 py-8 text-center text-gray-400 text-sm">Nenhuma sessão no mês</div>
-              ) : (
-                <div className="p-4 grid grid-cols-2 gap-2">
-                  {specialtyDist.map(spec => {
-                    const bg = spec.color || '#e5e7eb'
-                    const tc = textColorForBg(bg)
-                    const pct = clinicThisMonth.length > 0 ? Math.round(spec.count / clinicThisMonth.length * 100) : 0
-                    return (
-                      <div key={spec.key} className="rounded-xl px-3 py-2.5 border border-gray-100" style={{ backgroundColor: bg }}>
-                        <div className="text-xl font-bold" style={{ color: tc }}>{spec.count}</div>
-                        <div className="text-xs font-medium leading-tight" style={{ color: tc, opacity: .85 }}>{spec.label}</div>
-                        <div className="text-xs mt-1 flex items-center gap-1 flex-wrap">
-                          <span style={{ color: tc, opacity: .75 }}>{spec.realized} realizadas</span>
-                          <span style={{ color: tc, opacity: .4 }}>·</span>
-                          <span style={{ color: tc, opacity: .55 }}>{pct}% do mês</span>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-            </div>
+            <TherapistPerformanceTable
+              therapists={monthlyMetrics.therapists}
+              currentUserId={user?.id}
+              title={`Terapeutas — ${referenceMonth.label}`}
+              loading={monthlyMetricsLoading}
+              error={monthlyMetricsError}
+              onRetry={reloadMonthlyMetrics}
+            />
+            <SpecialtyMonthlyPanel
+              specialties={monthlyMetrics.specialties}
+              specialtiesData={specialtiesData}
+              title={`Sessões por Especialidade — ${referenceMonth.label}`}
+              loading={monthlyMetricsLoading}
+              error={monthlyMetricsError}
+              onRetry={reloadMonthlyMetrics}
+            />
           </div>
 
           {/* ── Próximos atendimentos (admin) ─────────────────────────── */}
@@ -791,7 +976,10 @@ export default function DashboardPage() {
 
           {/* ── Pendências de preenchimento ────────────────────────────── */}
           {pendingFill.length > 0 && (
-            <div className="bg-amber-50 border border-amber-200 rounded-2xl overflow-hidden">
+            <div
+              ref={pendingSectionRef}
+              className={`bg-amber-50 border rounded-2xl overflow-hidden transition-all ${highlightPending ? 'border-amber-400 ring-2 ring-amber-400' : 'border-amber-200'}`}
+            >
               <div className="px-4 py-3 border-b border-amber-200 flex items-center gap-2 flex-wrap">
                 <FiAlertTriangle size={15} className="text-amber-600 shrink-0" />
                 <span className="font-semibold text-amber-800 text-sm">Pendências de preenchimento</span>
@@ -835,6 +1023,33 @@ export default function DashboardPage() {
               </div>
             </div>
           )}
+
+          {/* ── Meu desempenho — card pessoal ────────────────────────────── */}
+          <MyPerformanceCard
+            me={myMonthlyEntry}
+            referenceLabel={referenceMonth.label}
+            onRegularize={pendingFill.length > 0 ? handleRegularizePending : null}
+          />
+
+          {/* ── Ranking terapeutas + distribuição especialidade (fonte única) ── */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <TherapistPerformanceTable
+              therapists={monthlyMetrics.therapists}
+              currentUserId={user?.id}
+              title={`Terapeutas — ${referenceMonth.label}`}
+              loading={monthlyMetricsLoading}
+              error={monthlyMetricsError}
+              onRetry={reloadMonthlyMetrics}
+            />
+            <SpecialtyMonthlyPanel
+              specialties={monthlyMetrics.specialties}
+              specialtiesData={specialtiesData}
+              title={`Sessões por Especialidade — ${referenceMonth.label}`}
+              loading={monthlyMetricsLoading}
+              error={monthlyMetricsError}
+              onRetry={reloadMonthlyMetrics}
+            />
+          </div>
 
           {/* ── Alertas clínicos ───────────────────────────────────────── */}
           {(evasionRisk.length > 0 || withConflicts > 0) && (
@@ -883,12 +1098,12 @@ export default function DashboardPage() {
             </div>
           )}
 
-          {/* ── Distribuição de pacientes por especialidade ─────────────── */}
-          {specialtyDist.length > 0 && (
+          {/* ── Distribuição de pacientes por especialidade (pessoal) ───── */}
+          {myPatientsBySpecialty.length > 0 && (
             <div>
               <SectionHeader title="Meus Pacientes por Especialidade" icon="👥" />
               <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-2">
-                {specialtyDist.map(spec => {
+                {myPatientsBySpecialty.map(spec => {
                   const bg = spec.color || '#e5e7eb'
                   const tc = textColorForBg(bg)
                   return (
@@ -908,7 +1123,7 @@ export default function DashboardPage() {
       {editingConsultation && (
         <ConsultationFormModal
           initial={editingConsultation}
-          onClose={() => setEditingConsultation(null)}
+          onClose={() => { setEditingConsultation(null); reloadMonthlyMetrics() }}
         />
       )}
 

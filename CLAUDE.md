@@ -196,6 +196,7 @@ supabase/
   111_room_allows_multiple_patients.sql # Coluna allows_multiple_patients em rooms — sala não gera ROOM_OVERLAP quando true
   112_consultation_status_replacement_flags.sql # Colunas requests_replacement_decision e is_scheduling_default em consultation_statuses (+ índice único parcial no máximo 1 status ativo padrão de agendamento)
   113_consultations_replacement.sql    # Colunas will_have_replacement e replacement_for_consultation_id em consultations (Reposição de Atendimentos) — CHECK anti-auto-referência + índice único parcial (no máx. 1 reposição direta por atendimento)
+  114_dashboard_monthly_metrics_rpc.sql # RPC get_dashboard_monthly_metrics (SECURITY DEFINER) — métricas agregadas (terapeutas + especialidades) para os painéis mensais do Dashboard, fonte única para Admin e Terapeuta; nunca retorna dado clínico/paciente
   functions/
     invite-therapist/index.ts    # Edge Function — envia convite por e-mail ao criar terapeuta
     suggest-convenio/index.ts    # Edge Function — gera sugestões de texto para relatório de convênio via OpenAI gpt-4o-mini
@@ -660,15 +661,28 @@ Não é mais editável. Texto padrão fixo definido em `DESEMPENHO_FIXO` em `gen
 ### Pendências de preenchimento
 
 - `pendingFill` = atendimentos com `c.date < today && agendadaIds.includes(c.consultationStatusId) && c.therapistId === user?.id` (somente primário — terapeuta secundário não é responsável pelo preenchimento).
-- Exibido como tabela editável abaixo do card "Agenda de Hoje" no painel terapeuta.
-- Lápis (FiEdit2) por linha abre `ConsultationFormModal` em modo edição.
-- No painel admin: coluna "Pendências" na tabela 🏆 Terapeutas — Mês, usando `c.therapistId === t.id`.
+- Exibido como tabela editável abaixo do card "Agenda de Hoje" no painel terapeuta; tem `ref` (`pendingSectionRef`) para o botão "Regularizar pendências" do card "Meu desempenho" rolar até ela e destacá-la temporariamente (`ring-2 ring-amber-400` por ~1.5s) — não é uma lista duplicada, é a mesma tabela.
+- Lápis (FiEdit2) por linha abre `ConsultationFormModal` em modo edição; ao fechar (sucesso ou cancelamento), `reloadMonthlyMetrics()` é chamado para manter os painéis mensais sincronizados sem F5.
 
-### Distribuição por especialidade
+### Distribuição de pacientes por especialidade (pessoal — só terapeuta)
 
-- `specialtyDist` usa `effectiveView === 'admin'` para decidir branch:
-  - Admin: conta sessões de `clinicThisMonth` + coluna `realized` (realizadas no mês).
-  - Terapeuta: conta **pacientes** de `myPatients` que têm aquela especialidade no cadastro.
+- `myPatientsBySpecialty` — conta **pacientes** de `myPatients` que têm aquela especialidade no cadastro. Indicador pessoal, exibido só no painel terapeuta ("Meus Pacientes por Especialidade"), mantido separado do painel coletivo "Sessões por Especialidade — mês" abaixo para não confundir os dois.
+
+### Painéis mensais compartilhados (Admin + Terapeuta) — "Terapeutas" e "Sessões por Especialidade"
+
+Os dois painéis (`🏆 Terapeutas — mês` e `📊 Sessões por Especialidade — mês`) aparecem em **ambas** as visões (`effectiveView === 'admin'` e `'therapist'`), com a mesma fonte de dados — sem cálculo duplicado entre Admin e Terapeuta.
+
+- **Motivo de existir uma RPC:** a policy de SELECT em `consultations` ([20_fix_consultations_team_select.sql](supabase/20_fix_consultations_team_select.sql)) só libera ao terapeuta linhas onde ele é `therapist_id`, ou (se `belongs_to_team`) linhas de pacientes com terapeuta de equipe envolvido — nunca a clínica inteira. O array `consultations` do `DataContext` não contém os atendimentos dos colegas para um terapeuta comum, então os painéis não podiam ser calculados client-side como o admin já fazia. Em vez de ampliar a RLS de `consultations` (rejeitado por design — vazaria dado clínico), foi criada a RPC `get_dashboard_monthly_metrics` (migration 114), `SECURITY DEFINER` + `SET LOCAL row_security = off`, que só retorna contagens agregadas (nunca `patient_id`, nome de paciente ou conteúdo clínico) — `therapist_id`/`name`/`color` (já visível a todo autenticado hoje, ex. legenda da Agenda) e contagens totais/realizadas por terapeuta e por especialidade. Valida `EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid())`; `GRANT EXECUTE` só para `authenticated`.
+- **Elegibilidade decidida no frontend, passada como parâmetro para a RPC** (`p_realizada_status_ids`, `p_agendada_status_ids` — os mesmos `useMemo` `realizadaIds`/`agendadaIds` já existentes) — evita duplicar em SQL a lógica de normalização de texto (`norm()`, remove acentos via NFD) que já existe em JS; garante as mesmas regras de elegibilidade nas duas linguagens sem reimplementar.
+- **`src/utils/dashboardMetrics.js`** — helpers puros, única fonte para as duas visões:
+  - `getReferenceMonth(now)` — regra do **3º dia útil**: até o final do 3º dia útil do mês corrente (inclusive), os 2 painéis + o card pessoal mostram o **mês anterior**; do 4º dia útil em diante, mostram o **mês corrente**. Sábado/domingo não contam como dia útil. **Feriados não são considerados (limitação conhecida).** Escopo desta regra: **só** os 2 painéis mensais + card "Meu desempenho" — os StatCards do topo (Sessões no mês, Taxa de realização, Realizadas no mês, Faltas+canceladas, comparativos "vs mês anterior") continuam no mês corrente literal, por decisão de produto.
+  - `getPerformanceTier(rate, hasEligible)` — 4 faixas visuais (100% Excelência / 95–99% Meta alcançada / 85–94% Quase lá / <85% Atenção às pendências) + caso sem atendimento elegível. Mensagens sempre positivas/acionáveis, nunca punitivas ("pior terapeuta", "ranking de produtividade" etc. propositalmente evitados).
+  - `computeFillProjection({ completed, total, pending })` — quantos preenchimentos faltam para a próxima meta, **sem prometer o impossível**: `needed = ceil(nextGoalPct/100 * total) - completed`, capado em `pending`; se `pending` não bastar para a meta, marca `achievable: false` e a UI cai para uma mensagem genérica ("preencha suas N pendências") em vez de afirmar que a meta X% é alcançável.
+  - `compareTherapistPerformance(a, b)` — ordenação única do ranking: maior Taxa → maior preenchidos → maior Total → nome (pt-BR). Usada tanto para ordenar a tabela quanto para achar a posição do usuário logado.
+- **`TherapistPerformanceTable`** (sub-componente local em `DashboardPage.jsx`, reaproveitado nas duas views): recebe a lista crua da RPC, só deriva `rate` (não recalcula total/completed), filtra `total > 0`, ordena com `compareTherapistPerformance`. Medalhas 🥇🥈🥉 nas 3 primeiras posições com tooltip "Posição baseada na Taxa de preenchimento do período."; linha do usuário logado destacada (fundo azul claro) com rótulo "— Você" (só visual, não altera `therapist.name` no banco); Total sempre visível ao lado da Taxa; sem `slice`, lista completa com scroll interno (`max-h-96 overflow-y-auto`) para a própria linha continuar acessível.
+- **`SpecialtyMonthlyPanel`** (idem): junta `specialty_key`+contagens da RPC com `label`/`color` de `specialtiesData` (já carregado, dado público). Subtítulo fixo "Visão consolidada da clínica no período." nas duas views — sempre a clínica inteira, nunca só os pacientes/especialidades do terapeuta logado.
+- **`MyPerformanceCard`** (idem, só na view terapeuta): Taxa, Posição (índice+1 na lista ordenada/filtrada da RPC), "{completed} de {total}", Pendências, barra de progresso, tier + mensagem, "Meta: {nextGoalPct}%" + frase de projeção, botão "Regularizar pendências" (só quando `pending > 0`) que rola/destaca a tabela de pendências já existente — não abre modal nem cria lista nova.
+- Busca via `supabase.rpc('get_dashboard_monthly_metrics', {...})` direto em `DashboardPage.jsx` (mesmo padrão local já usado para `financial`/`newLeadsCount`, sem passar pelo `DataContext`) — dispara uma vez (independe de `effectiveView`, reaproveitado pelos dois painéis no toggle dual-role) e de novo a cada fechamento do modal de pendência. Erro → `Toast` + estado local isolado com botão "Tentar novamente"; nunca derruba o resto do Dashboard.
 
 ## Dados da Empresa (`/admin/empresa`)
 
