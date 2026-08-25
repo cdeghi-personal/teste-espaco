@@ -715,8 +715,17 @@ Os dois painéis (`🏆 Terapeutas — mês` e `📊 Sessões por Especialidade 
 - **`addAllPageFooters(doc, options)`** — itera todas as páginas e aplica `addPageFooter`.
 - **`sectionBlock(doc, text, y, { uppercase })`** — bloco de seção com fundo azul e texto branco.
 - **`labelValue(doc, label, value, x, y, maxWidth)`** — renderiza par label/valor em linha, retorna novo y.
-- **`loadLogo()`** — carrega `/logo.png` como base64 via `fetch`.
+- **`loadLogo()`** — carrega `/logo.jpg` (Casa Amarela) como base64 via `fetch`.
 - **`fmtDatePDF(str)`**, **`fmtCurrencyPDF(val)`**, **`formatMesLabel(yearMonth)`**.
+
+### Marca / Logos (rebrand parcial — Therali)
+
+O sistema está em transição de marca: "Therali" é a nova marca do produto, "Espaço Casa Amarela" continua sendo a clínica (cliente/conteúdo). Dois arquivos de logo distintos em `public/`, cada um usado só onde faz sentido — **não são intercambiáveis**:
+
+- **`public/logo.jpg`** (Casa Amarela) — site público (`PublicHeader.jsx`, `PublicFooter.jsx`), cabeçalho de todos os PDFs gerados (`pdfShared.js` `loadLogo()`), e agora também ao lado do Therali no sidebar do admin (ver abaixo).
+- **`public/therali-horizontal-light.png`** (Therali, fundo transparente, variante para fundo claro) — tela de login (`LoginPage.jsx`) e admin (`AdminSidebar.jsx`, barra superior mobile de `AdminLayout.jsx`). Existem também `therali-horizontal-dark.png`, `therali-symbol-light.png` e `therali-symbol-dark.png` já em `public/`, ainda não usados em nenhuma tela.
+- **`AdminSidebar.jsx`** (topo, acima do menu): as duas logos lado a lado na mesma linha — Therali alinhado à esquerda, Casa Amarela alinhada à direita (`flex justify-between`).
+- Site público, PDFs e rodapé continuam só com Casa Amarela — nenhuma mudança ali.
 
 ## Suporte (`/admin/suporte`)
 
