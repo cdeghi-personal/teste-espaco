@@ -105,9 +105,9 @@ function PodiumLoading({ label = 'Calculando ranking…' }) {
   return (
     <div className="px-4 py-10 flex flex-col items-center justify-center gap-3">
       <div className="relative w-64 h-10">
-        <span className="podium-runner absolute inset-y-0 text-3xl leading-10">🏃</span>
-        <span className="absolute inset-y-0 right-0 text-3xl leading-10">🏁</span>
-        <div className="absolute bottom-1.5 left-0 right-8 border-b-2 border-dashed border-gray-200" />
+        <span className="podium-runner absolute inset-y-0 text-3xl leading-10 inline-block" style={{ transform: 'scaleX(-1)' }}>🏃</span>
+        <span className="absolute inset-y-0 right-0 text-3xl leading-10">🏆</span>
+        <div className="absolute bottom-1.5 left-0 right-12 border-b-2 border-dashed border-gray-200" />
       </div>
       <p className="text-xs text-gray-400">{label}</p>
     </div>
