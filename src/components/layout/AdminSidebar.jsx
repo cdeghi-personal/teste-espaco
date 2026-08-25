@@ -90,7 +90,7 @@ export default function AdminSidebar({ open, onClose }) {
       {/* Logo */}
       <div className="px-4 py-3 border-b border-gray-100 shrink-0">
         <NavLink to="/" className="flex items-center" onClick={onClose}>
-          <img src="/logo.jpg" alt="Casa Amarela" className="h-10 w-auto" />
+          <img src="/therali-horizontal-light.png" alt="Therali" className="h-10 w-auto" />
         </NavLink>
       </div>
 

@@ -63,7 +63,7 @@ export default function LoginPage() {
         <div className="bg-white rounded-3xl shadow-2xl p-8">
           {/* Logo oficial */}
           <div className="flex justify-center mb-6">
-            <img src="/logo.jpg" alt="Espaço Casa Amarela" className="h-20 w-auto rounded-xl shadow-sm" />
+            <img src="/therali-horizontal-light.png" alt="Therali" className="h-20 w-auto" />
           </div>
 
           {forgotSent ? (

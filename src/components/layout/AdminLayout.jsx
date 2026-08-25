@@ -26,7 +26,7 @@ export default function AdminLayout() {
           >
             <FiMenu size={20} />
           </button>
-          <img src="/logo.jpg" alt="Casa Amarela" className="h-8 w-auto" />
+          <img src="/therali-horizontal-light.png" alt="Therali" className="h-8 w-auto" />
         </div>
 
         <main className="flex-1 overflow-y-auto overflow-x-hidden scrollbar-thin">
