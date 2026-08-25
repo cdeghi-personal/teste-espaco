@@ -32,6 +32,15 @@
   }
 }
 
+@keyframes podium-run {
+  0%   { left: 0%; }
+  70%  { left: calc(100% - 1.4rem); }
+  100% { left: calc(100% - 1.4rem); }
+}
+.podium-runner {
+  animation: podium-run 1.8s ease-in-out infinite;
+}
+
 @layer utilities {
   .scrollbar-thin {
     scrollbar-width: thin;

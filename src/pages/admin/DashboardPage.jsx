@@ -11,7 +11,6 @@ import { useData } from '../../context/DataContext'
 import { useAuth } from '../../context/AuthContext'
 import { useToast } from '../../components/ui/Toast'
 import Badge from '../../components/ui/Badge'
-import Spinner from '../../components/ui/Spinner'
 import HelpButton from '../../components/ui/HelpButton'
 import { formatDateShort } from '../../utils/dateUtils'
 import { supabase } from '../../lib/supabase'
@@ -102,6 +101,19 @@ function SectionHeader({ title, icon, action }) {
 
 // ── painéis mensais compartilhados (Admin + Terapeuta) ─────────────────────────
 
+function PodiumLoading({ label = 'Calculando ranking…' }) {
+  return (
+    <div className="px-4 py-8 flex flex-col items-center justify-center gap-3">
+      <div className="relative w-48 h-7">
+        <span className="podium-runner absolute inset-y-0 text-xl leading-7">🏃</span>
+        <span className="absolute inset-y-0 right-0 text-xl leading-7">🏁</span>
+        <div className="absolute bottom-0 left-0 right-5 border-b border-dashed border-gray-200" />
+      </div>
+      <p className="text-xs text-gray-400">{label}</p>
+    </div>
+  )
+}
+
 function TherapistPerformanceTable({ therapists, currentUserId, title, loading, error, onRetry }) {
   const rows = useMemo(() => {
     return (therapists || [])
@@ -116,7 +128,7 @@ function TherapistPerformanceTable({ therapists, currentUserId, title, loading, 
         <h2 className="font-semibold text-gray-900 text-sm">🏆 {title}</h2>
       </div>
       {loading ? (
-        <div className="px-4 py-8 flex items-center justify-center"><Spinner size="sm" /></div>
+        <PodiumLoading label="Calculando ranking…" />
       ) : error ? (
         <div className="px-4 py-8 text-center text-sm text-red-500 space-y-2">
           <p>Não foi possível carregar o ranking.</p>
@@ -210,7 +222,7 @@ function SpecialtyMonthlyPanel({ specialties, specialtiesData, title, loading, e
         <p className="text-xs text-gray-400 mt-0.5">Visão consolidada da clínica no período.</p>
       </div>
       {loading ? (
-        <div className="px-4 py-8 flex items-center justify-center"><Spinner size="sm" /></div>
+        <PodiumLoading label="Calculando especialidades…" />
       ) : error ? (
         <div className="px-4 py-8 text-center text-sm text-red-500 space-y-2">
           <p>Não foi possível carregar os dados.</p>
@@ -246,12 +258,16 @@ function SpecialtyMonthlyPanel({ specialties, specialtiesData, title, loading, e
   )
 }
 
-function MyPerformanceCard({ me, referenceLabel, onRegularize, rankingSorted }) {
+function MyPerformanceCard({ me, referenceLabel, onRegularize, rankingSorted, loading }) {
   if (!me) {
     return (
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
         <h2 className="font-semibold text-gray-900 text-sm mb-2">Meu desempenho — {referenceLabel}</h2>
-        <p className="text-sm text-gray-400">Você ainda não possui atendimentos elegíveis neste período.</p>
+        {loading ? (
+          <PodiumLoading label="Calculando seu desempenho…" />
+        ) : (
+          <p className="text-sm text-gray-400">Você ainda não possui atendimentos elegíveis neste período.</p>
+        )}
       </div>
     )
   }
@@ -440,6 +456,13 @@ export default function DashboardPage() {
   const [monthlyMetricsLoading, setMonthlyMetricsLoading] = useState(true)
   const [monthlyMetricsError, setMonthlyMetricsError] = useState(false)
 
+  // Evita setState/toast depois que a página já desmontou (ex.: usuário deu
+  // logout enquanto a chamada estava em andamento — a promise resolve/rejeita
+  // depois do redirecionamento para o login, e sem essa guarda o toast de erro
+  // aparecia por cima da tela de login).
+  const mountedRef = useRef(true)
+  useEffect(() => () => { mountedRef.current = false }, [])
+
   const reloadMonthlyMetrics = useCallback(async () => {
     setMonthlyMetricsLoading(true)
     setMonthlyMetricsError(false)
@@ -452,6 +475,7 @@ export default function DashboardPage() {
         p_agendada_status_ids: agendadaIds,
       })
       if (error || data?.error) throw new Error(data?.error || error?.message)
+      if (!mountedRef.current) return
       setMonthlyMetrics({
         therapists: (data.therapists || []).map(r => ({
           therapistId: r.therapist_id, therapistName: r.therapist_name, therapistColor: r.therapist_color,
@@ -464,10 +488,12 @@ export default function DashboardPage() {
       })
     } catch (err) {
       console.error('[DashboardPage] get_dashboard_monthly_metrics', err)
-      setMonthlyMetricsError(true)
-      showToast('Não foi possível carregar os painéis mensais.', 'error')
+      if (mountedRef.current) {
+        setMonthlyMetricsError(true)
+        showToast('Não foi possível carregar os painéis mensais.', 'error')
+      }
     } finally {
-      setMonthlyMetricsLoading(false)
+      if (mountedRef.current) setMonthlyMetricsLoading(false)
     }
   }, [referenceMonth, today, realizadaIds, agendadaIds, showToast])
 
@@ -1029,6 +1055,7 @@ export default function DashboardPage() {
             referenceLabel={referenceMonth.label}
             onRegularize={pendingFill.length > 0 ? handleRegularizePending : null}
             rankingSorted={rankingSorted}
+            loading={monthlyMetricsLoading}
           />
 
           {/* ── Ranking terapeutas + distribuição especialidade (fonte única) ── */}
