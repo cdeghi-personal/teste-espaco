@@ -37,7 +37,7 @@ function textColorForBg(hex) {
 }
 
 export default function PatientFormModal({ onClose, initial = {}, readOnly = false }) {
-  const { paymentMethods, therapists, diagnoses, patientStatuses, specialtiesData, addPatient, updatePatient, companySettings } = useData()
+  const { paymentMethods, therapists, diagnoses, patientStatuses, specialtiesData, addPatient, updatePatient, addPatientSpecialtyKey, companySettings } = useData()
   const { user } = useAuth()
   const toast = useToast()
   const isAdmin = user?.role === 'admin'
@@ -166,9 +166,25 @@ export default function PatientFormModal({ onClose, initial = {}, readOnly = fal
     setSaving(true)
     try {
       if (isEdit) {
-        await updatePatient(initial.id, form)
+        if (canSeePricing) {
+          await updatePatient(initial.id, form)
+        } else {
+          // Sem acesso a preços: só admin/Gerente do Caso podem gravar direto
+          // em patient_specialties (valores financeiros inclusos). Especialidade
+          // nova (sempre em branco) vai pela RPC dedicada; o resto do
+          // formulário salva normalmente, sem tocar em specialties.
+          const newKeys = form.specialties
+            .map(s => s.key)
+            .filter(key => !(initial.specialties || []).some(s => s.key === key))
+          for (const key of newKeys) {
+            const result = await addPatientSpecialtyKey(initial.id, key)
+            if (result?.error) throw new Error(result.error)
+          }
+          const { specialties: _specialties, ...rest } = form
+          await updatePatient(initial.id, rest)
+        }
       } else {
-        await addPatient(form)
+        await addPatient(canSeePricing ? form : { ...form, specialties: [] })
       }
       onClose()
     } catch (err) {

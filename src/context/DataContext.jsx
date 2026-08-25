@@ -417,6 +417,23 @@ export function DataProvider({ children }) {
     }
   }
 
+  // Único caminho pra um terapeuta envolvido/de equipe (sem ser o Gerente do
+  // Caso) adicionar uma especialidade — sempre em branco, nunca sobrescreve
+  // uma já existente. Admin/Gerente do Caso continuam usando updatePatient
+  // normalmente (grava direto na tabela, com os valores financeiros).
+  async function addPatientSpecialtyKey(patientId, specialty) {
+    const { data, error } = await supabase.rpc('add_patient_specialty_key', {
+      p_patient_id: patientId,
+      p_specialty: specialty,
+    })
+    if (error || data?.error) return { error: data?.error || error?.message }
+    const { data: fresh, error: freshError } = await supabase.from('patients').select(PATIENT_SELECT).eq('id', patientId).single()
+    if (fresh && !freshError) {
+      setPatients(prev => prev.map(p => p.id === patientId ? mapPatient(fresh) : p))
+    }
+    return { success: true }
+  }
+
   async function deletePatient(id) {
     const { data, error } = await supabase.rpc('admin_soft_delete_patient', { p_patient_id: id })
     if (error) { toast.show(error.message, 'error'); return { error: error.message } }
@@ -2273,7 +2290,7 @@ export function DataProvider({ children }) {
 
   const value = {
     isLoading,
-    patients, addPatient, updatePatient, deletePatient, restorePatient, getPatientById, fetchInactivePatients,
+    patients, addPatient, updatePatient, deletePatient, restorePatient, getPatientById, fetchInactivePatients, addPatientSpecialtyKey,
     guardians, addGuardian, updateGuardian, deleteGuardian, restoreGuardian, getGuardianById, getGuardiansForPatient,
     appointments, addAppointment, updateAppointment, deleteAppointment,
     consultations, addConsultation, updateConsultation, deleteConsultation, createConsultationReplacement, addConsultationSeries, updateConsultationSeries, deleteConsultationSeries,

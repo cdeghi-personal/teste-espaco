@@ -180,7 +180,7 @@ supabase/
   95_fix_patients_therapist_rls.sql    # Fix: WITH CHECK da policy de UPDATE de terapeuta em patients — permite soft-delete sem falhar RLS de dual-role
   96_admin_soft_delete_patient.sql     # RPC admin_soft_delete_patient SECURITY DEFINER — substitui UPDATE direto que sofria de silent failure com múltiplas policies RLS
   97_fix_rpc_auth_uid.sql              # Fix: auth.uid() → current_setting('request.jwt.claims')::jsonb->>'sub' nos RPCs de admin (SECURITY DEFINER)
-  98_fix_soft_delete_no_admin_check.sql # Fix: remove verificação de admin do RPC admin_soft_delete_patient — instável para dual-role; segurança via frontend
+  98_fix_soft_delete_no_admin_check.sql # Fix: remove verificação de admin do RPC admin_soft_delete_patient — instável para dual-role; segurança via frontend (revertido pela migration 119 — achado real na revisão de segurança: qualquer autenticado inativava qualquer paciente)
   99_fix_cleanup_audit_resource_id.sql # Fix: tipo do resource_id no INSERT de audit_logs dentro de cleanup_inactive_patient_data (uuid, não text)
   100_fix_cleanup_fk_order.sql         # Fix: order de DELETE em cleanup — payment_invoices antes de payment_demonstratives (FK constraint)
   101_guardian_financial_responsible.sql # Flag is_financial_responsible em guardians — CPF obrigatório somente quando marcado como financeiro
@@ -201,6 +201,10 @@ supabase/
   116_dashboard_metrics_pending_split.sql # CREATE OR REPLACE de get_dashboard_monthly_metrics — separa "pending" em pending_month/pending_previous (mesma assinatura da 114)
   117_dashboard_metrics_total_atendidos.sql # CREATE OR REPLACE de get_dashboard_monthly_metrics — "total" passa a contar só até a data de corte; "completed" (rótulo "Atendidos") deixa de depender de consumesPrepaidSession e passa a ser "status ≠ aguarda desfecho", fechando Total = Atendidos + Pend.(mês) (mesma assinatura da 114)
   118_consultations_status_not_null.sql # Backfill de consultations com consultation_status_id nulo (status "aguarda desfecho" ativo alfabeticamente primeiro) + ALTER COLUMN ... SET NOT NULL — corrige a causa raiz de Total não bater no painel "Terapeutas — mês" para atendimentos órfãos
+  119_admin_soft_delete_patient_auth_check.sql # Reintroduz checagem de admin (padrão current_setting jwt.claims da migration 97) no RPC admin_soft_delete_patient — achado da revisão de segurança: a 98 tinha removido a checagem, deixando qualquer autenticado inativar qualquer paciente
+  120_patients_admin_field_guard.sql   # Trigger BEFORE UPDATE em patients: reverte silenciosamente uma tentativa de setar deleted=false→true por quem não é admin (WITH CHECK (true) da migration 95 permitia isso via UPDATE direto). Não bloqueia restaurar (true→false, hoje não é admin-only na UI) nem primary_therapist_id (não há evidência de que reatribuir Gerente do Caso seja restrito por design)
+  121_persist_consultation_conflicts_auth_check.sql # Adiciona checagem de propriedade/equipe (mesma lógica da policy conflicts_therapist_select) no RPC persist_consultation_conflicts — antes qualquer autenticado podia apagar/forjar conflitos de agenda de qualquer atendimento
+  122_patient_specialties_write_guard.sql # Separa SELECT (amplo, como já era) de INSERT/UPDATE/DELETE (restrito a admin ou Gerente do Caso) em patient_specialties — a policy FOR ALL da migration 18 deixava qualquer terapeuta vinculado (inclusive só "envolvido"/"equipe") escrever valores financeiros direto pelo cliente Supabase. Nova RPC add_patient_specialty_key preserva a função "Adicionar especialidade" (sempre em branco) que terapeutas comuns já usavam
   functions/
     invite-therapist/index.ts    # Edge Function — envia convite por e-mail ao criar terapeuta
     suggest-convenio/index.ts    # Edge Function — gera sugestões de texto para relatório de convênio via OpenAI gpt-4o-mini
@@ -475,7 +479,7 @@ Authentication → URL Configuration:
 ## Campos do Paciente
 
 - **Terapeutas:** `primary_therapist_id` (**Gerente do Caso**) + tabela `patient_involved_therapists` (Terapeutas Envolvidos, N:N). No app: `therapistId` e `involvedTherapistIds[]`.
-- **Especialidades em Atendimento:** tabela `patient_specialties` com colunas `specialty` (key), `patient_value` e `therapist_value`. No app: `patient.specialties = [{ key, patientValue, therapistValue }]`. Valores visíveis/editáveis somente por admin.
+- **Especialidades em Atendimento:** tabela `patient_specialties` com colunas `specialty` (key), `patient_value` e `therapist_value`. No app: `patient.specialties = [{ key, patientValue, therapistValue }]`. Valores financeiros visíveis/editáveis por admin ou pelo **Gerente do Caso** (`canSeePricing` em `PatientFormModal.jsx`) — reforçado no banco desde a migration 122 (RLS de escrita restrita a admin/gerente; qualquer outro terapeuta com acesso ao paciente só consegue **adicionar** uma especialidade nova (sempre em branco) via a RPC `add_patient_specialty_key`, nunca editar/remover uma existente).
 - **Dados pessoais extras:** `rg`, `phone`, `email`, `address`, `neighborhood`, `city`, `state`, `zip_code`, `indication`
 - **Dados escolares:** `school_name`, `school_phone`, `school_coordinator` (campos de endereço escolar removidos do DB em 103)
 - **Médico responsável:** `doctor_insurance`, `doctor_name`, `doctor_specialty`, `doctor_phone`
@@ -1036,7 +1040,7 @@ Quando um atendimento em edição recebe um status configurado com `requests_rep
 ### DataContext — novos valores e funções
 
 - `calendarBlocks` — array de bloqueios ativos (não cancelados) carregado no `fetchAll`; disponível via `useData()`
-- `persistConflicts(consultationId, conflicts[])` — chama RPC `persist_consultation_conflicts` (SECURITY DEFINER); substitui conflitos do atendimento atomicamente
+- `persistConflicts(consultationId, conflicts[])` — chama RPC `persist_consultation_conflicts` (SECURITY DEFINER); substitui conflitos do atendimento atomicamente. Desde a migration 121, a RPC exige que quem chama seja admin, o terapeuta primário/participante do atendimento, ou de equipe (mesma lógica da policy `conflicts_therapist_select`) — antes qualquer autenticado podia alterar conflitos de qualquer atendimento.
 - `rebuildRelatedConflicts(relatedIds, updatedConsultations, blocksOverride?)` — reprocessa conflitos de atendimentos afetados; `blocksOverride` permite passar o array de bloqueios atualizado sincronamente antes do React re-renderizar (evita race condition após setState)
 - `addCalendarBlock(data)` — cria bloqueio avulso; após salvar, reconstrói conflitos das consultas afetadas
 - `addCalendarBlockSeries(data)` — cria série de bloqueios via `generateSeriesDates`; reconstrói conflitos de todas as datas geradas
