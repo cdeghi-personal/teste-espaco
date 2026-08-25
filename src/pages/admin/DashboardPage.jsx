@@ -103,11 +103,11 @@ function SectionHeader({ title, icon, action }) {
 
 function PodiumLoading({ label = 'Calculando ranking…' }) {
   return (
-    <div className="px-4 py-8 flex flex-col items-center justify-center gap-3">
-      <div className="relative w-48 h-7">
-        <span className="podium-runner absolute inset-y-0 text-xl leading-7">🏃</span>
-        <span className="absolute inset-y-0 right-0 text-xl leading-7">🏁</span>
-        <div className="absolute bottom-0 left-0 right-5 border-b border-dashed border-gray-200" />
+    <div className="px-4 py-10 flex flex-col items-center justify-center gap-3">
+      <div className="relative w-64 h-10">
+        <span className="podium-runner absolute inset-y-0 text-3xl leading-10">🏃</span>
+        <span className="absolute inset-y-0 right-0 text-3xl leading-10">🏁</span>
+        <div className="absolute bottom-1.5 left-0 right-8 border-b-2 border-dashed border-gray-200" />
       </div>
       <p className="text-xs text-gray-400">{label}</p>
     </div>
@@ -403,7 +403,7 @@ export default function DashboardPage() {
   const { user } = useAuth()
   const {
     patients, consultations, therapists, rooms,
-    patientStatuses, specialtiesData, consultationStatuses,
+    patientStatuses, specialtiesData, consultationStatuses, isLoading: dataLoading,
   } = useData()
   const { show: showToast } = useToast()
 
@@ -498,7 +498,13 @@ export default function DashboardPage() {
   }, [referenceMonth, today, realizadaIds, agendadaIds, showToast])
 
   useEffect(() => {
-    if (!user) return
+    // Espera o DataContext terminar de carregar consultationStatuses antes de
+    // disparar — se consultationStatuses ainda está vazio (fetchAll do
+    // DataContext em andamento), realizadaIds/agendadaIds também vêm vazios,
+    // e a RPC trata array vazio como "nenhum status excluído": tudo conta
+    // como Atendidos, mostrando 100% pra todo mundo até o efeito rodar de
+    // novo com os ids corretos — daí o "flash" de 100% seguido de correção.
+    if (!user || dataLoading) return
     reloadMonthlyMetrics()
     // Depende de user?.authId (estável), não do objeto `user` inteiro — o
     // AuthContext recria esse objeto a cada evento do Supabase Auth (inclusive
@@ -506,7 +512,7 @@ export default function DashboardPage() {
     // e usar o objeto como dependência recarregava os painéis a cada refresh
     // de token, não só quando o usuário realmente muda.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.authId, referenceMonth.monthKey, realizadaIds, agendadaIds])
+  }, [user?.authId, dataLoading, referenceMonth.monthKey, realizadaIds, agendadaIds])
 
   // Auto-refresh a cada 5 minutos — mantém os painéis atualizados numa aba
   // aberta por muito tempo, sem depender de foco de janela ou refresh de token.
