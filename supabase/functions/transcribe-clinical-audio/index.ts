@@ -156,6 +156,11 @@ Deno.serve(async (req) => {
     if (authzError || !authz?.allowed) {
       return jsonResponse({ error: 'Não autorizado.' }, 403)
     }
+    // Especialidade do atendimento (label amigável, ex.: "Fisioterapia"),
+    // resolvida pela própria RPC — só um dado de contexto pra ajudar o
+    // modelo a não "corrigir" termos técnicos válidos da área. Nunca
+    // influencia o conteúdo ditado.
+    const specialtyLabel = typeof authz.specialty === 'string' ? authz.specialty : null
 
     // ── Secrets ─────────────────────────────────────────────────────────
     const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY')
@@ -170,7 +175,7 @@ Deno.serve(async (req) => {
     transcribeForm.append('file', audio, audio.name || 'gravacao.webm')
     transcribeForm.append('model', transcriptionModel)
     transcribeForm.append('language', 'pt')
-    transcribeForm.append('prompt', `Contexto: registro clínico de terapia, campo "${ALLOWED_FIELDS[fieldName]}".`)
+    transcribeForm.append('prompt', `Contexto: registro clínico de ${specialtyLabel || 'terapia'}, campo "${ALLOWED_FIELDS[fieldName]}".`)
 
     const transcribeRes = await fetch('https://api.openai.com/v1/audio/transcriptions', {
       method: 'POST',
@@ -204,7 +209,7 @@ Deno.serve(async (req) => {
           model: reviewModel,
           messages: [
             { role: 'system', content: REVIEW_SYSTEM_PROMPT },
-            { role: 'user', content: `${FIELD_CONTEXT[fieldName]}\n\nTranscrição:\n${rawTranscript}` },
+            { role: 'user', content: `${specialtyLabel ? `Especialidade do atendimento: ${specialtyLabel}.\n` : ''}${FIELD_CONTEXT[fieldName]}\n\nTranscrição:\n${rawTranscript}` },
           ],
           temperature: 0.1,
         }),

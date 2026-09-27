@@ -207,6 +207,7 @@ supabase/
   122_patient_specialties_write_guard.sql # Separa SELECT (amplo, como já era) de INSERT/UPDATE/DELETE (restrito a admin ou Gerente do Caso) em patient_specialties — a policy FOR ALL da migration 18 deixava qualquer terapeuta vinculado (inclusive só "envolvido"/"equipe") escrever valores financeiros direto pelo cliente Supabase. Nova RPC add_patient_specialty_key preserva a função "Adicionar especialidade" (sempre em branco) que terapeutas comuns já usavam
   123_payment_invoices_payment_date.sql # Adiciona payment_invoices.payment_date (data efetiva do pagamento, distinta de paid_at/paid_by); backfill via paid_at (timezone America/Sao_Paulo); CHECK NOT VALID (status<>'PAID' OR payment_date IS NOT NULL); primeira auditoria (trigger) em payment_invoices; RPCs mark_invoice_paid (transação atômica consultas+fatura) e set_invoice_payment_date (regularização de legado)
   124_voice_clinical_transcription.sql # Preenchimento por voz nos campos clínicos: company_settings.voice_transcription_enabled + therapists.can_use_voice_transcription (ambas admin only); trigger fn_guard_therapist_voice_flag (mesmo padrão da 120, guardando as duas direções); RPC can_use_voice_transcription_for_consultation (SECURITY DEFINER — única fonte de verdade da autorização, usada pela Edge Function transcribe-clinical-audio)
+  125_voice_transcription_specialty_context.sql # CREATE OR REPLACE de can_use_voice_transcription_for_consultation — acrescenta a especialidade (label amigável, via join com specialties) ao retorno de sucesso, como contexto de domínio pro modelo de transcrição/revisão (nunca influencia o conteúdo ditado)
   functions/
     invite-therapist/index.ts    # Edge Function — envia convite por e-mail ao criar terapeuta
     suggest-convenio/index.ts    # Edge Function — gera sugestões de texto para relatório de convênio via OpenAI gpt-4o-mini
@@ -830,12 +831,19 @@ Secrets: `OPENAI_API_KEY` (já existente, reaproveitado — não modificado); `O
 - **`Textarea.jsx`** ganhou a prop opcional `labelRight` (nó extra alinhado à direita do label, ex.: o botão de microfone) — 100% compatível com todo uso existente que não passa essa prop.
 - `AuthContext.jsx`, `DataContext.jsx` (`addTherapist`/`updateTherapist`/`updateCompanySettings`/`fetchAll`), `TherapistFormModal.jsx`, `CompanySettingsPage.jsx`, `mapTherapist` — mapeiam os dois campos novos, seguindo os padrões já existentes (`belongsToTeam` pro terapeuta, objeto fixo do `updateCompanySettings` cuidando de nunca derrubar os outros campos ao salvar).
 
+### Contexto de domínio enviado à IA (migration 125)
+
+Além do texto ditado, a Edge Function recebe da própria RPC `can_use_voice_transcription_for_consultation` (nunca do cliente, evita injeção via um "campo de contexto" forjado) a **especialidade do atendimento** (label amigável, ex.: "Fisioterapia", via join com `specialties`) — usada como vocabulário no prompt da transcrição (Etapa 1) e como frase de contexto na revisão (Etapa 2). Só ajuda o modelo a não "corrigir" um termo técnico válido da área pra outra coisa — **nunca influencia o conteúdo ditado**.
+
+Escopo deliberadamente mínimo, decidido com o usuário: **nome do paciente** (não implementado — sem problema de grafia reportado até agora, revisar se surgir) e **conteúdo dos outros 3 campos clínicos como contexto** (não implementado — risco real de o modelo "ajudar" incorporando um detalhe que só existia no outro campo, violando a regra de nunca acrescentar/inferir) ficam para uma segunda etapa, propositalmente adiados.
+
 ### Limitações do MVP / backlog
 
 - Sem rate-limiting persistente (ex.: 30 transcrições/hora) — só os limites de duração (3min) e tamanho (~20MB) por gravação, mais o controle de custo de nunca chamar a OpenAI para uma requisição não autorizada.
 - Só `ConsultationFormModal` — `SeriesFormModal` fora de escopo.
 - Sem verificação automatizada de configuração da conta OpenAI (faturamento, quota, Zero Data Retention) — item manual, fora do alcance do código.
 - Compatibilidade de navegador dependente de `MediaRecorder`/`isTypeSupported()` — sem testes automatizados de gravação real (requer microfone/navegador ao vivo).
+- Contexto de domínio enviado à IA limitado à especialidade (ver acima) — nome do paciente e conteúdo dos outros campos ficam para uma segunda etapa.
 
 ## Gestão Financeira / Pacotes Pré-pagos
 
