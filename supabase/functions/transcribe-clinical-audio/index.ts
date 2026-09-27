@@ -87,7 +87,9 @@ Preserve integralmente:
 - incertezas;
 - termos clínicos.
 
-Retorne somente o texto revisado, sem explicações, títulos ou comentários adicionais.`
+Retorne somente o texto revisado, sem explicações, títulos ou comentários adicionais.
+
+A mensagem do usuário pode incluir uma seção de CONTEXTO (ex.: especialidade do atendimento) antes da transcrição, claramente demarcada. Use esse contexto apenas para entender melhor o vocabulário e os termos técnicos esperados — nunca repita, resuma ou inclua o conteúdo do CONTEXTO na sua resposta. Sua resposta deve conter exclusivamente a revisão do texto que estiver na seção TRANSCRIÇÃO.`
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -209,7 +211,17 @@ Deno.serve(async (req) => {
           model: reviewModel,
           messages: [
             { role: 'system', content: REVIEW_SYSTEM_PROMPT },
-            { role: 'user', content: `${specialtyLabel ? `Especialidade do atendimento: ${specialtyLabel}.\n` : ''}${FIELD_CONTEXT[fieldName]}\n\nTranscrição:\n${rawTranscript}` },
+            {
+              role: 'user',
+              content: [
+                '=== CONTEXTO (não incluir na resposta; só para entender vocabulário/termos esperados) ===',
+                specialtyLabel ? `Especialidade do atendimento: ${specialtyLabel}` : null,
+                FIELD_CONTEXT[fieldName],
+                '',
+                '=== TRANSCRIÇÃO (revise somente este texto; retorne só a revisão dele) ===',
+                rawTranscript,
+              ].filter(line => line !== null).join('\n'),
+            },
           ],
           temperature: 0.1,
         }),
