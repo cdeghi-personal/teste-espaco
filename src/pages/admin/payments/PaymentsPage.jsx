@@ -4,8 +4,10 @@ import HelpButton from '../../../components/ui/HelpButton'
 import { useData } from '../../../context/DataContext'
 import { useToast } from '../../../components/ui/Toast'
 import Modal from '../../../components/ui/Modal'
+import PaymentDateModal from './PaymentDateModal'
 import { format, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
+import { formatDateTimeShort } from '../../../utils/dateUtils'
 import { generatePaymentSummaryPDF, generatePaymentDetailPDF } from '../../../utils/generatePaymentReportPDF'
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
@@ -37,9 +39,10 @@ function StatusBadge({ status }) {
 
 // ─── Modal de detalhes da fatura ──────────────────────────────────────────────
 
-function InvoiceDetailModal({ invoice, onClose }) {
+function InvoiceDetailModal({ invoice, onClose, therapists }) {
   const snap = invoice.snapshot || {}
   const consultations = snap.consultations || []
+  const paidByName = invoice.paid_by ? therapists?.find(t => t.userId === invoice.paid_by)?.name : null
 
   return (
     <Modal title={`Fatura ${invoice.nf_number ? `NF ${invoice.nf_number}` : '(sem NF)'}`} onClose={onClose} size="xl">
@@ -64,11 +67,23 @@ function InvoiceDetailModal({ invoice, onClose }) {
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           <StatusBadge status={invoice.status} />
           {invoice.cancelled_at && <span className="text-xs text-gray-400">Cancelada em {fmtDate(invoice.cancelled_at)}</span>}
-          {invoice.paid_at && <span className="text-xs text-gray-400">Paga em {fmtDate(invoice.paid_at)}</span>}
         </div>
+
+        {invoice.status === 'PAID' && (
+          <div className="flex items-center gap-3 flex-wrap text-xs text-gray-500 bg-green-50 border border-green-100 rounded-xl px-3 py-2">
+            <span>
+              Data do pagamento:{' '}
+              {invoice.payment_date
+                ? <strong className="text-gray-700">{fmtDate(invoice.payment_date)}</strong>
+                : <span className="text-amber-600">não informada</span>}
+            </span>
+            {invoice.paid_at && <span>Registrado no sistema em {formatDateTimeShort(invoice.paid_at)}</span>}
+            {paidByName && <span>por {paidByName}</span>}
+          </div>
+        )}
 
         {/* Atendimentos */}
         {consultations.length > 0 && (
@@ -123,11 +138,12 @@ function InvoiceDetailModal({ invoice, onClose }) {
 
 // ─── Card da fatura ───────────────────────────────────────────────────────────
 
-function InvoiceCard({ invoice, consultationStatuses, onView, onCancel, onPaid }) {
+function InvoiceCard({ invoice, consultationStatuses, onView, onCancel, onPaid, onBackfillDate }) {
   const patientName = invoice.patients?.full_name || invoice.snapshot?.patientName || '—'
   const snap = invoice.snapshot || {}
   const canAction = invoice.status === 'ISSUED'
   const count = (invoice.consultation_ids || []).length
+  const needsPaymentDate = invoice.status === 'PAID' && !invoice.payment_date
 
   return (
     <div className="bg-white rounded-xl border border-gray-100 shadow-sm px-4 py-3 space-y-2">
@@ -140,6 +156,9 @@ function InvoiceCard({ invoice, consultationStatuses, onView, onCancel, onPaid }
         )}
         {invoice.nf_issue_date && (
           <span className="text-xs text-gray-500">Emissão <strong className="text-gray-700">{fmtDate(invoice.nf_issue_date)}</strong></span>
+        )}
+        {invoice.status === 'PAID' && invoice.payment_date && (
+          <span className="text-xs text-gray-500">Pago em <strong className="text-gray-700">{fmtDate(invoice.payment_date)}</strong></span>
         )}
         <div className="ml-auto flex items-center gap-2 shrink-0">
           <button
@@ -175,6 +194,14 @@ function InvoiceCard({ invoice, consultationStatuses, onView, onCancel, onPaid }
             </button>
           </div>
         )}
+        {needsPaymentDate && (
+          <button
+            onClick={() => onBackfillDate(invoice)}
+            className="ml-auto text-xs text-amber-600 hover:underline shrink-0"
+          >
+            Informar data do pagamento
+          </button>
+        )}
       </div>
     </div>
   )
@@ -203,7 +230,7 @@ function monthBtnLabel(offset) {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function PaymentsPage() {
-  const { getPaymentInvoices, cancelPaymentInvoice, markInvoicePaid, consultationStatuses, companySettings } = useData()
+  const { getPaymentInvoices, cancelPaymentInvoice, markInvoicePaid, setInvoicePaymentDate, consultationStatuses, companySettings, therapists } = useData()
   const toast = useToast()
 
   const [invoices, setInvoices]         = useState([])
@@ -214,7 +241,9 @@ export default function PaymentsPage() {
   const [dateTo, setDateTo]             = useState(() => monthRange(0).to)
 
   const [viewInvoice, setViewInvoice]   = useState(null)
-  const [confirmAction, setConfirmAction] = useState(null) // { type: 'cancel'|'paid', invoice }
+  const [confirmAction, setConfirmAction] = useState(null) // { type: 'cancel', invoice }
+  const [payingInvoice, setPayingInvoice] = useState(null)
+  const [backfillInvoice, setBackfillInvoice] = useState(null)
   const [actionLoading, setActionLoading] = useState(false)
 
   const loadInvoices = useCallback(async () => {
@@ -252,28 +281,41 @@ export default function PaymentsPage() {
     }
   }
 
-  async function handlePaid(invoice) {
+  function handleOpenPaid(invoice) {
     const pagoStatus = (consultationStatuses || []).find(s =>
       s.name?.toLowerCase().includes('pago') || s.name?.toLowerCase().includes('50')
     )
     if (!pagoStatus) {
       toast.show('Status "Pago" não encontrado. Crie-o em Status Atendimento antes de marcar como paga.', 'error')
-      setConfirmAction(null)
       return
     }
-    setActionLoading(true)
-    try {
-      await markInvoicePaid(invoice.id, invoice.consultation_ids || [], pagoStatus.id)
-      toast.show('Fatura marcada como Paga. Atendimentos atualizados.', 'success')
-      setConfirmAction(null)
-      setInvoices(prev => prev.map(inv =>
-        inv.id === invoice.id ? { ...inv, status: 'PAID', paid_at: new Date().toISOString() } : inv
-      ))
-    } catch (err) {
-      toast.show('Erro ao marcar como paga: ' + (err?.message || ''), 'error')
-    } finally {
-      setActionLoading(false)
+    setPayingInvoice(invoice)
+  }
+
+  async function handlePaid(invoice, paymentDate) {
+    const pagoStatus = (consultationStatuses || []).find(s =>
+      s.name?.toLowerCase().includes('pago') || s.name?.toLowerCase().includes('50')
+    )
+    if (!pagoStatus) {
+      toast.show('Status "Pago" não encontrado. Crie-o em Status Atendimento antes de marcar como paga.', 'error')
+      setPayingInvoice(null)
+      return
     }
+    await markInvoicePaid(invoice.id, invoice.consultation_ids || [], paymentDate, pagoStatus.id)
+    toast.show('Fatura marcada como Paga. Atendimentos atualizados.', 'success')
+    setPayingInvoice(null)
+    setInvoices(prev => prev.map(inv =>
+      inv.id === invoice.id ? { ...inv, status: 'PAID', paid_at: new Date().toISOString(), payment_date: paymentDate } : inv
+    ))
+  }
+
+  async function handleSetPaymentDate(invoice, paymentDate) {
+    await setInvoicePaymentDate(invoice.id, paymentDate)
+    toast.show('Data do pagamento registrada.', 'success')
+    setBackfillInvoice(null)
+    setInvoices(prev => prev.map(inv =>
+      inv.id === invoice.id ? { ...inv, payment_date: paymentDate } : inv
+    ))
   }
 
   const [exporting, setExporting] = useState(false)
@@ -294,13 +336,14 @@ export default function PaymentsPage() {
 
   function handleExportCSV() {
     if (invoices.length === 0) { toast.show('Nenhuma fatura para exportar com os filtros atuais.', 'error'); return }
-    const headers = ['NF', 'Paciente', 'Período', 'Status', 'Data Emissão', 'Total (R$)', 'Atendimentos', 'Data Geração']
+    const headers = ['NF', 'Paciente', 'Período', 'Status', 'Data Emissão', 'Data Pagamento', 'Total (R$)', 'Atendimentos', 'Data Geração']
     const rows = invoices.map(inv => [
       inv.nf_number || '',
       inv.patients?.full_name || inv.snapshot?.patientName || '',
       inv.snapshot?.period || '',
       STATUS_CONFIG[inv.status]?.label || inv.status,
       inv.nf_issue_date ? fmtDate(inv.nf_issue_date) : '',
+      inv.payment_date ? fmtDate(inv.payment_date) : '',
       Number(inv.total_amount || 0).toFixed(2).replace('.', ','),
       (inv.consultation_ids || []).length,
       inv.created_at ? fmtDate(inv.created_at.slice(0, 10)) : '',
@@ -334,7 +377,8 @@ export default function PaymentsPage() {
             <p><strong>O que é esta tela:</strong> lista todas as faturas geradas a partir dos Demonstrativos Definitivos em Relatórios. Cada fatura corresponde a um período faturado para um paciente.</p>
             <p><strong>Status das faturas:</strong> <em>Emitida</em> (NF gerada, aguardando pagamento), <em>Paga</em> (pagamento confirmado) ou <em>Cancelada</em> (NF estornada — atendimentos voltam ao status anterior).</p>
             <p><strong>Ver detalhes:</strong> clique em <em>Ver detalhes</em> para abrir o snapshot completo da fatura, incluindo a lista de atendimentos com data, horário, especialidade, terapeuta e valor.</p>
-            <p><strong>Marcar como Pago:</strong> disponível para faturas com status <em>Emitida</em>. Confirme para registrar o recebimento e atualizar o status para <em>Paga</em>.</p>
+            <p><strong>Marcar como Pago:</strong> disponível para faturas com status <em>Emitida</em>. Informe a data em que o pagamento foi efetivamente realizado (pode ser anterior a hoje, nunca futura) — essa é a data financeira, separada do momento técnico em que a operação foi confirmada no sistema.</p>
+            <p><strong>Informar data do pagamento:</strong> ação disponível em faturas já <em>Pagas</em> sem data registrada (casos antigos). Preenche só a data — não altera o status dos atendimentos nem quem/quando a fatura foi marcada como paga no sistema.</p>
             <p><strong>Cancelar NF:</strong> disponível para faturas com status <em>Emitida</em>. Cancela a fatura e restaura automaticamente o status original de cada atendimento, removendo os dados da NF.</p>
             <p><strong>Filtros:</strong> use os botões de mês (Mês-2 / Mês-1 / Atual) ou defina um período manual. Filtre por status ou busque pelo número da NF ou nome do paciente.</p>
             <p><strong>Exportar:</strong> use os botões no cabeçalho para exportar as faturas filtradas. <em>Resumo</em> gera um PDF com uma linha por fatura e total geral. <em>Detalhado</em> gera um PDF com os atendimentos de cada fatura. <em>CSV</em> exporta a listagem em formato compatível com Excel. Faturas canceladas não são incluídas nos PDFs.</p>
@@ -451,7 +495,8 @@ export default function PaymentsPage() {
               consultationStatuses={consultationStatuses}
               onView={setViewInvoice}
               onCancel={inv => setConfirmAction({ type: 'cancel', invoice: inv })}
-              onPaid={inv  => setConfirmAction({ type: 'paid',   invoice: inv })}
+              onPaid={handleOpenPaid}
+              onBackfillDate={setBackfillInvoice}
             />
           ))}
         </div>
@@ -459,13 +504,13 @@ export default function PaymentsPage() {
 
       {/* Modal de detalhes */}
       {viewInvoice && (
-        <InvoiceDetailModal invoice={viewInvoice} onClose={() => setViewInvoice(null)} />
+        <InvoiceDetailModal invoice={viewInvoice} onClose={() => setViewInvoice(null)} therapists={therapists} />
       )}
 
-      {/* Modal de confirmação cancel/paid */}
+      {/* Modal de confirmação de cancelamento */}
       {confirmAction && (
         <Modal
-          title={confirmAction.type === 'cancel' ? 'Cancelar NF' : 'Marcar como Paga'}
+          title="Cancelar NF"
           onClose={() => !actionLoading && setConfirmAction(null)}
           size="sm"
           footer={
@@ -478,36 +523,40 @@ export default function PaymentsPage() {
                 Cancelar
               </button>
               <button
-                onClick={() => confirmAction.type === 'cancel'
-                  ? handleCancel(confirmAction.invoice)
-                  : handlePaid(confirmAction.invoice)
-                }
+                onClick={() => handleCancel(confirmAction.invoice)}
                 disabled={actionLoading}
-                className={`px-4 py-2 text-sm font-semibold rounded-xl transition-colors disabled:opacity-50 ${
-                  confirmAction.type === 'cancel'
-                    ? 'bg-red-600 text-white hover:bg-red-700'
-                    : 'bg-green-600 text-white hover:bg-green-700'
-                }`}
+                className="px-4 py-2 text-sm font-semibold rounded-xl transition-colors disabled:opacity-50 bg-red-600 text-white hover:bg-red-700"
               >
-                {actionLoading
-                  ? 'Aguarde...'
-                  : confirmAction.type === 'cancel' ? 'Confirmar Cancelamento' : 'Confirmar Pagamento'}
+                {actionLoading ? 'Aguarde...' : 'Confirmar Cancelamento'}
               </button>
             </div>
           }
         >
-          {confirmAction.type === 'cancel' ? (
-            <p className="text-sm text-gray-700">
-              Tem certeza que deseja cancelar esta NF?{' '}
-              Os atendimentos vinculados retornarão ao status anterior ao faturamento e os campos de NF serão limpos.
-            </p>
-          ) : (
-            <p className="text-sm text-gray-700">
-              Confirmar pagamento desta fatura?{' '}
-              Os atendimentos vinculados serão atualizados para o status <strong>Pago</strong>.
-            </p>
-          )}
+          <p className="text-sm text-gray-700">
+            Tem certeza que deseja cancelar esta NF?{' '}
+            Os atendimentos vinculados retornarão ao status anterior ao faturamento e os campos de NF serão limpos.
+          </p>
         </Modal>
+      )}
+
+      {/* Modal de confirmação de pagamento (com data efetiva) */}
+      {payingInvoice && (
+        <PaymentDateModal
+          title="Confirmar pagamento"
+          helperText='Informe a data em que o pagamento foi efetivamente realizado. Os atendimentos vinculados serão atualizados para o status "Pago".'
+          onConfirm={date => handlePaid(payingInvoice, date)}
+          onClose={() => setPayingInvoice(null)}
+        />
+      )}
+
+      {/* Modal de regularização de fatura paga sem data (legado) */}
+      {backfillInvoice && (
+        <PaymentDateModal
+          title="Informar data do pagamento"
+          helperText="Esta fatura já está paga, mas não possui data de pagamento registrada. Informe a data em que o pagamento efetivamente ocorreu — os atendimentos e o registro técnico do pagamento não serão alterados."
+          onConfirm={date => handleSetPaymentDate(backfillInvoice, date)}
+          onClose={() => setBackfillInvoice(null)}
+        />
       )}
     </div>
   )

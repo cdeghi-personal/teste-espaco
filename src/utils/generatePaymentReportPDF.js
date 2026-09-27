@@ -48,13 +48,15 @@ export async function generatePaymentSummaryPDF({ invoices, dateFrom, dateTo, st
   let firstPage = true
   autoTable(doc, {
     startY: 32,
-    head: [['NF', 'Paciente', 'Período', 'Status', 'Emissão', 'Total']],
+    head: [['NF', 'Paciente', 'Período', 'Status', 'Emissão / Pagamento', 'Total']],
     body: sorted.map(inv => [
       inv.nf_number || '—',
       invoicePatientName(inv),
       inv.snapshot?.period || '—',
       STATUS_LABEL[inv.status] || inv.status,
-      fmtDatePDF(inv.nf_issue_date),
+      inv.status === 'PAID' && inv.payment_date
+        ? `Emissão: ${fmtDatePDF(inv.nf_issue_date)}\nPagamento: ${fmtDatePDF(inv.payment_date)}`
+        : fmtDatePDF(inv.nf_issue_date),
       fmtCurrencyPDF(inv.total_amount),
     ]),
     foot: [[
@@ -118,11 +120,12 @@ export async function generatePaymentDetailPDF({ invoices, dateFrom, dateTo, sta
     const nfLabel = inv.nf_number ? `NF ${inv.nf_number}` : 'Sem NF'
     const statusLabel = STATUS_LABEL[inv.status] || inv.status
     const emissao = inv.nf_issue_date ? `  ·  Emissão ${fmtDatePDF(inv.nf_issue_date)}` : ''
+    const pagamento = (inv.status === 'PAID' && inv.payment_date) ? `  ·  Pagamento ${fmtDatePDF(inv.payment_date)}` : ''
 
     invoiceHeaderIndices.add(body.length)
     body.push([
       {
-        content: `${patientName}   ·   ${snap.period || '—'}   ·   ${nfLabel}${emissao}   ·   ${statusLabel}`,
+        content: `${patientName}   ·   ${snap.period || '—'}   ·   ${nfLabel}${emissao}${pagamento}   ·   ${statusLabel}`,
         colSpan: 5,
         styles: { fontStyle: 'bold', fontSize: 8, textColor: [255, 255, 255], fillColor: PDF_BLUE },
       },

@@ -1700,31 +1700,38 @@ export function DataProvider({ children }) {
     if (error) throw new Error(error.message)
   }
 
-  async function markInvoicePaid(invoiceId, consultationIds, paidStatusId) {
-    const { data: { session } } = await supabase.auth.getSession()
-    const userId = session?.user?.id || null
+  // consultationIds é usado só para o patch otimista local de `consultations`
+  // (mesmo padrão de cancelPaymentInvoice/batchFaturarConsultations) — nunca é
+  // enviado à RPC nem usado para autorização; mark_invoice_paid lê os IDs
+  // direto da própria fatura no banco, então um valor divergente aqui não
+  // teria efeito nenhum além de deixar a UI momentaneamente desatualizada.
+  async function markInvoicePaid(invoiceId, consultationIds, paymentDate, paidStatusId) {
+    const { data, error } = await supabase.rpc('mark_invoice_paid', {
+      p_invoice_id: invoiceId,
+      p_payment_date: paymentDate,
+      p_consultation_status_id: paidStatusId,
+    })
+    if (error) throw new Error(error.message)
+    if (data?.error) throw new Error(data.error)
 
     if (consultationIds?.length && paidStatusId) {
-      const { error: cErr } = await supabase
-        .from('consultations')
-        .update({ consultation_status_id: paidStatusId })
-        .in('id', consultationIds)
-      if (cErr) throw new Error(cErr.message)
       setConsultations(prev => prev.map(c =>
         consultationIds.includes(c.id) ? { ...c, consultationStatusId: paidStatusId } : c
       ))
     }
+    return data
+  }
 
-    const { error } = await supabase
-      .from('payment_invoices')
-      .update({
-        status:    'PAID',
-        paid_at:   new Date().toISOString(),
-        paid_by:   userId,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', invoiceId)
+  // Regularização de fatura PAID legada sem payment_date — só preenche esse
+  // campo; nunca sobrescreve paid_at/paid_by nem altera status de consultas.
+  async function setInvoicePaymentDate(invoiceId, paymentDate) {
+    const { data, error } = await supabase.rpc('set_invoice_payment_date', {
+      p_invoice_id: invoiceId,
+      p_payment_date: paymentDate,
+    })
     if (error) throw new Error(error.message)
+    if (data?.error) throw new Error(data.error)
+    return data
   }
 
   async function addPaymentDemonstrativo(data) {
@@ -2312,7 +2319,7 @@ export function DataProvider({ children }) {
     companySettings, updateCompanySettings,
     addPrepaidPackage, getPrepaidData, addLedgerAdjustment,
     batchFaturarConsultations, addPaymentDemonstrativo, getPaymentDemonstrativos,
-    createPaymentInvoice, getPaymentInvoices, cancelPaymentInvoice, markInvoicePaid,
+    createPaymentInvoice, getPaymentInvoices, cancelPaymentInvoice, markInvoicePaid, setInvoicePaymentDate,
     calendarBlocks, addCalendarBlock, addCalendarBlockSeries, updateCalendarBlock, updateCalendarBlockSeriesFuture, cancelCalendarBlock, cancelCalendarBlockSeriesFuture, getCalendarBlockHistory,
     getPatientCleanupSummary, cleanupInactivePatientData,
   }
