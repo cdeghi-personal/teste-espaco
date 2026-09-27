@@ -89,7 +89,9 @@ Preserve integralmente:
 
 Retorne somente o texto revisado, sem explicações, títulos ou comentários adicionais.
 
-A mensagem do usuário pode incluir uma seção de CONTEXTO (ex.: especialidade do atendimento) antes da transcrição, claramente demarcada. Use esse contexto apenas para entender melhor o vocabulário e os termos técnicos esperados — nunca repita, resuma ou inclua o conteúdo do CONTEXTO na sua resposta. Sua resposta deve conter exclusivamente a revisão do texto que estiver na seção TRANSCRIÇÃO.`
+A mensagem do usuário pode incluir uma seção de CONTEXTO (ex.: especialidade do atendimento) antes da transcrição, claramente demarcada. Use esse contexto apenas para entender melhor o vocabulário e os termos técnicos esperados — nunca repita, resuma ou inclua o conteúdo do CONTEXTO na sua resposta. Sua resposta deve conter exclusivamente a revisão do texto que estiver na seção TRANSCRIÇÃO.
+
+Quando a especialidade do atendimento estiver informada no CONTEXTO, revise como um profissional experiente dessa especialidade revisaria o próprio registro — usando o vocabulário e os termos técnicos apropriados a essa área. Isso nunca autoriza acrescentar diagnóstico, conduta ou qualquer informação que não tenha sido dita na transcrição — só ajusta o tom e o vocabulário ao que é esperado nessa especialidade.`
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
