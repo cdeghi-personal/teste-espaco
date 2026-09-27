@@ -87,7 +87,7 @@ export function DataProvider({ children }) {
   const [consultationStatuses, setConsultationStatuses] = useState([])
   const [appointmentTypes, setAppointmentTypes] = useState([])
   const [ageRanges, setAgeRanges] = useState([])
-  const [companySettings, setCompanySettings] = useState({ razaoSocial: '', cnpj: '', aiSystemPrompt: '', cnes: '', therapistDiscountPercent: 0 })
+  const [companySettings, setCompanySettings] = useState({ razaoSocial: '', cnpj: '', aiSystemPrompt: '', cnes: '', therapistDiscountPercent: 0, voiceTranscriptionEnabled: false })
   const [calendarBlocks, setCalendarBlocks] = useState([])
   const [isLoading, setIsLoading] = useState(true)
 
@@ -173,7 +173,7 @@ export function DataProvider({ children }) {
       supabase.from('consultation_statuses').select('*').order('name'),
       supabase.from('appointment_types').select('*').order('name'),
       supabase.from('age_ranges').select('*').order('min_age'),
-      supabase.from('company_settings').select('razao_social, cnpj, ai_system_prompt, cnes, therapist_discount_percent').eq('id', 1).maybeSingle(),
+      supabase.from('company_settings').select('razao_social, cnpj, ai_system_prompt, cnes, therapist_discount_percent, voice_transcription_enabled').eq('id', 1).maybeSingle(),
       supabase.from('calendar_blocks').select('*').eq('cancelled', false).order('date', { ascending: false }),
     ])
 
@@ -199,6 +199,7 @@ export function DataProvider({ children }) {
         aiSystemPrompt: companyRes.data.ai_system_prompt || '',
         cnes: companyRes.data.cnes || '',
         therapistDiscountPercent: companyRes.data.therapist_discount_percent ?? 0,
+        voiceTranscriptionEnabled: companyRes.data.voice_transcription_enabled || false,
       })
     }
     setCalendarBlocks((calendarBlocksRes.data || []).map(mapCalendarBlock))
@@ -1025,6 +1026,7 @@ export function DataProvider({ children }) {
         pix_key: data.pixKey || null,
         color: data.color || null,
         belongs_to_team: data.belongsToTeam || false,
+        can_use_voice_transcription: data.canUseVoiceTranscription || false,
         active: true,
       })
       .select()
@@ -1054,6 +1056,7 @@ export function DataProvider({ children }) {
     if (data.color !== undefined) update.color = data.color || null
     if (data.active !== undefined) update.active = data.active
     if (data.belongsToTeam !== undefined) update.belongs_to_team = data.belongsToTeam
+    if (data.canUseVoiceTranscription !== undefined) update.can_use_voice_transcription = data.canUseVoiceTranscription
 
     // Update primary specialty from first in list
     if (data.therapistSpecialties !== undefined) {
@@ -1553,6 +1556,7 @@ export function DataProvider({ children }) {
         ai_system_prompt: data.aiSystemPrompt || null,
         cnes: data.cnes || null,
         therapist_discount_percent: data.therapistDiscountPercent ?? 0,
+        voice_transcription_enabled: data.voiceTranscriptionEnabled ?? false,
         updated_at: new Date().toISOString(),
       })
       .eq('id', 1)
@@ -1563,6 +1567,7 @@ export function DataProvider({ children }) {
       aiSystemPrompt: data.aiSystemPrompt || '',
       cnes: data.cnes || '',
       therapistDiscountPercent: data.therapistDiscountPercent ?? 0,
+      voiceTranscriptionEnabled: data.voiceTranscriptionEnabled ?? false,
     })
     return {}
   }

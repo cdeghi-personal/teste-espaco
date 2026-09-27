@@ -27,6 +27,7 @@ export default function CompanySettingsPage() {
   const [cnes, setCnes] = useState('')
   const [aiSystemPrompt, setAiSystemPrompt] = useState('')
   const [therapistDiscountPercent, setTherapistDiscountPercent] = useState('')
+  const [voiceTranscriptionEnabled, setVoiceTranscriptionEnabled] = useState(false)
   const [saving, setSaving] = useState(false)
 
   const isAdmin = user?.role === 'admin'
@@ -37,6 +38,7 @@ export default function CompanySettingsPage() {
     setCnes(companySettings.cnes || '')
     setAiSystemPrompt(companySettings.aiSystemPrompt || '')
     setTherapistDiscountPercent(String(companySettings.therapistDiscountPercent ?? ''))
+    setVoiceTranscriptionEnabled(companySettings.voiceTranscriptionEnabled || false)
   }, [companySettings])
 
   if (!isAdmin) return <Navigate to={ROUTES.DASHBOARD} replace />
@@ -63,6 +65,7 @@ export default function CompanySettingsPage() {
       cnes: cnes.trim(),
       aiSystemPrompt: aiSystemPrompt.trim(),
       therapistDiscountPercent: parseFloat(therapistDiscountPercent) || 0,
+      voiceTranscriptionEnabled,
     })
     setSaving(false)
     if (result?.error) {
@@ -163,6 +166,27 @@ export default function CompanySettingsPage() {
           >
             Restaurar prompt padrão
           </button>
+        </div>
+
+        {/* Transcrição clínica por voz */}
+        <div className="bg-white rounded-2xl border border-gray-200 p-6 space-y-3">
+          <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Transcrição Clínica por Voz</h2>
+          <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
+            <input
+              id="voiceTranscriptionEnabled"
+              type="checkbox"
+              checked={voiceTranscriptionEnabled}
+              onChange={e => setVoiceTranscriptionEnabled(e.target.checked)}
+              className="w-4 h-4 rounded accent-brand-blue"
+            />
+            <div>
+              <label htmlFor="voiceTranscriptionEnabled" className="text-sm font-medium text-gray-700">Transcrição clínica por voz</label>
+              <p className="text-xs text-gray-400">Habilita o uso de transcrição e revisão por IA para os terapeutas autorizados.</p>
+            </div>
+          </div>
+          <p className="text-xs text-gray-400">
+            Precisa estar habilitada aqui <strong>e</strong> ter a permissão individual marcada no cadastro de cada terapeuta (Terapeutas → Editar) para o microfone aparecer no atendimento.
+          </p>
         </div>
 
         <div className="flex justify-end">

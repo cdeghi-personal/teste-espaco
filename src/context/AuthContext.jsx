@@ -69,7 +69,7 @@ export function AuthProvider({ children }) {
       // terapeutas precisam do therapist.id para controle de acesso em alguns modulos
       const { data: therapist } = await supabase
         .from('therapists')
-        .select('id, name, specialty, belongs_to_team')
+        .select('id, name, specialty, belongs_to_team, can_use_voice_transcription')
         .eq('user_id', authUser.id)
         .maybeSingle()
 
@@ -82,6 +82,8 @@ export function AuthProvider({ children }) {
         name: therapist?.name || authUser.user_metadata?.full_name || authUser.user_metadata?.name || authUser.email.split('@')[0],
         specialty: therapist?.specialty || null,
         belongsToTeam: therapist?.belongs_to_team || false,
+        // admin puro (sem registro de terapeuta) nunca tem essa flag — therapist é null
+        canUseVoiceTranscription: therapist?.can_use_voice_transcription || false,
       })
     } catch (err) {
       console.error('Erro ao carregar usuario:', err)
@@ -93,6 +95,8 @@ export function AuthProvider({ children }) {
         role: 'admin',
         name: authUser.user_metadata?.full_name || authUser.user_metadata?.name || authUser.email.split('@')[0],
         specialty: null,
+        belongsToTeam: false,
+        canUseVoiceTranscription: false,
       })
     } finally {
       setIsLoading(false)

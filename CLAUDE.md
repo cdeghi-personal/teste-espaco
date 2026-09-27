@@ -206,10 +206,12 @@ supabase/
   121_persist_consultation_conflicts_auth_check.sql # Adiciona checagem de propriedade/equipe (mesma lógica da policy conflicts_therapist_select) no RPC persist_consultation_conflicts — antes qualquer autenticado podia apagar/forjar conflitos de agenda de qualquer atendimento
   122_patient_specialties_write_guard.sql # Separa SELECT (amplo, como já era) de INSERT/UPDATE/DELETE (restrito a admin ou Gerente do Caso) em patient_specialties — a policy FOR ALL da migration 18 deixava qualquer terapeuta vinculado (inclusive só "envolvido"/"equipe") escrever valores financeiros direto pelo cliente Supabase. Nova RPC add_patient_specialty_key preserva a função "Adicionar especialidade" (sempre em branco) que terapeutas comuns já usavam
   123_payment_invoices_payment_date.sql # Adiciona payment_invoices.payment_date (data efetiva do pagamento, distinta de paid_at/paid_by); backfill via paid_at (timezone America/Sao_Paulo); CHECK NOT VALID (status<>'PAID' OR payment_date IS NOT NULL); primeira auditoria (trigger) em payment_invoices; RPCs mark_invoice_paid (transação atômica consultas+fatura) e set_invoice_payment_date (regularização de legado)
+  124_voice_clinical_transcription.sql # Preenchimento por voz nos campos clínicos: company_settings.voice_transcription_enabled + therapists.can_use_voice_transcription (ambas admin only); trigger fn_guard_therapist_voice_flag (mesmo padrão da 120, guardando as duas direções); RPC can_use_voice_transcription_for_consultation (SECURITY DEFINER — única fonte de verdade da autorização, usada pela Edge Function transcribe-clinical-audio)
   functions/
     invite-therapist/index.ts    # Edge Function — envia convite por e-mail ao criar terapeuta
     suggest-convenio/index.ts    # Edge Function — gera sugestões de texto para relatório de convênio via OpenAI gpt-4o-mini
     dashboard-greeting/index.ts  # Edge Function — saudacao personalizada do dashboard via OpenAI gpt-4o-mini (JWT Verification DESATIVADO)
+    transcribe-clinical-audio/index.ts # Edge Function — transcrição + revisão IA dos campos clínicos do atendimento (JWT Verification ATIVADO — única função autenticada do projeto); ver seção "Preenchimento por Voz nos Campos Clínicos"
 ```
 
 ## Supabase — Banco de Dados
@@ -789,6 +791,51 @@ Quando um atendimento em edição recebe um status configurado com `requests_rep
 - **Navegação:** prop `onNavigate(consultation)` no `ConsultationFormModal`, opcional — reaproveita o mesmo estado de visualização (`viewItem`/`viewConsultation`) já usado para a transição visualizar→editar em `AgendaPage.jsx`/`ConsultationsPage.jsx`/`MedicalRecordsPage.jsx`. Card "Ver atendimento original" aparece quando o registro aberto tem `replacementForConsultationId` preenchido.
 - **Chips:** "Reposição" (cyan) no atendimento de reposição; "Reposição agendada" (teal) no original quando há vínculo. Sem chip "Sem reposição" persistente nos cards de lista (evita poluir a maioria dos cards de falta/cancelamento) — esse estado fica visível dentro do próprio modal.
 - **Auditoria:** nenhuma chamada manual — os triggers genéricos de INSERT/UPDATE em `consultations` (migration 25/26/107) já cobrem a criação da reposição e a atualização do original.
+
+## Preenchimento por Voz nos Campos Clínicos (`ConsultationFormModal`)
+
+Botão de microfone (`FiMic`, tooltip "Preencher por voz") em cada um dos 4 campos clínicos — **Objetivo Principal da Sessão** (`mainObjective`), **Relato da Sessão / Evolução** (`evolutionNotes`), **Objetivo da Próxima Sessão** (`nextObjectives`), **Orientações Passadas ao Responsável** (`guardianFeedback`) — que grava a fala do terapeuta, transcreve e revisa automaticamente via IA (OpenAI), mostra uma prévia editável e só aplica ao formulário depois de confirmação explícita. **Nunca salva o atendimento sozinho** — só atualiza o estado local do form, igual a digitar no campo.
+
+### Habilitação em dois níveis (nunca vinculado só ao papel admin)
+
+O microfone só aparece quando **todas** as condições são verdadeiras — `voiceInputEnabled` em `ConsultationFormModal.jsx`:
+1. **Configuração global** `company_settings.voice_transcription_enabled` (admin only, card "Transcrição Clínica por Voz" em Dados da Empresa).
+2. **Permissão individual** `therapists.can_use_voice_transcription` (admin only, checkbox "Permite transcrição clínica por voz" no cadastro do terapeuta — abaixo de "Pertence à Equipe"). Exposta via `useAuth()` como `user.canUseVoiceTranscription` (`AuthContext.loadUser`, mesmo padrão de `belongsToTeam` — um admin puro tem `therapist = null`, logo essa flag é sempre `false` pra ele, **nunca ganha acesso só por ser admin**).
+3. `canEditConsultation(user, {...}, consultationStatuses)` — a mesma regra já existente (`src/utils/consultationPermissions.js`) que controla quem pode editar o atendimento: admin com `status.adminCanEdit !== false`, OU terapeuta **primário** (nunca participante secundário/equipe). A permissão de voz nunca expande esse conjunto, só soma condições.
+4. `!readOnly`, `!requiresNote` (status não usa o fluxo de Observação), `form.eventType === 'SESSION'`.
+5. **Só em edição** (`isEdit === true`) — a checagem de autorização é feita no banco contra um atendimento já existente (`consultationId`); não há o que checar antes do primeiro salvamento, então o microfone não aparece na criação de um atendimento novo.
+
+A checagem do frontend é só de UX (esconder/mostrar o botão) — a autorização de verdade é sempre refeita no banco, ver abaixo.
+
+### Migration `124_voice_clinical_transcription.sql`
+
+- `company_settings.voice_transcription_enabled` e `therapists.can_use_voice_transcription` (ambas `BOOLEAN NOT NULL DEFAULT FALSE` — nenhum terapeuta/config existente foi alterado ao aplicar).
+- **Trigger `fn_guard_therapist_voice_flag`** (`BEFORE UPDATE ON therapists`) — a policy de UPDATE em `therapists` (`02_rls.sql`, nunca redefinida) é `USING (user_id = auth.uid())` sem restrição de coluna, então um terapeuta comum conseguiria alterar a própria `can_use_voice_transcription` via update direto sem essa trigger (mesma classe de achado já corrigida nas migrations 120/122). Reverte silenciosamente qualquer alteração feita por quem não é admin — guarda **as duas direções** (diferente da 120, que só guarda uma porque "restaurar paciente" tinha um caminho legítimo sem admin; aqui não existe direção segura pra um terapeuta alterar sozinho).
+- **RPC `can_use_voice_transcription_for_consultation(p_consultation_id)`** (`SECURITY DEFINER`, mesmo padrão de autenticação via JWT claims das migrations 119-123) — única fonte de verdade da autorização, chamada pela Edge Function. Replica fielmente `canEditConsultation` + os gates específicos de voz (terapeuta com a flag, config global ligada, `event_type='SESSION'`, status sem `shows_observation`). Erro sempre genérico (`{allowed: false}`), nunca diferencia "não existe" de "não é seu" de "sem permissão".
+
+### Edge Function `transcribe-clinical-audio`
+
+Diferente de `dashboard-greeting`/`suggest-convenio` (JWT Verification **desativado**, sem client Supabase, corpo confiado cegamente) — esta é a **primeira função autenticada** do projeto: JWT Verification **ativado** no Dashboard do Supabase (sem `supabase/config.toml`, que não existe no projeto — criar um agora arriscaria alterar sem querer o comportamento das outras duas funções num deploy futuro via CLI). Client Supabase criado com a chave anon + header `Authorization` repassado (mesmo padrão de `invite-therapist/index.ts`), identifica o usuário via `auth.getUser()`. Sem client `service_role` — nenhum motivo legítimo pra bypassar RLS além do que a RPC já encapsula.
+
+Fluxo: recebe `multipart/form-data` (`audio`, `consultationId`, `fieldName`) → valida `fieldName` por allowlist (as 4 chaves acima, nunca aceita nome arbitrário), `consultationId` como UUID, MIME type do áudio por allowlist (`audio/webm[;codecs=opus]`, `audio/mp4`, `audio/ogg[;codecs=opus]`, variações), tamanho (~20MB) → chama `can_use_voice_transcription_for_consultation` (rejeita com 403 **antes** de gastar qualquer chamada à OpenAI — controle de custo) → Etapa 1 `/v1/audio/transcriptions` (modelo `OPENAI_TRANSCRIPTION_MODEL`, fallback `gpt-4o-mini-transcribe`; `language: pt`; prompt curto só com o nome do campo — nunca paciente/prontuário/histórico) → Etapa 2 `/v1/chat/completions` (modelo `OPENAI_CLINICAL_REVIEW_MODEL`, fallback `gpt-4o-mini`; `temperature: 0.1`; prompt de revisão restritivo — remove hesitações/repetições, corrige pontuação, nunca acrescenta fato/diagnóstico/conduta, preserva negações/nomes/números/termos técnicos integralmente). Falha na transcrição → erro, nada é retornado. Falha só na revisão → `{ rawTranscript, reviewedText: null, reviewFailed: true, fieldName }` (usuário ainda pode aproveitar a transcrição crua). Sucesso total → `{ rawTranscript, reviewedText, fieldName }`.
+
+**Nunca grava áudio em Storage** — existe só na memória da invocação, descartado ao final. **Sem tabela de log nova** (decisão explícita: os logs de invocação do próprio Dashboard do Supabase já cobrem operação/erro/duração sem precisar escrever nada) — nenhum `console.*` grava conteúdo de áudio, transcrição ou texto revisado, só metadados (`userId`, `consultationId`, `fieldName`, status HTTP).
+
+Secrets: `OPENAI_API_KEY` (já existente, reaproveitado — não modificado); `OPENAI_TRANSCRIPTION_MODEL`/`OPENAI_CLINICAL_REVIEW_MODEL` (opcionais, com fallback hardcoded se ausentes).
+
+### Frontend
+
+- **`VoiceClinicalInput.jsx`** (`src/pages/admin/consultations/`) — botão + máquina de estados (idle/gravando/processando). `MediaRecorder` com negociação de formato via `isTypeSupported()` (`audio/webm;codecs=opus` → `audio/mp4` → `audio/webm` → `audio/ogg;codecs=opus`, nessa ordem — nunca fixo em `audio/webm` sozinho, que falha no Safari/iOS); sem formato suportado → botão desabilitado com mensagem de incompatibilidade, preenchimento manual nunca afetado. Limite de 3 minutos com corte automático e cronômetro. Um único campo `activeVoiceField` (estado no `ConsultationFormModal`, compartilhado pelos 4 componentes) impede duas gravações simultâneas — os outros 3 microfones ficam desabilitados enquanto um está gravando/processando. Ao parar/cancelar/desmontar: para todas as tracks do `MediaStream`, limpa timers, descarta blobs. `AbortController` cancela a chamada em andamento se o usuário cancelar o processamento ou fechar o formulário.
+- **`VoiceTranscriptionPreviewModal.jsx`** — prévia obrigatória antes de aplicar: texto revisado editável (textarea), alternância "Ver transcrição original", aviso fixo pra revisar nomes/termos antes de aplicar. Campo vazio → "Inserir texto"; campo com conteúdo → "Adicionar ao final" (ação recomendada) ou "Substituir conteúdo" (com confirmação extra inline) — nunca sobrescreve silenciosamente. **Detecção de edição concorrente:** compara o valor do campo no momento em que a gravação começou com o valor atual (ao vivo) — se mudou enquanto o áudio processava, desabilita "Substituir" e só permite "Adicionar ao final" ou cancelar. "Gravar novamente" descarta a prévia e reinicia a gravação.
+- **`Textarea.jsx`** ganhou a prop opcional `labelRight` (nó extra alinhado à direita do label, ex.: o botão de microfone) — 100% compatível com todo uso existente que não passa essa prop.
+- `AuthContext.jsx`, `DataContext.jsx` (`addTherapist`/`updateTherapist`/`updateCompanySettings`/`fetchAll`), `TherapistFormModal.jsx`, `CompanySettingsPage.jsx`, `mapTherapist` — mapeiam os dois campos novos, seguindo os padrões já existentes (`belongsToTeam` pro terapeuta, objeto fixo do `updateCompanySettings` cuidando de nunca derrubar os outros campos ao salvar).
+
+### Limitações do MVP / backlog
+
+- Sem rate-limiting persistente (ex.: 30 transcrições/hora) — só os limites de duração (3min) e tamanho (~20MB) por gravação, mais o controle de custo de nunca chamar a OpenAI para uma requisição não autorizada.
+- Só `ConsultationFormModal` — `SeriesFormModal` fora de escopo.
+- Sem verificação automatizada de configuração da conta OpenAI (faturamento, quota, Zero Data Retention) — item manual, fora do alcance do código.
+- Compatibilidade de navegador dependente de `MediaRecorder`/`isTypeSupported()` — sem testes automatizados de gravação real (requer microfone/navegador ao vivo).
 
 ## Gestão Financeira / Pacotes Pré-pagos
 

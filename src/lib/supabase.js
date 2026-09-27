@@ -102,6 +102,7 @@ export function mapTherapist(row) {
       canBeRt: s.can_be_rt || false,
     })),
     belongsToTeam: row.belongs_to_team || false,
+    canUseVoiceTranscription: row.can_use_voice_transcription || false,
     active: row.active,
     createdAt: row.created_at,
   }

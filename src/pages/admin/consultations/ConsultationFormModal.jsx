@@ -12,6 +12,8 @@ import { generateId } from '../../../utils/storageUtils'
 import { isoToday } from '../../../utils/dateUtils'
 import { detectConflicts, buildConflictTooltip } from '../../../utils/conflictUtils'
 import { PAYMENT_TYPE_LABELS } from '../../../constants/paymentTypes'
+import { canEditConsultation } from '../../../utils/consultationPermissions'
+import VoiceClinicalInput from './VoiceClinicalInput'
 
 const EMPTY_ACTIVITY = { id: '', name: '', description: '', outcome: 'achieved' }
 
@@ -34,7 +36,7 @@ function fmtShortDate(iso) {
 }
 
 export default function ConsultationFormModal({ onClose, initial = {}, readOnly = false, onEditRequest = null, onNavigate = null }) {
-  const { patients, therapists, specialtiesData, rooms, consultationStatuses, appointmentTypes, appointments, addConsultation, updateConsultation, createConsultationReplacement, updateConsultationSeries, getPrepaidData, consultations, calendarBlocks } = useData()
+  const { patients, therapists, specialtiesData, rooms, consultationStatuses, appointmentTypes, appointments, addConsultation, updateConsultation, createConsultationReplacement, updateConsultationSeries, getPrepaidData, consultations, calendarBlocks, companySettings } = useData()
   const { user } = useAuth()
   const isEdit = !!initial.id
 
@@ -67,6 +69,9 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
   const [pendingConflicts, setPendingConflicts] = useState([])
   const [saving, setSaving] = useState(false)
   const [replicateNextObjective, setReplicateNextObjective] = useState(true)
+  // Campo com gravação/processamento de voz ativo (ou null) — compartilhado
+  // pelos 4 VoiceClinicalInput pra impedir duas gravações simultâneas.
+  const [activeVoiceField, setActiveVoiceField] = useState(null)
   const [replacementDraft, setReplacementDraft] = useState(EMPTY_REPLACEMENT_DRAFT)
   const [replacementConflictsToConfirm, setReplacementConflictsToConfirm] = useState(null)
   const { show } = useToast()
@@ -445,6 +450,16 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
   const requiresObservation = requiresNote && selectedStatus?.requiresObservation !== false
   const isAwaitingOutcome = selectedStatus?.isAwaitingOutcome === true
   const clinicalFieldsRequired = !requiresNote && !isAwaitingOutcome && form.eventType !== 'INTERVIEW'
+  // Preenchimento por voz: nunca concede acesso além do que canEditConsultation
+  // já permite — só soma as duas configurações (global + individual do
+  // terapeuta) e as condições de exibição dos campos clínicos. Só em edição
+  // (isEdit): a autorização é checada no banco contra um atendimento já
+  // existente, não há o que checar antes do primeiro salvamento.
+  const voiceInputEnabled = isEdit
+    && companySettings.voiceTranscriptionEnabled === true
+    && user?.canUseVoiceTranscription === true
+    && canEditConsultation(user, { therapistId: form.therapistId, consultationStatusId: form.consultationStatusId }, consultationStatuses)
+    && !readOnly && !requiresNote && form.eventType === 'SESSION'
   const willConsume = selectedStatus?.consumesPrepaidSession === true
   const showPrepaidAlert = prepaidBalance !== null && willConsume && prepaidBalance <= 0
   const selectedPatient = form.patientId ? patients.find(p => p.id === form.patientId) : null
@@ -829,6 +844,18 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
             <section>
               <Textarea
                 label={clinicalFieldsRequired ? 'Objetivo Principal da Sessão *' : 'Objetivo Principal da Sessão'}
+                labelRight={voiceInputEnabled && (
+                  <VoiceClinicalInput
+                    fieldKey="mainObjective"
+                    fieldTitle="Objetivo Principal da Sessão"
+                    value={form.mainObjective}
+                    consultationId={initial.id}
+                    enabled={voiceInputEnabled}
+                    activeFieldKey={activeVoiceField}
+                    onActiveChange={setActiveVoiceField}
+                    onApply={text => set('mainObjective', text)}
+                  />
+                )}
                 value={form.mainObjective}
                 onChange={e => set('mainObjective', e.target.value)}
                 error={errors.mainObjective}
@@ -897,6 +924,18 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
               <div className="space-y-3">
                 <Textarea
                   label={clinicalFieldsRequired ? 'Relato da Sessão / Evolução *' : 'Relato da Sessão / Evolução'}
+                  labelRight={voiceInputEnabled && (
+                    <VoiceClinicalInput
+                      fieldKey="evolutionNotes"
+                      fieldTitle="Relato da Sessão / Evolução"
+                      value={form.evolutionNotes}
+                      consultationId={initial.id}
+                      enabled={voiceInputEnabled}
+                      activeFieldKey={activeVoiceField}
+                      onActiveChange={setActiveVoiceField}
+                      onApply={text => set('evolutionNotes', text)}
+                    />
+                  )}
                   value={form.evolutionNotes}
                   onChange={e => set('evolutionNotes', e.target.value)}
                   error={errors.evolutionNotes}
@@ -906,6 +945,18 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
                 />
                 <Textarea
                   label="Objetivo da Próxima Sessão"
+                  labelRight={voiceInputEnabled && (
+                    <VoiceClinicalInput
+                      fieldKey="nextObjectives"
+                      fieldTitle="Objetivo da Próxima Sessão"
+                      value={form.nextObjectives}
+                      consultationId={initial.id}
+                      enabled={voiceInputEnabled}
+                      activeFieldKey={activeVoiceField}
+                      onActiveChange={setActiveVoiceField}
+                      onApply={text => set('nextObjectives', text)}
+                    />
+                  )}
                   value={form.nextObjectives}
                   onChange={e => set('nextObjectives', e.target.value)}
                   error={errors.nextObjectives}
@@ -924,7 +975,26 @@ export default function ConsultationFormModal({ onClose, initial = {}, readOnly 
                     <span className="text-xs text-gray-500">Replicar como objetivo da próxima sessão agendada deste paciente</span>
                   </label>
                 )}
-                <Textarea label="Orientações Passadas ao Responsável" value={form.guardianFeedback} onChange={e => set('guardianFeedback', e.target.value)} placeholder="O que foi comunicado ao responsável ao final da sessão..." rows={2} disabled={readOnly} />
+                <Textarea
+                  label="Orientações Passadas ao Responsável"
+                  labelRight={voiceInputEnabled && (
+                    <VoiceClinicalInput
+                      fieldKey="guardianFeedback"
+                      fieldTitle="Orientações Passadas ao Responsável"
+                      value={form.guardianFeedback}
+                      consultationId={initial.id}
+                      enabled={voiceInputEnabled}
+                      activeFieldKey={activeVoiceField}
+                      onActiveChange={setActiveVoiceField}
+                      onApply={text => set('guardianFeedback', text)}
+                    />
+                  )}
+                  value={form.guardianFeedback}
+                  onChange={e => set('guardianFeedback', e.target.value)}
+                  placeholder="O que foi comunicado ao responsável ao final da sessão..."
+                  rows={2}
+                  disabled={readOnly}
+                />
               </div>
             </section>
           </>

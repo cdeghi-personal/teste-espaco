@@ -15,7 +15,7 @@ const EMPTY = {
   name: '', email: '', phone: '', cpf: '',
   therapistSpecialties: [{ ...EMPTY_SPEC }],
   bank: '', agency: '', accountNumber: '', pixKey: '',
-  color: '#6b7280', active: true, belongsToTeam: false,
+  color: '#6b7280', active: true, belongsToTeam: false, canUseVoiceTranscription: false,
 }
 
 function ColorPicker({ value, onChange }) {
@@ -336,6 +336,19 @@ export default function TherapistFormModal({ onClose, initial = {} }) {
             <div>
               <label htmlFor="belongsToTeam" className="text-sm font-medium text-gray-700">Pertence à Equipe</label>
               <p className="text-xs text-gray-400">Acessa todos os pacientes e prontuários da clínica</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
+            <input
+              id="canUseVoiceTranscription"
+              type="checkbox"
+              checked={form.canUseVoiceTranscription}
+              onChange={e => set('canUseVoiceTranscription', e.target.checked)}
+              className="w-4 h-4 rounded accent-brand-blue"
+            />
+            <div>
+              <label htmlFor="canUseVoiceTranscription" className="text-sm font-medium text-gray-700">Permite transcrição clínica por voz</label>
+              <p className="text-xs text-gray-400">Permite que este terapeuta utilize o microfone para preencher campos clínicos, desde que a funcionalidade esteja habilitada globalmente em Dados da Empresa.</p>
             </div>
           </div>
           {isEdit && (

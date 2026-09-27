@@ -1,7 +1,12 @@
-export default function Textarea({ label, error, className = '', rows = 3, disabled, placeholder, ...props }) {
+export default function Textarea({ label, labelRight, error, className = '', rows = 3, disabled, placeholder, ...props }) {
   return (
     <div className="flex flex-col gap-1">
-      {label && <label className="text-sm font-medium text-gray-700">{label}</label>}
+      {(label || labelRight) && (
+        <div className="flex items-center justify-between gap-2">
+          {label && <label className="text-sm font-medium text-gray-700">{label}</label>}
+          {labelRight}
+        </div>
+      )}
       <textarea
         rows={rows}
         disabled={disabled}
